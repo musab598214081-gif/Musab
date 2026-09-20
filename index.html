@@ -315,6 +315,17 @@
     <input type="text" id="serverUrl" placeholder="https://ntfy.sh" autocomplete="off">
     <button class="btn ghost" id="saveServer">Save server</button>
 
+    <label for="tokenVal">ntfy account token (recommended)</label>
+    <p class="sub" style="margin:0 0 6px">
+      Without one, everybody on your wifi shares a single small allowance
+      and calls start being refused after a busy evening. A free account at
+      <b>ntfy.sh</b> gets its own. Sign up, go to <b>Account → Access
+      tokens → Create</b>, and paste the <code>tk_…</code> token here. It
+      travels in the invite links so the whole family uses it.
+    </p>
+    <input type="text" id="tokenVal" placeholder="tk_..." autocomplete="off">
+    <button class="btn ghost" id="saveToken">Save token</button>
+
     <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
 
     <div class="sectiontitle">Ringtone</div>
@@ -369,7 +380,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20t";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20u";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -383,6 +394,23 @@ var DEFAULT_SERVER = "https://ntfy.sh";
  * the family stays on one server. */
 function srv(){
   return (state && state.server) || DEFAULT_SERVER;
+}
+
+/* Signed-in requests get their own allowance instead of sharing one
+   per IP address with every other anonymous user on that connection -
+   which is what runs out after an evening of calls.
+   Passed as a query parameter rather than an Authorization header on
+   purpose: a custom header turns every request into a CORS preflight,
+   doubling the request count, which is the very thing being rationed.
+   ntfy expects base64url of the whole header value, padding stripped. */
+function authParam(){
+  var t = state && state.token;
+  if (!t) return "";
+  try {
+    var b64 = btoa("Bearer " + t)
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    return "&auth=" + b64;
+  } catch (e) { return ""; }
 }
 var STOREKEY = "familyNotifyer.v2";
 var MAXBODY  = 3400;          /* ntfy caps a message at 4096 bytes */
@@ -453,7 +481,8 @@ function encodeConfig(){
   var payload = JSON.stringify({ h: state.house, m: state.members,
                                  t: state.turn || null,
                                  r: state.rev || 0,
-                                 s: state.server || null });
+                                 s: state.server || null,
+                                 k: state.token || null });
   var b64 = btoa(unescape(encodeURIComponent(payload)));
   return b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -499,7 +528,8 @@ function ringPush(memberId, title, message, answerable){
   var base = srv() + "/" + encodeURIComponent(ringTopic(memberId))
            + "?title="  + encodeURIComponent(title)
            + "&priority=5&tags=telephone_receiver"
-           + "&click="  + encodeURIComponent(home);
+           + "&click="  + encodeURIComponent(home)
+           + authParam();
 
   /* An Answer button right on the notification.
      Tapping the notification body works too, but a labelled button is
@@ -541,7 +571,8 @@ function ringPush(memberId, title, message, answerable){
    with nothing on screen to explain why. */
 function sendSig(memberId, obj){
   var body = JSON.stringify(obj);
-  var url  = srv() + "/" + encodeURIComponent(sigTopic(memberId)) + "?priority=1";
+  var url  = srv() + "/" + encodeURIComponent(sigTopic(memberId))
+           + "?priority=1" + authParam();
 
   if (body.length <= MAXBODY) return fetch(url, { method:"POST", body: body });
 
@@ -574,7 +605,8 @@ function beat(which){ lastBeat[which] = Date.now(); }
 function openRing(){
   if (ringSrc) ringSrc.close();
   ringSrc = new EventSource(
-    srv() + "/" + encodeURIComponent(ringTopic(state.me)) + "/sse");
+    srv() + "/" + encodeURIComponent(ringTopic(state.me))
+    + "/sse?_=1" + authParam());
   beat("ring");
   ringSrc.onopen  = function(){ beat("ring"); paintStatus(true); };
   ringSrc.onerror = function(){ paintStatus(false); };
@@ -617,7 +649,7 @@ function openRing(){
 function openSignal(){
   if (sigSrc) sigSrc.close();
   var topic = encodeURIComponent(sigTopic(state.me));
-  sigSrc = new EventSource(srv() + "/" + topic + "/sse");
+  sigSrc = new EventSource(srv() + "/" + topic + "/sse?_=1" + authParam());
   beat("sig");
   sigSrc.addEventListener("keepalive", function(){ beat("sig"); });
   sigSrc.addEventListener("open", function(){ beat("sig"); });
@@ -640,7 +672,7 @@ function openSignal(){
 function pollSignal(){
   if (!state || !state.me) return;
   fetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
-        + "/json?poll=1&since=2m")
+        + "/json?poll=1&since=2m" + authParam())
     .then(function(r){ return r.text(); })
     .then(function(text){
       text.split("\n").forEach(function(line){
@@ -1525,6 +1557,7 @@ function openSetup(){
 
   $("verTag").textContent = VERSION;
   $("serverUrl").value = (state && state.server) || "";
+  $("tokenVal").value  = (state && state.token) || "";
   $("connState").textContent = "Tap check to see whether this network "
     + "allows the notification server.";
   paintNotifyState();
@@ -1734,7 +1767,7 @@ function broadcastRoster(){
     if (m.id === state.me) return;
     sendSig(m.id, { t:"roster", from: state.me, rev: state.rev || 0,
                     members: state.members, turn: state.turn || null,
-                    server: state.server || null })
+                    server: state.server || null, token: state.token || null })
       .catch(function(){});
   });
 }
@@ -1747,6 +1780,7 @@ function takeRoster(msg){
   state.members = msg.members;
   state.turn = msg.turn || null;
   state.server = msg.server || null;
+  state.token = msg.token || null;
 
   /* If this phone's person is no longer on the list, they have been
      removed. Better to say so than to sit on a topic nobody calls. */
@@ -1797,7 +1831,7 @@ function tryJoin(){
 
   state = { house: cfg.h, me: mine, members: cfg.m, rev: cfg.r || 0,
             recent: keep, turn: cfg.t || null, tone: keepTone,
-            server: cfg.s || null };
+            server: cfg.s || null, token: cfg.k || null };
 
   if (mine) {
     save();
@@ -1922,7 +1956,7 @@ $("checkConn").onclick = function(){
   var topic = encodeURIComponent(sigTopic(state.me));
 
   function canRead(){
-    return fetch(srv() + "/" + topic + "/json?poll=1&since=10s")
+    return fetch(srv() + "/" + topic + "/json?poll=1&since=10s" + authParam())
       .then(function(r){ return r.ok ? "ok" : ("status " + r.status); })
       .catch(function(){ return "blocked"; });
   }
@@ -1931,7 +1965,7 @@ $("checkConn").onclick = function(){
      in the ntfy app, at the lowest priority - so a connection test
      never makes anybody's phone buzz. */
   function canSend(){
-    return fetch(srv() + "/" + topic + "?priority=1",
+    return fetch(srv() + "/" + topic + "?priority=1" + authParam(),
                  { method:"POST", body:"connection test" })
       .then(function(r){
         if (r.ok) return "ok";
@@ -1964,6 +1998,23 @@ $("checkConn").onclick = function(){
       }
     });
   });
+};
+
+$("saveToken").onclick = function(){
+  if (!state) { toast("Save your family first"); return; }
+  var t = $("tokenVal").value.trim();
+  if (t && t.indexOf("tk_") !== 0) {
+    toast("An ntfy token starts with tk_");
+    return;
+  }
+  state.token = t || null;
+  state.rev = (state.rev || 0) + 1;
+  save();
+  broadcastRoster();
+  if (state.me) { openRing(); openSignal(); }
+  paintInvites();
+  $("mineLink").textContent = personalLink();
+  toast(t ? "Token saved — send everyone their link again" : "Token cleared");
 };
 
 $("saveServer").onclick = function(){
