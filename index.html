@@ -382,7 +382,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20v";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20w";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -639,10 +639,19 @@ function paintCool(){
   var left = Math.ceil((coolUntil - Date.now()) / 1000);
   var mm = Math.floor(left / 60), ss = left % 60;
   el.style.display = "block";
-  el.textContent = "Paused for " + mm + ":" + ("0" + ss).slice(-2)
-    + " — " + srv() + " asked us to slow down. Nothing is being sent "
-    + "until then, so the allowance can refill. Add an account token in "
-    + "Settings to stop this happening.";
+  el.innerHTML = "";
+  el.appendChild(document.createTextNode(
+    "Paused for " + mm + ":" + ("0" + ss).slice(-2) + " — " + srv()
+    + " asked us to slow down. Nothing is being sent until then, so the "
+    + "allowance can refill. "));
+  var b = document.createElement("button");
+  b.textContent = "Try now";
+  b.style.cssText = "background:#FFD9A8;color:#5C2E00;border:0;border-radius:8px;"
+    + "padding:6px 12px;font-weight:700;font-family:inherit;font-size:13px;"
+    + "margin-left:8px;cursor:pointer";
+  b.onclick = function(){ coolUntil = 0; paintCool(); reviveStreams(true);
+                          toast("Trying again"); };
+  el.appendChild(b);
 }
 
 setInterval(function(){
@@ -2040,16 +2049,23 @@ $("checkConn").onclick = function(){
       clearTimeout(timer);
       var ms = Date.now() - started;
 
+      var who = (state && state.token) ? "signed in with your token"
+                                       : "anonymous — no token set";
       if (read === "ok" && send === "ok") {
         el.textContent = "Working — " + srv() + " answered in " + ms
-          + "ms, and this network can both receive and send.";
+          + "ms, and this network can both receive and send. ("
+          + who + ".)";
       } else if (send === "blocked" && read === "ok") {
         el.textContent = "This network lets the app READ from " + srv()
           + " but blocks SENDING to it. Calls and buzzes from this "
           + "network will never reach anyone. Incoming still works.";
       } else if (send === "throttled") {
-        el.textContent = "Reachable, but " + srv() + " is throttling you "
-          + "right now (too many messages). Wait a few minutes.";
+        el.textContent = "Reachable, but " + srv() + " is throttling you ("
+          + who + "). "
+          + ((state && state.token)
+             ? "Even with a token — you may have hit the daily limit; it "
+               + "resets tomorrow."
+             : "Add an account token in Settings to get your own allowance.");
       } else if (read === "blocked" && send === "blocked") {
         el.textContent = "Cannot reach " + srv() + " at all from this "
           + "network — it is being blocked. Try mobile data to compare.";
@@ -2070,6 +2086,10 @@ $("saveToken").onclick = function(){
   }
   state.token = t || null;
   state.rev = (state.rev || 0) + 1;
+  /* The pause was for the OLD allowance. Signing in gets a new one, so
+     holding the page silent for the rest of the countdown makes a fix
+     look exactly like the problem it fixed. */
+  coolUntil = 0; paintCool();
   save();
   broadcastRoster();
   if (state.me) { openRing(); openSignal(); }
@@ -2087,6 +2107,7 @@ $("saveServer").onclick = function(){
   }
   state.server = (v && v !== DEFAULT_SERVER) ? v : null;
   state.rev = (state.rev || 0) + 1;
+  coolUntil = 0; paintCool();   /* different server, different limit */
   save();
   broadcastRoster();
   if (state.me) { openRing(); openSignal(); }
