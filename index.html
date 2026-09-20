@@ -271,6 +271,8 @@
       <button class="btn ghost" id="testMe">Test my phone</button>
     </div>
 
+    <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
+
     <div class="sectiontitle">Ringtone</div>
     <p class="sub">How this phone sounds when somebody calls or buzzes you.
       Tap one to hear it. This is your own setting — it doesn't change
@@ -323,6 +325,9 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
+var VERSION  = "2026-09-20e";   /* shown in Settings, so you can tell at a
+                                   glance whether a phone is on the build
+                                   you think it is */
 var SERVER   = "https://ntfy.sh";
 var STOREKEY = "familyNotifyer.v2";
 var MAXBODY  = 3400;          /* ntfy caps a message at 4096 bytes */
@@ -420,12 +425,29 @@ function personalLink(){
 
 /* The ring topic. Loud on purpose: priority 5 is what gets a phone to
    vibrate hard and pop over whatever is on screen. */
-function ringPush(memberId, title, message){
-  var url = SERVER + "/" + encodeURIComponent(ringTopic(memberId))
-          + "?title="  + encodeURIComponent(title)
-          + "&priority=5&tags=telephone_receiver"
-          + "&click="  + encodeURIComponent(location.origin + location.pathname);
-  return fetch(url, { method:"POST", body: message });
+function ringPush(memberId, title, message, answerable){
+  var home = location.origin + location.pathname;
+  var base = SERVER + "/" + encodeURIComponent(ringTopic(memberId))
+           + "?title="  + encodeURIComponent(title)
+           + "&priority=5&tags=telephone_receiver"
+           + "&click="  + encodeURIComponent(home);
+
+  /* An Answer button right on the notification.
+     Tapping the notification body works too, but a labelled button is
+     a bigger target on a locked screen and says what it will do. */
+  var url = base;
+  if (answerable) {
+    url += "&actions=" + encodeURIComponent(
+      "view, Answer, " + home + ", clear=true");
+  }
+
+  return fetch(url, { method:"POST", body: message }).then(function(r){
+    if (r.ok || !answerable) return r;
+    /* If ntfy ever rejects the action format, the ring itself still
+       has to go out - a notification with no button beats no
+       notification at all. */
+    return fetch(base, { method:"POST", body: message });
+  });
 }
 
 /* The signal topic. Priority 1, so that even if somebody subscribed to
@@ -472,7 +494,23 @@ function openRing(){
        phone. The call screen is raised by the offer on the signal
        topic, so showing the buzz overlay too would put two different
        things on screen for one call. */
-    if (fresh && title.indexOf(CALLTAG) === -1) showBuzz(title, m.message || "");
+    if (title.indexOf(CALLTAG) === -1) {
+      if (fresh) showBuzz(title, m.message || "");
+      return;
+    }
+
+    /* A call push landed. The call screen is supposed to be raised by
+       the offer on the signal topic - but if that stream dropped while
+       the phone slept, the offer is sitting on the server unread and
+       the phone does nothing at all. Go and look for it, and if there
+       is still no call a few seconds later, at least say somebody
+       tried rather than staying silent. */
+    if (!fresh || call) return;
+    pollSignal();
+    setTimeout(function(){ if (!call) pollSignal(); }, 1500);
+    setTimeout(function(){
+      if (!call) showBuzz(title, "Tried to call you — tap to call back");
+    }, 5000);
   };
 }
 
@@ -487,11 +525,17 @@ function openSignal(){
     takeSignal(m.message, m.time);
   };
 
-  /* Catching up, which is the whole point on a phone. The page is
-     usually opened BY the notification, seconds after the offer was
-     sent - by which time a live stream alone has already missed it.
-     ntfy keeps recent messages, so ask for the last two minutes. */
-  fetch(SERVER + "/" + topic + "/json?poll=1&since=2m")
+  pollSignal();
+}
+
+/* Catching up, which is the whole point on a phone. The page is
+   usually opened BY the notification, seconds after the offer was
+   sent - by which time a live stream alone has already missed it.
+   ntfy keeps recent messages, so ask for the last two minutes. */
+function pollSignal(){
+  if (!state || !state.me) return;
+  fetch(SERVER + "/" + encodeURIComponent(sigTopic(state.me))
+        + "/json?poll=1&since=2m")
     .then(function(r){ return r.text(); })
     .then(function(text){
       text.split("\n").forEach(function(line){
@@ -732,6 +776,11 @@ function watchConnect(){
 function callError(err, phase){
   var name = (err && err.name) || "";
   var text = (err && err.message) || "";
+  /* The toast has room for one short sentence; the console has room
+     for the truth. Anyone debugging this on a desktop can open the
+     developer tools and read exactly what threw. */
+  try { console.error("[notifyer] " + phase + " failed:", name, text, err); }
+  catch (e) {}
   if (name === "NotAllowedError")
     return "Microphone permission was refused";
   if (name === "NotFoundError" || name === "OverconstrainedError")
@@ -783,7 +832,7 @@ function startCall(peerId){
       tone();
       /* Wake their phone, because the page is almost certainly not open
          on the other side. */
-      ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer")
+      ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true)
         .catch(function(){});
       remember(nameOf(peerId), "voice call", true);
       call.giveUp = setTimeout(function(){
@@ -813,6 +862,8 @@ function onSignal(msg){
     showCallScreen(msg.from, true);
     setCallState("Incoming call");
     tone();
+    if (document.hidden)
+      systemNotify(nameOf(msg.from) + " is calling", "Tap to answer");
     return;
   }
 
@@ -1067,11 +1118,47 @@ function buzz(memberId, message){
     .catch(function(){ toast("Could not reach " + nameOf(memberId)); });
 }
 
+/* The nearest thing to bringing the page forward by itself.
+ *
+ * When the page is open but buried - another tab, another app, screen
+ * off - it can raise a system notification of its own, and tapping
+ * THAT focuses this page rather than opening a second copy. It still
+ * takes a tap, because nothing on the web may steal the screen, but it
+ * is one tap and the page is already alive behind it. */
+function systemNotify(title, body){
+  try {
+    if (!("Notification" in window)) return false;
+    if (Notification.permission !== "granted") return false;
+    var n = new Notification(title, {
+      body: body,
+      tag: "notifyer-call",       /* replaces itself, never stacks */
+      renotify: true,
+      requireInteraction: true    /* stays until it is dealt with */
+    });
+    n.onclick = function(){
+      try { window.focus(); } catch (e) {}
+      try { n.close(); } catch (e) {}
+    };
+    return true;
+  } catch (e) { return false; }
+}
+
+/* Asked for on a tap, never on load. A permission prompt that appears
+   the moment a page opens is the one people dismiss without reading. */
+function askNotify(){
+  try {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+    Notification.requestPermission();
+  } catch (e) {}
+}
+
 function showBuzz(from, what){
   $("ringFrom").textContent = from;
   $("ringWhat").textContent = what || "wants your attention";
   $("ring").classList.add("on");
   tone();
+  if (document.hidden) systemNotify(from, what || "wants your attention");
   setTimeout(stopTone, 5000);
 }
 
@@ -1181,6 +1268,7 @@ function openAct(id){
   pendingId = id;
   $("actTitle").textContent = nameOf(id);
   unlockAudio();                /* this tap is our chance to unlock audio */
+  askNotify();
   openSheet("actSheet");
 }
 
@@ -1215,6 +1303,7 @@ function openSetup(){
   chosenColour = (state && memberById(state.me))
     ? memberById(state.me).colour : COLOURS[0];
 
+  $("verTag").textContent = VERSION;
   paintSwatches(); paintMembers(); paintTopic(); paintTones();
   $("shareArea").style.display = state ? "block" : "none";
   if (state) { $("shareLink").textContent = inviteLink();
@@ -1308,6 +1397,7 @@ function saveSetup(){
   draft.tone = (state && state.tone) || draft.tone || "classic";
   state = draft; save();
 
+  askNotify();
   paintMain(); openRing(); openSignal(); paintTopic();
   $("shareArea").style.display = "block";
   $("shareLink").textContent = inviteLink();
