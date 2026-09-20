@@ -369,7 +369,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20p";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20q";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -980,14 +980,32 @@ function startCall(peerId){
       $("callNote").textContent = "";
       tone();
       /* Wake their phone, because the page is almost certainly not open
-         on the other side. */
+         on the other side.
+         The result is reported rather than swallowed. Firing this and
+         ignoring the outcome meant the screen said "Ringing..." whether
+         or not the notification had actually gone anywhere - so a
+         network that blocks the server looked exactly like a person not
+         picking up, which is the single most misleading thing this app
+         could do. */
       ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true)
-        .catch(function(){});
+        .then(function(r){
+          if (r && r.ok) return;
+          if (call) $("callNote").textContent =
+            "Their phone will not ring — the server refused the alert";
+        })
+        .catch(function(){
+          if (call) $("callNote").textContent =
+            "Their phone will not ring — cannot reach " + srv()
+            + " from this network";
+        });
       remember(nameOf(peerId), "voice call", true);
       call.giveUp = setTimeout(function(){
         if (call && call.state === "calling") {
           stopTone();
           setCallState("No answer");
+          if (!$("callNote").textContent)
+            $("callNote").textContent =
+              "Their phone rang but nobody picked up";
           setTimeout(function(){ hangUp("noanswer"); }, 1800);
         }
       }, 45000);
