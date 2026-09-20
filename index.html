@@ -369,7 +369,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20n";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20p";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -975,6 +975,9 @@ function startCall(peerId){
     .then(function(){
       if (!call) return;
       setCallState("Ringing…");
+      /* The microphone hint has done its job by now; leaving it up
+         reads as though something is still waiting on you. */
+      $("callNote").textContent = "";
       tone();
       /* Wake their phone, because the page is almost certainly not open
          on the other side. */
