@@ -369,7 +369,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20s";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20t";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -510,13 +510,26 @@ function ringPush(memberId, title, message, answerable){
       "view, Answer, " + home + ", clear=true");
   }
 
-  return fetch(url, { method:"POST", body: message }).then(function(r){
-    if (r.ok || !answerable) return r;
-    /* If ntfy ever rejects the action format, the ring itself still
-       has to go out - a notification with no button beats no
-       notification at all. */
-    return fetch(base, { method:"POST", body: message });
-  });
+  function attempt(u, tries){
+    return fetch(u, { method:"POST", body: message }).then(function(r){
+      if (r.ok) return r;
+      /* 429 is "slow down", not "no". The allowance refills steadily,
+         so a short wait usually turns a refusal into a delivery -
+         and a ring that arrives three seconds late is a working call,
+         while one that is dropped is a missed one. */
+      if (r.status === 429 && tries > 0) {
+        return new Promise(function(res){
+          setTimeout(function(){ res(attempt(u, tries - 1)); }, 3500);
+        });
+      }
+      /* If ntfy ever rejects the action format, the ring itself still
+         has to go out - a notification with no button beats no
+         notification at all. */
+      if (u !== base) return attempt(base, tries);
+      return r;
+    });
+  }
+  return attempt(url, 2);
 }
 
 /* The signal topic. Priority 1, so that even if somebody subscribed to
@@ -1010,7 +1023,8 @@ function startCall(peerId){
         .then(function(r){
           if (r && r.ok) return;
           var why = (r && r.status === 429)
-            ? "too many messages just now — wait a minute and try again"
+            ? "ntfy.sh is rate-limiting this network — it refills in a few "
+              + "minutes, or use mobile data"
             : "the server answered " + (r ? r.status : "?");
           if (call) $("callNote").textContent =
             "Their phone will not ring — " + why;
@@ -1151,7 +1165,11 @@ function hangUp(why){
   if (call.timer)    clearInterval(call.timer);
   /* "bye" is only worth sending when there is somebody at the other end
      expecting one. A call that never connected has nothing to tell. */
-  if (why && why !== "failed" && why !== "noanswer")
+  /* Only when there is somebody at the other end expecting it. A call
+     that never connected has nothing to say goodbye to, and every
+     message spent is one less left in the hour's allowance. */
+  if (why && why !== "failed" && why !== "noanswer" && why !== "busy" &&
+      call.state !== "calling")
     sendSig(call.peer, { t:"bye", call: call.id, from: state.me })
       .catch(function(){});
   if (call.pc) { try { call.pc.close(); } catch (e) {} }
@@ -2043,7 +2061,7 @@ function reviveStreams(force){
       now - lastBeat.sig > STALE) { openSignal(); }
 }
 
-setInterval(function(){ reviveStreams(false); }, 30000);
+setInterval(function(){ reviveStreams(false); }, 60000);
 
 document.addEventListener("visibilitychange", function(){
   if (document.hidden) return;
@@ -2051,7 +2069,8 @@ document.addEventListener("visibilitychange", function(){
      user is definitely waiting on it, and a stream that died while the
      screen was off will not have noticed yet. */
   reviveStreams(true);
-  pollSignal();
+  /* openSignal already catches up on reconnect, so a second poll here
+     was a duplicate request every time the screen came on. */
 });
 
 window.addEventListener("online",  function(){ reviveStreams(true); });
