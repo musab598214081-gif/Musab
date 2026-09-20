@@ -106,8 +106,25 @@
   #ring{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     text-align:center;padding:30px}
-  #ring.on{display:flex;animation:flash 1s steps(1,end) infinite}
-  @keyframes flash{0%,49%{background:#0052CB}50%,100%{background:#00AEE6}}
+  #ring.on{display:flex;animation:flash .62s steps(1,end) infinite}
+  /* Four hard cuts rather than two, and twice as fast.
+     steps(1,end) is what makes it a flash instead of a fade - a
+     crossfade between colours reads as a gentle pulse, which is the
+     opposite of what an incoming call wants. Every stop stays dark
+     enough for white text to survive it. */
+  @keyframes flash{
+    0%   { background:#0052CB }
+    25%  { background:#00AEE6 }
+    50%  { background:#062744 }
+    75%  { background:#00AEE6 }
+    100% { background:#0052CB }
+  }
+  /* The avatar breathes against the flashing, so the screen is still
+     moving for anyone who cannot see the colour change. */
+  @keyframes pulse{
+    0%,100% { transform:scale(1);    box-shadow:0 0 0 0   rgba(255,255,255,.55) }
+    50%     { transform:scale(1.09); box-shadow:0 0 0 22px rgba(255,255,255,0) }
+  }
   #ring .from{font-size:34px;font-weight:800;margin:0 0 8px}
   #ring .what{font-size:19px;opacity:.9;margin:0 0 40px}
   #ring button{background:#fff;color:#0B1B2B;border:0;border-radius:14px;
@@ -120,7 +137,9 @@
     padding-top:calc(60px + env(safe-area-inset-top,0px));
     padding-bottom:calc(40px + env(safe-area-inset-bottom,0px))}
   #call.on{display:flex}
-  #call.incoming{animation:flash 1.1s steps(1,end) infinite}
+  #call.incoming{animation:flash .62s steps(1,end) infinite}
+  #call.incoming .avatar{animation:pulse 1.15s ease-in-out infinite}
+  #ring.on .from{animation:pulse 1.15s ease-in-out infinite}
   #call .top{text-align:center;width:100%}
   #call .avatar{width:96px;height:96px;border-radius:50%;margin:0 auto 22px;
     display:flex;align-items:center;justify-content:center;
@@ -244,6 +263,12 @@
       <button class="btn ghost" id="copyTopic">Copy topic</button>
       <button class="btn ghost" id="testMe">Test my phone</button>
     </div>
+
+    <div class="sectiontitle">Ringtone</div>
+    <p class="sub">How this phone sounds when somebody calls or buzzes you.
+      Tap one to hear it. This is your own setting — it doesn't change
+      what anyone else hears.</p>
+    <div id="toneList"></div>
 
     <div class="sectiontitle">Relay server</div>
     <p class="sub">
@@ -540,6 +565,11 @@ function paintCallButtons(incoming){
     $("callNote").textContent = "Decline    ·    Answer";
     return;
   }
+
+  /* Cleared here, not just when a call starts. Answering repaints these
+     buttons but left the incoming caption sitting underneath them, so
+     the screen read "Decline / Answer" under a mute and a hang-up. */
+  $("callNote").textContent = "";
 
   var mute = document.createElement("button");
   mute.className = "rnd mute"; mute.textContent = "🎙";
@@ -842,6 +872,55 @@ function startTimer(){
 
 var toneStop = null;
 
+/* The ringtones.
+ *
+ * Each is a list of steps played in order and then repeated after
+ * `gap` seconds. A step is one or two frequencies sounded together for
+ * `d` seconds, followed by `r` seconds of silence. Two frequencies at
+ * once is what gives a real telephone bell its character - a single
+ * sine is unmistakably a computer beep.
+ *
+ * All of it is synthesised, deliberately: an audio file would be
+ * another request to a server, another thing to fail on a bad
+ * connection, and another few hundred KB in a file that is meant to
+ * stay one page.
+ */
+var TONES = {
+  classic: {
+    name: "Classic", gap: 1.9,
+    steps: [ { f:[440,480], d:.85, r:.15 }, { f:[440,480], d:.85, r:.2 } ]
+  },
+  digital: {
+    name: "Digital", gap: 1.5,
+    steps: [ { f:[880], d:.16, r:.09 }, { f:[1100], d:.16, r:.09 },
+             { f:[880], d:.16, r:.09 }, { f:[1100], d:.3,  r:.2 } ]
+  },
+  chime: {
+    name: "Chime", gap: 2.2,
+    steps: [ { f:[660], d:.28, r:.04 }, { f:[880], d:.28, r:.04 },
+             { f:[1320], d:.55, r:.2 } ]
+  },
+  urgent: {
+    name: "Urgent", gap: .75,
+    steps: [ { f:[1046,1318], d:.11, r:.07 }, { f:[1046,1318], d:.11, r:.07 },
+             { f:[1046,1318], d:.11, r:.07 }, { f:[1046,1318], d:.11, r:.07 } ]
+  },
+  knock: {
+    name: "Knock", gap: 1.6,
+    steps: [ { f:[196,240], d:.1, r:.13 }, { f:[196,240], d:.1, r:.13 },
+             { f:[196,240], d:.1, r:.4 } ]
+  },
+  soft: {
+    name: "Soft", gap: 3.0,
+    steps: [ { f:[523], d:.5, r:.12 }, { f:[784], d:.7, r:.3 } ]
+  }
+};
+var TONE_ORDER = ["classic","digital","chime","urgent","soft","knock"];
+
+function toneName(){
+  return (state && state.tone && TONES[state.tone]) ? state.tone : "classic";
+}
+
 function unlockAudio(){
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -849,33 +928,68 @@ function unlockAudio(){
   } catch (e) {}
 }
 
+/* One pass of a pattern, scheduled ahead of time on the audio clock
+   rather than driven by timers. setTimeout on a phone drifts badly
+   enough to turn a ring cadence into mush. */
+function playPattern(key){
+  var spec = TONES[key] || TONES.classic;
+  if (!audioCtx) return spec.gap;
+  var at = audioCtx.currentTime + 0.02;
+  spec.steps.forEach(function(st){
+    st.f.forEach(function(freq){
+      try {
+        var osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        /* Ramped rather than switched on and off: an instant start or
+           stop on a sine produces an audible click on every note. */
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.28 / st.f.length, at + 0.012);
+        g.gain.setValueAtTime(0.28 / st.f.length, at + st.d - 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + st.d);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(at); osc.stop(at + st.d + 0.02);
+      } catch (e) {}
+    });
+    at += st.d + st.r;
+  });
+  return (at - audioCtx.currentTime) + spec.gap;
+}
+
 function tone(){
   unlockAudio();
   if (!audioCtx) return;
   stopTone();
-  var on = true;
-  function burst(){
+  var key = toneName(), on = true, iv = null;
+
+  function round(){
     if (!on) return;
-    try {
-      var t0 = audioCtx.currentTime, i;
-      for (i = 0; i < 2; i++) {
-        var osc = audioCtx.createOscillator(), g = audioCtx.createGain();
-        osc.type = "sine"; osc.frequency.value = i ? 660 : 880;
-        g.gain.setValueAtTime(0.0001, t0 + i*0.45);
-        g.gain.exponentialRampToValueAtTime(0.22, t0 + i*0.45 + 0.03);
-        g.gain.exponentialRampToValueAtTime(0.0001, t0 + i*0.45 + 0.38);
-        osc.connect(g); g.connect(audioCtx.destination);
-        osc.start(t0 + i*0.45); osc.stop(t0 + i*0.45 + 0.4);
-      }
-    } catch (e) {}
-    if (navigator.vibrate) navigator.vibrate([400,200,400]);
+    var wait = playPattern(key);
+    /* Vibration follows the pattern's own shape, so the phone in a
+       pocket rings in the same rhythm as the phone on the table. */
+    if (navigator.vibrate) {
+      var pat = [], spec = TONES[key] || TONES.classic;
+      spec.steps.forEach(function(st){
+        pat.push(Math.round(st.d*1000), Math.round(st.r*1000));
+      });
+      try { navigator.vibrate(pat); } catch (e) {}
+    }
+    iv = setTimeout(round, Math.max(400, wait * 1000));
   }
-  burst();
-  var iv = setInterval(burst, 2400);
+  round();
+
   toneStop = function(){
-    on = false; clearInterval(iv);
-    if (navigator.vibrate) navigator.vibrate(0);
+    on = false;
+    if (iv) clearTimeout(iv);
+    if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
   };
+}
+
+/* A single pass, for the preview buttons in Settings. */
+function previewTone(key){
+  unlockAudio();
+  stopTone();
+  playPattern(key);
 }
 
 function stopTone(){ if (toneStop) { toneStop(); toneStop = null; } }
@@ -1042,7 +1156,7 @@ function openSetup(){
   chosenColour = (state && memberById(state.me))
     ? memberById(state.me).colour : COLOURS[0];
 
-  paintSwatches(); paintMembers(); paintTopic();
+  paintSwatches(); paintMembers(); paintTopic(); paintTones();
   $("shareArea").style.display = state ? "block" : "none";
   if (state) $("shareLink").textContent = inviteLink();
   openSheet("setupSheet");
@@ -1079,6 +1193,25 @@ function paintMembers(){
   });
 }
 
+function paintTones(){
+  var box = $("toneList");
+  if (!box) return;
+  box.innerHTML = "";
+  var current = toneName();
+  TONE_ORDER.forEach(function(key){
+    var b = document.createElement("button");
+    b.className = "msgopt";
+    b.textContent = (key === current ? "● " : "○ ") + TONES[key].name;
+    b.onclick = function(){
+      if (!state) { toast("Save your family first"); return; }
+      state.tone = key; save();
+      paintTones();
+      previewTone(key);
+    };
+    box.appendChild(b);
+  });
+}
+
 function paintTopic(){
   $("myTopic").textContent = (state && state.me)
     ? ringTopic(state.me) : "Save first, and your topic appears here.";
@@ -1103,6 +1236,9 @@ function saveSetup(){
   draft.me = mine.id;
   draft.recent = (state && state.recent) || [];
   draft.turn = (state && state.turn) || draft.turn || null;
+  /* Personal, so it stays on this phone and never travels in the
+     invite link - everyone picks their own. */
+  draft.tone = (state && state.tone) || draft.tone || "classic";
   state = draft; save();
 
   paintMain(); openRing(); openSignal(); paintTopic();
@@ -1121,8 +1257,9 @@ function tryJoin(){
   if (!cfg) { toast("That invite link looks damaged"); return false; }
 
   var keep = (state && state.recent) || [];
+  var keepTone = (state && state.tone) || "classic";
   state = { house: cfg.h, me:null, members: cfg.m,
-            recent: keep, turn: cfg.t || null };
+            recent: keep, turn: cfg.t || null, tone: keepTone };
 
   var main = $("main"); main.innerHTML = "";
   var p = document.createElement("p");
