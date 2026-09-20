@@ -354,7 +354,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20k";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20l";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var SERVER   = "https://ntfy.sh";
@@ -868,6 +868,23 @@ function watchConnect(){
 
 /* One generic message told you nothing. These are the failures that
    actually happen, each with the thing to go and change. */
+/* getUserMedia never settles while the permission prompt is open, and
+   if the prompt is dismissed - or the window is not focused, so the
+   browser never shows it - it never settles at all. The call then sits
+   on "Asking for the microphone..." for ever with no way out but
+   reloading the page. Race it against a clock. */
+function micStream(){
+  var media = navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  var timeout = new Promise(function(_res, rej){
+    setTimeout(function(){
+      var e = new Error("No answer to the microphone prompt");
+      e.name = "MicTimeout";
+      rej(e);
+    }, 20000);
+  });
+  return Promise.race([media, timeout]);
+}
+
 function callError(err, phase){
   var name = (err && err.name) || "";
   var text = (err && err.message) || "";
@@ -876,6 +893,8 @@ function callError(err, phase){
      developer tools and read exactly what threw. */
   try { console.error("[notifyer] " + phase + " failed:", name, text, err); }
   catch (e) {}
+  if (name === "MicTimeout")
+    return "Waiting for the microphone — look for the Allow prompt in your browser";
   if (name === "NotAllowedError")
     return "Microphone permission was refused";
   if (name === "NotFoundError" || name === "OverconstrainedError")
@@ -905,8 +924,9 @@ function startCall(peerId){
            stream: null, state: "calling", pending: [] };
   showCallScreen(peerId, false);
   setCallState("Asking for the microphone…");
+  $("callNote").textContent = "Your browser should be asking to allow it";
 
-  navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+  micStream()
     .then(function(stream){
       if (!call) { stopStream(stream); return null; }
       call.stream = stream;
@@ -1009,9 +1029,10 @@ function answer(){
   if (!call || call.state !== "incoming") return;
   stopTone();
   setCallState("Asking for the microphone…");
+  $("callNote").textContent = "Your browser should be asking to allow it";
   $("call").classList.remove("incoming");
 
-  navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+  micStream()
     .then(function(stream){
       if (!call) { stopStream(stream); return null; }
       call.stream = stream;
