@@ -537,10 +537,28 @@ function paintStatus(live){
 
 var call = null;    /* {id, peer, out, pc, stream, state, t0, timer} */
 
+/* Tidies what somebody actually pasted into the relay box.
+ *
+ * A TURN url has to carry its scheme, and people paste all sorts:
+ * "notifyer.metered.live:443" with no scheme, an https:// address
+ * copied from the dashboard, or the whole thing wrapped in quotes from
+ * a code sample. Every one of those makes RTCPeerConnection throw the
+ * moment it is constructed - which used to surface as "Could not start
+ * the call" with no hint that the relay was the problem. */
+function tidyTurn(raw){
+  var u = String(raw || "").trim().replace(/^["'\s]+|["',\s]+$/g, "");
+  if (!u) return "";
+  u = u.replace(/^https?:\/\//i, "");
+  if (!/^turns?:/i.test(u)) u = "turn:" + u;
+  /* turn:host[:port][?transport=...] and nothing stranger */
+  return /^turns?:[A-Za-z0-9.\-]+(:\d+)?(\?transport=(udp|tcp))?$/i.test(u) ? u : "";
+}
+
 function iceServers(){
   var list = STUN.slice();
-  if (state.turn && state.turn.url) {
-    list.push({ urls: state.turn.url,
+  var url = state.turn && tidyTurn(state.turn.url);
+  if (url) {
+    list.push({ urls: url,
                 username: state.turn.user || "",
                 credential: state.turn.pass || "" });
   }
@@ -607,7 +625,17 @@ function paintCallButtons(incoming){
 }
 
 function newPeer(peerId){
-  var pc = new RTCPeerConnection({ iceServers: iceServers() });
+  var pc;
+  try {
+    pc = new RTCPeerConnection({ iceServers: iceServers() });
+  } catch (e) {
+    /* Bad relay details should cost you the relay, not the call. Try
+       again on STUN alone and say so, because a call that works on
+       wifi and fails on mobile data is exactly what a broken relay
+       looks like from the outside. */
+    pc = new RTCPeerConnection({ iceServers: STUN.slice() });
+    $("callNote").textContent = "Relay details look wrong — trying without";
+  }
 
   pc.onicecandidate = function(ev){
     if (!ev.candidate || !call) return;
@@ -699,6 +727,25 @@ function watchConnect(){
   }, 25000);
 }
 
+/* One generic message told you nothing. These are the failures that
+   actually happen, each with the thing to go and change. */
+function callError(err, phase){
+  var name = (err && err.name) || "";
+  var text = (err && err.message) || "";
+  if (name === "NotAllowedError")
+    return "Microphone permission was refused";
+  if (name === "NotFoundError" || name === "OverconstrainedError")
+    return "No microphone found on this device";
+  if (name === "NotReadableError")
+    return "The microphone is busy in another app";
+  if (name === "SyntaxError" || /ice|turn|server/i.test(text))
+    return "Relay server details are not valid — check Settings";
+  if (/fetch|network|load failed/i.test(text) || name === "TypeError")
+    return "No internet connection";
+  return (phase === "answer" ? "Could not answer" : "Could not start the call")
+         + (name ? " (" + name + ")" : "");
+}
+
 function startCall(peerId){
   if (call) { toast("Already on a call"); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -748,9 +795,7 @@ function startCall(peerId){
       }, 45000);
     })
     .catch(function(err){
-      toast(err && err.name === "NotAllowedError"
-        ? "Microphone permission was refused"
-        : "Could not start the call");
+      toast(callError(err, "start"));
       hangUp("failed");
     });
 }
@@ -843,9 +888,7 @@ function answer(){
       });
     })
     .catch(function(err){
-      toast(err && err.name === "NotAllowedError"
-        ? "Microphone permission was refused"
-        : "Could not answer");
+      toast(callError(err, "answer"));
       hangUp("failed");
     });
 }
@@ -1255,7 +1298,7 @@ function saveSetup(){
   /* Read from the boxes rather than from the last saved state, so
      typing relay details and then pressing Save (instead of Save relay)
      does not silently throw them away. */
-  var tUrl = $("turnUrl").value.trim();
+  var tUrl = tidyTurn($("turnUrl").value);
   draft.turn = tUrl ? { url: tUrl,
                         user: $("turnUser").value.trim(),
                         pass: $("turnPass").value.trim() }
@@ -1390,9 +1433,18 @@ $("testMe").onclick = function(){
 };
 $("saveTurn").onclick = function(){
   if (!state) { toast("Save your family first"); return; }
-  var url = $("turnUrl").value.trim();
+  var raw = $("turnUrl").value.trim();
+  if (raw && !tidyTurn(raw)) {
+    toast("That does not look like a TURN address — it should be like " +
+          "turn:name.metered.live:443");
+    return;
+  }
+  var url = tidyTurn(raw);
+  if (url) $("turnUrl").value = url;          /* show what was stored */
   state.turn = url ? { url:url, user:$("turnUser").value.trim(),
                        pass:$("turnPass").value.trim() } : null;
+  if (url && (!state.turn.user || !state.turn.pass))
+    toast("Saved, but a relay usually needs a username and credential too");
   save();
   $("shareLink").textContent = inviteLink();
   $("mineLink").textContent = personalLink();
