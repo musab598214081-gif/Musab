@@ -106,8 +106,11 @@
   #ring{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:none;
     flex-direction:column;align-items:center;justify-content:center;
     text-align:center;padding:30px}
-  #ring.on{display:flex;animation:flash .62s steps(1,end) infinite}
-  /* Four hard cuts rather than two, and twice as fast.
+  #ring.on{display:flex;animation:flash .95s steps(1,end) infinite}
+  /* Four hard cuts rather than two.
+     Eased back from .62s, which read as a strobe rather than a ring -
+     fast enough to be unmissable is not the same as fast enough to be
+     unpleasant, and this sits on screen for up to 45 seconds.
      steps(1,end) is what makes it a flash instead of a fade - a
      crossfade between colours reads as a gentle pulse, which is the
      opposite of what an incoming call wants. Every stop stays dark
@@ -137,9 +140,9 @@
     padding-top:calc(60px + env(safe-area-inset-top,0px));
     padding-bottom:calc(40px + env(safe-area-inset-bottom,0px))}
   #call.on{display:flex}
-  #call.incoming{animation:flash .62s steps(1,end) infinite}
-  #call.incoming .avatar{animation:pulse 1.15s ease-in-out infinite}
-  #ring.on .from{animation:pulse 1.15s ease-in-out infinite}
+  #call.incoming{animation:flash .95s steps(1,end) infinite}
+  #call.incoming .avatar{animation:pulse 1.6s ease-in-out infinite}
+  #ring.on .from{animation:pulse 1.6s ease-in-out infinite}
   #call .top{text-align:center;width:100%}
   #call .avatar{width:96px;height:96px;border-radius:50%;margin:0 auto 22px;
     display:flex;align-items:center;justify-content:center;
@@ -247,17 +250,17 @@
 
     <div id="shareArea" style="display:none">
       <div class="sectiontitle">Invite the others</div>
-      <p class="sub">Send them this link — they just pick their own name.</p>
-      <div class="codebox" id="shareLink"></div>
-      <div class="row">
-        <button class="btn ghost" id="copyLink">Copy link</button>
-        <button class="btn ghost" id="shareNative">Share</button>
-      </div>
+      <p class="sub">
+        Each person gets their <b>own</b> link. Opening it signs them in as
+        that person — nobody chooses, so nobody can pick the wrong name.
+        Send each one to the right person and don't forward them.
+      </p>
+      <div id="inviteList"></div>
 
       <div class="sectiontitle">Your own link</div>
-      <p class="sub">Bookmark this one on this phone. It restores everything —
-        including who you are — if the browser ever forgets. Don't send it to
-        anyone else; it names you.</p>
+      <p class="sub">Bookmark this on this phone. It brings everything back —
+        including who you are — if the browser ever forgets. Send it to
+        nobody; it names you.</p>
       <div class="codebox" id="mineLink"></div>
       <button class="btn ghost" id="copyMine">Copy my link</button>
     </div>
@@ -325,7 +328,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20e";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20g";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var SERVER   = "https://ntfy.sh";
@@ -396,7 +399,8 @@ function nameOf(id){ var m = memberById(id); return m ? m.name : "Someone"; }
 
 function encodeConfig(){
   var payload = JSON.stringify({ h: state.house, m: state.members,
-                                 t: state.turn || null });
+                                 t: state.turn || null,
+                                 r: state.rev || 0 });
   var b64 = btoa(unescape(encodeURIComponent(payload)));
   return b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -408,6 +412,20 @@ function decodeConfig(str){
     return (o.h && o.m && o.m.length) ? o : null;
   } catch (e) { return null; }
 }
+/* Every link now names the person it is for.
+ *
+ * One link that everybody opened and then picked a name from was the
+ * source of real confusion: people chose the wrong row, two phones
+ * claimed the same person, and calls went to a topic nobody was
+ * listening on. A link that arrives already meaning "this is you"
+ * removes the choice, and with it the mistake. */
+function linkFor(memberId){
+  return location.origin + location.pathname
+       + "#j=" + encodeConfig() + "&m=" + memberId;
+}
+
+/* Still used when a link has to work for whoever opens it - a phone
+   being set up by hand, mostly. */
 function inviteLink(){
   return location.origin + location.pathname + "#j=" + encodeConfig();
 }
@@ -417,9 +435,7 @@ function inviteLink(){
    after a stretch of not visiting it - and without this the only way
    back is to open the family link and pick your name again, which is
    fine until it happens while you are waiting for a call. */
-function personalLink(){
-  return inviteLink() + "&m=" + state.me;
-}
+function personalLink(){ return linkFor(state.me); }
 
 /* -------------------------------------------------------- publishing */
 
@@ -867,6 +883,8 @@ function onSignal(msg){
     return;
   }
 
+  if (msg.t === "roster") { takeRoster(msg); return; }
+
   if (!call || msg.call !== call.id) return;
 
   if (msg.t === "answer" && call.pc) {
@@ -997,31 +1015,31 @@ var toneStop = null;
  */
 var TONES = {
   classic: {
-    name: "Classic", gap: 1.9,
+    name: "Classic", gap: 2.47,
     steps: [ { f:[440,480], d:.85, r:.15 }, { f:[440,480], d:.85, r:.2 } ]
   },
   digital: {
-    name: "Digital", gap: 1.5,
+    name: "Digital", gap: 1.95,
     steps: [ { f:[880], d:.16, r:.09 }, { f:[1100], d:.16, r:.09 },
              { f:[880], d:.16, r:.09 }, { f:[1100], d:.3,  r:.2 } ]
   },
   chime: {
-    name: "Chime", gap: 2.2,
+    name: "Chime", gap: 2.86,
     steps: [ { f:[660], d:.28, r:.04 }, { f:[880], d:.28, r:.04 },
              { f:[1320], d:.55, r:.2 } ]
   },
   urgent: {
-    name: "Urgent", gap: .75,
+    name: "Urgent", gap: 0.98,
     steps: [ { f:[1046,1318], d:.11, r:.07 }, { f:[1046,1318], d:.11, r:.07 },
              { f:[1046,1318], d:.11, r:.07 }, { f:[1046,1318], d:.11, r:.07 } ]
   },
   knock: {
-    name: "Knock", gap: 1.6,
+    name: "Knock", gap: 2.08,
     steps: [ { f:[196,240], d:.1, r:.13 }, { f:[196,240], d:.1, r:.13 },
              { f:[196,240], d:.1, r:.4 } ]
   },
   soft: {
-    name: "Soft", gap: 3.0,
+    name: "Soft", gap: 3.9,
     steps: [ { f:[523], d:.5, r:.12 }, { f:[784], d:.7, r:.3 } ]
   }
 };
@@ -1306,8 +1324,7 @@ function openSetup(){
   $("verTag").textContent = VERSION;
   paintSwatches(); paintMembers(); paintTopic(); paintTones();
   $("shareArea").style.display = state ? "block" : "none";
-  if (state) { $("shareLink").textContent = inviteLink();
-               $("mineLink").textContent = personalLink(); }
+  if (state) { paintInvites(); $("mineLink").textContent = personalLink(); }
   openSheet("setupSheet");
 }
 
@@ -1339,6 +1356,61 @@ function paintMembers(){
     del.textContent = "×";
     del.onclick = function(){ draft.members.splice(i,1); paintMembers(); };
     row.appendChild(inp); row.appendChild(del); box.appendChild(row);
+  });
+}
+
+function paintInvites(){
+  var box = $("inviteList");
+  if (!box || !state) return;
+  box.innerHTML = "";
+  var others = state.members.filter(function(m){ return m.id !== state.me; });
+
+  if (!others.length) {
+    var p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = "Add somebody to the family first.";
+    box.appendChild(p);
+    return;
+  }
+
+  others.forEach(function(m){
+    var row = document.createElement("div");
+    row.style.marginBottom = "14px";
+
+    var who = document.createElement("div");
+    who.style.cssText = "display:flex;align-items:center;margin-bottom:6px";
+    var dot = document.createElement("span");
+    dot.style.cssText = "width:12px;height:12px;border-radius:50%;margin-right:10px;"
+                      + "flex:0 0 auto;background:" + m.colour;
+    var nm = document.createElement("span");
+    nm.style.cssText = "font-weight:700;font-size:15px";
+    nm.textContent = "Link for " + m.name;
+    who.appendChild(dot); who.appendChild(nm);
+
+    var code = document.createElement("div");
+    code.className = "codebox";
+    code.textContent = linkFor(m.id);
+
+    var btns = document.createElement("div");
+    btns.className = "row";
+    var send = document.createElement("button");
+    send.className = "btn ghost";
+    send.textContent = "Send to " + m.name;
+    send.onclick = function(){
+      var url = linkFor(m.id);
+      if (navigator.share)
+        navigator.share({ title: "Family Notifyer — " + m.name, url: url })
+                 .catch(function(){});
+      else copy(url, "Link for " + m.name + " copied");
+    };
+    var cp = document.createElement("button");
+    cp.className = "btn ghost";
+    cp.textContent = "Copy";
+    cp.onclick = function(){ copy(linkFor(m.id), "Link for " + m.name + " copied"); };
+    btns.appendChild(send); btns.appendChild(cp);
+
+    row.appendChild(who); row.appendChild(code); row.appendChild(btns);
+    box.appendChild(row);
   });
 }
 
@@ -1395,14 +1467,58 @@ function saveSetup(){
   /* Personal, so it stays on this phone and never travels in the
      invite link - everyone picks their own. */
   draft.tone = (state && state.tone) || draft.tone || "classic";
-  state = draft; save();
+  state = draft;
+  state.rev = (state.rev || 0) + 1;
+  save();
+  broadcastRoster();
 
   askNotify();
   paintMain(); openRing(); openSignal(); paintTopic();
   $("shareArea").style.display = "block";
-  $("shareLink").textContent = inviteLink();
+  paintInvites();
   $("mineLink").textContent = personalLink();
   toast("Saved");
+}
+
+/* Telling the others what changed.
+ *
+ * The family list and the relay travel inside the invite links, which
+ * means the moment somebody is added - or a relay is finally set up -
+ * every link already sent is out of date, and the fix was "re-share
+ * the link to everyone" every single time. Nobody does that reliably.
+ *
+ * Instead the change is pushed to each person's signal topic. It rides
+ * a revision number so the newest edit wins and an older phone coming
+ * back online cannot undo it. */
+function broadcastRoster(){
+  if (!state || !state.me) return;
+  state.members.forEach(function(m){
+    if (m.id === state.me) return;
+    sendSig(m.id, { t:"roster", from: state.me, rev: state.rev || 0,
+                    members: state.members, turn: state.turn || null })
+      .catch(function(){});
+  });
+}
+
+function takeRoster(msg){
+  if (!state || !msg.members || !msg.members.length) return;
+  if ((msg.rev || 0) <= (state.rev || 0)) return;   /* ours is newer */
+
+  state.rev = msg.rev || 0;
+  state.members = msg.members;
+  state.turn = msg.turn || null;
+
+  /* If this phone's person is no longer on the list, they have been
+     removed. Better to say so than to sit on a topic nobody calls. */
+  var still = false, i;
+  for (i = 0; i < state.members.length; i++)
+    if (state.members[i].id === state.me) still = true;
+  if (!still) state.me = null;
+
+  save();
+  paintMain();
+  if (state.me) { openRing(); openSignal(); toast("Family list updated"); }
+  else toast("You were removed from the family");
 }
 
 /* --------------------------------------------------- joining a house */
@@ -1439,7 +1555,7 @@ function tryJoin(){
   for (i = 0; i < cfg.m.length; i++) if (cfg.m[i].id === mine) stillThere = true;
   if (!stillThere) mine = null;
 
-  state = { house: cfg.h, me: mine, members: cfg.m,
+  state = { house: cfg.h, me: mine, members: cfg.m, rev: cfg.r || 0,
             recent: keep, turn: cfg.t || null, tone: keepTone };
 
   if (mine) {
@@ -1500,7 +1616,6 @@ $("sendCustom").onclick = function(){
 
 $("ringOk").onclick = function(){ $("ring").classList.remove("on"); stopTone(); };
 
-$("copyLink").onclick  = function(){ copy(inviteLink(), "Invite link copied"); };
 $("copyMine").onclick  = function(){
   if (!state || !state.me) { toast("Save first"); return; }
   copy(personalLink(), "Your own link copied — bookmark it");
@@ -1508,12 +1623,6 @@ $("copyMine").onclick  = function(){
 $("copyTopic").onclick = function(){
   if (!state || !state.me) { toast("Save first"); return; }
   copy(ringTopic(state.me), "Topic copied");
-};
-$("shareNative").onclick = function(){
-  if (navigator.share)
-    navigator.share({ title:"Family Notifyer", url: inviteLink() })
-             .catch(function(){});
-  else copy(inviteLink(), "Invite link copied");
 };
 $("testMe").onclick = function(){
   if (!state || !state.me) { toast("Save first"); return; }
@@ -1535,8 +1644,10 @@ $("saveTurn").onclick = function(){
                        pass:$("turnPass").value.trim() } : null;
   if (url && (!state.turn.user || !state.turn.pass))
     toast("Saved, but a relay usually needs a username and credential too");
+  state.rev = (state.rev || 0) + 1;
   save();
-  $("shareLink").textContent = inviteLink();
+  broadcastRoster();
+  paintInvites();
   $("mineLink").textContent = personalLink();
   toast(url ? "Relay saved — re-share the invite link" : "Relay cleared");
 };
