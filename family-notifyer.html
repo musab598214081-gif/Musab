@@ -585,28 +585,72 @@ function newPeer(peerId){
     if (p && p.catch) p.catch(function(){});
   };
 
+  /* Listened for on BOTH events, on purpose.
+
+     connectionState is the modern one, but Safari went years without
+     it, and on a browser that does not fire it the call sits on
+     "Connecting..." for ever - even while the audio is flowing
+     perfectly, because nothing ever tells the screen otherwise. The
+     older iceConnectionState is supported everywhere, so whichever
+     arrives first wins and markConnected guards against running
+     twice. */
   pc.onconnectionstatechange = function(){
     if (!call || !call.pc) return;
     var s = call.pc.connectionState;
-    if (s === "connected") {
-      stopTone();
-      call.state = "connected";
-      call.t0 = Date.now();
-      $("call").classList.remove("incoming");
-      startTimer();
-    } else if (s === "failed") {
-      stopTone();
-      $("callNote").textContent = (state.turn && state.turn.url)
-        ? "Could not connect"
-        : "No direct route — add a relay server in Settings";
-      setCallState("Call failed");
-      setTimeout(function(){ hangUp("failed"); }, 2800);
-    } else if (s === "disconnected") {
+    if (s === "connected") markConnected();
+    else if (s === "failed") markFailed();
+    else if (s === "disconnected" && call.state === "connected")
       setCallState("Reconnecting…");
-    }
+  };
+
+  pc.oniceconnectionstatechange = function(){
+    if (!call || !call.pc) return;
+    var s = call.pc.iceConnectionState;
+    if (s === "connected" || s === "completed") markConnected();
+    else if (s === "failed") markFailed();
   };
 
   return pc;
+}
+
+function markConnected(){
+  if (!call || call.state === "connected") return;   /* both events fire */
+  stopTone();
+  if (call.watchdog) { clearTimeout(call.watchdog); call.watchdog = null; }
+  if (call.giveUp) { clearTimeout(call.giveUp); call.giveUp = null; }
+  call.state = "connected";
+  call.t0 = Date.now();
+  $("call").classList.remove("incoming");
+  $("callNote").textContent = "";
+  startTimer();
+}
+
+function markFailed(){
+  if (!call || call.state === "connected" || call.state === "failed") return;
+  call.state = "failed";
+  stopTone();
+  if (call.watchdog) { clearTimeout(call.watchdog); call.watchdog = null; }
+  $("callNote").textContent = (state.turn && state.turn.url)
+    ? "Could not connect — the relay did not answer either"
+    : "No route between the phones — add a relay server in Settings";
+  setCallState("Call failed");
+  setTimeout(function(){ hangUp("failed"); }, 3200);
+}
+
+/* Started the moment both sides have described themselves.
+
+   Without it a call can hang on "Connecting..." indefinitely: the
+   giveUp timer only covers the ringing phase and stops applying once an
+   answer arrives, and ICE itself can spend a very long time trying
+   candidate pairs before it admits defeat - if it ever reports failed
+   at all. Twenty-five seconds is well past a connection that was going
+   to work. */
+function watchConnect(){
+  if (!call) return;
+  if (call.watchdog) clearTimeout(call.watchdog);
+  call.watchdog = setTimeout(function(){
+    if (call && call.state !== "connected") markFailed();
+  }, 25000);
 }
 
 function startCall(peerId){
@@ -687,6 +731,7 @@ function onSignal(msg){
     stopTone();
     setCallState("Connecting…");
     call.state = "answered";
+    watchConnect();
     call.pc.setRemoteDescription({ type:"answer", sdp: msg.sdp })
       .then(drainPending).catch(function(){});
     return;
@@ -746,6 +791,7 @@ function answer(){
         call.state = "answered";
         paintCallButtons(false);
         setCallState("Connecting…");
+        watchConnect();
         return sendSig(call.peer, { t:"answer", call: call.id,
                                     from: state.me, sdp: ans.sdp });
       });
@@ -761,8 +807,9 @@ function answer(){
 function hangUp(why){
   stopTone();
   if (!call) { hideCallScreen(); return; }
-  if (call.giveUp) clearTimeout(call.giveUp);
-  if (call.timer)  clearInterval(call.timer);
+  if (call.giveUp)   clearTimeout(call.giveUp);
+  if (call.watchdog) clearTimeout(call.watchdog);
+  if (call.timer)    clearInterval(call.timer);
   /* "bye" is only worth sending when there is somebody at the other end
      expecting one. A call that never connected has nothing to tell. */
   if (why && why !== "failed" && why !== "noanswer")
