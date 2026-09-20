@@ -188,6 +188,14 @@
   Calls and the invite link both need a real web address — put the file on a
   free host (GitHub Pages) and open that instead. See SETUP.md, step 1.
 </div>
+<div id="ntfywarn" style="display:none;background:#0C3A55;color:#BFE6FA;
+  padding:12px 16px;font-size:13px;line-height:1.5;border-bottom:1px solid #16537A">
+  <b>This phone won't ring yet.</b>
+  It only rings while this page is open until you subscribe in the ntfy app.
+  <button id="ntfyfix" style="background:#00AEE6;color:#04202B;border:0;
+    border-radius:8px;padding:7px 12px;font-weight:700;font-family:inherit;
+    font-size:13px;margin-left:6px;cursor:pointer">Set it up</button>
+</div>
 <main id="main"></main>
 
 <audio id="remoteAudio" autoplay playsinline></audio>
@@ -266,13 +274,20 @@
     </div>
 
     <div class="sectiontitle">Ringing this phone</div>
-    <p class="sub">Install the free <b>ntfy</b> app and subscribe to this topic,
-      so the phone rings when the page is closed.</p>
+    <p class="sub">
+      This phone only rings while the page is open, unless you install the
+      free <b>ntfy</b> app. That app is what wakes the phone when the page
+      is closed.
+    </p>
+    <button class="btn" id="ntfyOpen">1 · Open the ntfy app and subscribe</button>
+    <p class="sub" style="margin-top:8px">
+      Nothing happened? The app isn't installed yet — get <b>ntfy</b> from the
+      App Store or Play Store, then tap the button again.
+    </p>
+    <button class="btn ghost" id="testMe">2 · Test — this phone should buzz</button>
+    <p class="sub" style="margin-top:8px">Your topic, if you ever need to type it by hand:</p>
     <div class="codebox" id="myTopic">—</div>
-    <div class="row">
-      <button class="btn ghost" id="copyTopic">Copy topic</button>
-      <button class="btn ghost" id="testMe">Test my phone</button>
-    </div>
+    <button class="btn ghost" id="copyTopic">Copy topic</button>
 
     <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
 
@@ -328,7 +343,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20g";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20h";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var SERVER   = "https://ntfy.sh";
@@ -1240,6 +1255,7 @@ function paintMain(){
   main.appendChild(box);
 
   paintRecent();
+  paintNtfyWarn();
   paintStatus(ringSrc && ringSrc.readyState === 1);
 }
 
@@ -1433,6 +1449,12 @@ function paintTones(){
   });
 }
 
+function paintNtfyWarn(){
+  var el = $("ntfywarn");
+  if (!el) return;
+  el.style.display = (state && state.me && !state.ntfy) ? "block" : "none";
+}
+
 function paintTopic(){
   $("myTopic").textContent = (state && state.me)
     ? ringTopic(state.me) : "Save first, and your topic appears here.";
@@ -1624,6 +1646,20 @@ $("copyTopic").onclick = function(){
   if (!state || !state.me) { toast("Save first"); return; }
   copy(ringTopic(state.me), "Topic copied");
 };
+/* ntfy registers the ntfy:// scheme, so this hands the phone the topic
+   instead of asking somebody to retype twenty characters of random
+   text. If the app is not installed nothing happens at all - the
+   browser simply ignores a scheme it does not know - which is why the
+   line underneath says so. */
+$("ntfyOpen").onclick = function(){
+  if (!state || !state.me) { toast("Save first"); return; }
+  state.ntfy = true; save(); paintNtfyWarn();
+  try { location.href = "ntfy://ntfy.sh/" + ringTopic(state.me); }
+  catch (e) { copy(ringTopic(state.me), "Topic copied — paste it into ntfy"); }
+};
+
+$("ntfyfix").onclick = function(){ openSetup(); };
+
 $("testMe").onclick = function(){
   if (!state || !state.me) { toast("Save first"); return; }
   ringPush(state.me, "Test", "If your phone buzzed, you are set up")
