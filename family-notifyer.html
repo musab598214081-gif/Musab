@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0B1B2B">
+<title>Family Notifyer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%93%9E%3C%2Ftext%3E%3C%2Fsvg%3E">
+<style>
+  :root{
+    --ink:#0B1B2B; --ink-soft:#16293D; --line:#22384F;
+    --bg:#0B1B2B; --card:#16293D; --text:#FFFFFF; --muted:#93A9C0;
+    --accent:#00AEE6; --ok:#34C759; --warn:#FF9500; --bad:#FF3B30;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *,*::before,*::after{box-sizing:inherit}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; display:flex; flex-direction:column;
+  }
+  header{
+    padding:16px 18px 12px; display:flex; align-items:center;
+    border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  header .bell{font-size:22px;line-height:1;margin-right:12px}
+  header h1{font-size:17px;margin:0;font-weight:700}
+  header .who{font-size:12px;color:var(--muted)}
+  .iconbtn{background:none;border:0;color:var(--muted);font-size:20px;
+    padding:6px 8px;cursor:pointer;border-radius:8px}
+  .iconbtn:active{background:var(--card)}
+
+  main{flex:1 1 auto;overflow-y:auto;padding:14px 14px 28px}
+  .hint{color:var(--muted);font-size:13px;line-height:1.45;margin:0 0 14px}
+
+  .person{
+    display:flex;align-items:center;width:100%;text-align:left;
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;margin-bottom:10px;color:var(--text);
+    font-size:16px;font-family:inherit;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .person:active{transform:scale(.985)}
+  .person .dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;margin-right:14px}
+  .person .nm{flex:1;font-weight:600}
+  .person .sub{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
+  .person .go{color:var(--muted);font-size:18px}
+  .person.me{opacity:.55}
+
+  .sectiontitle{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;
+    color:var(--muted);margin:22px 4px 10px;font-weight:700}
+  .log{font-size:13px;color:var(--muted);padding:8px 4px;border-bottom:1px solid var(--line)}
+  .log b{color:var(--text);font-weight:600}
+
+  .sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(4,12,20,.72);
+    display:none;align-items:flex-end;justify-content:center;z-index:40}
+  .sheet.on{display:flex}
+  .sheetbody{background:var(--ink-soft);width:100%;max-width:560px;
+    border-radius:18px 18px 0 0;padding:20px 18px;
+    padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
+    max-height:88%;overflow-y:auto}
+  .sheetbody h2{margin:0 0 4px;font-size:18px}
+  .sheetbody p.sub{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.45}
+  label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:600}
+  input[type=text]{width:100%;padding:13px 14px;border-radius:11px;
+    border:1px solid var(--line);background:var(--ink);color:var(--text);
+    font-size:16px;font-family:inherit}
+  input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .btn{width:100%;padding:15px;border-radius:12px;border:0;font-size:16px;
+    font-weight:700;font-family:inherit;margin-top:14px;cursor:pointer;
+    background:var(--accent);color:#04202B}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .btn.green{background:var(--ok);color:#04220E}
+  .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+  .btn:active{opacity:.85}
+  .row{display:flex}
+  .row .btn{flex:1}
+  .row .btn + .btn{margin-left:10px}
+
+  .msgopt{display:block;width:100%;text-align:left;padding:14px 16px;margin-bottom:8px;
+    background:var(--ink);border:1px solid var(--line);border-radius:12px;
+    color:var(--text);font-size:16px;font-family:inherit;cursor:pointer}
+  .msgopt:active{border-color:var(--accent)}
+
+  .swatches{display:flex;flex-wrap:wrap;margin-top:6px}
+  .swatch{width:34px;height:34px;border-radius:50%;border:3px solid transparent;
+    cursor:pointer;margin:0 10px 10px 0}
+  .swatch.sel{border-color:#fff}
+
+  .memberrow{display:flex;align-items:center;margin-bottom:8px}
+  .memberrow input{flex:1;margin-right:8px}
+  .memberrow button{background:transparent;border:1px solid var(--line);color:var(--bad);
+    border-radius:10px;width:44px;height:46px;font-size:18px;cursor:pointer;flex:0 0 auto}
+
+  .codebox{background:var(--ink);border:1px solid var(--line);border-radius:11px;
+    padding:12px 14px;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px;word-break:break-all;color:var(--muted);line-height:1.5}
+
+  /* buzz overlay */
+  #ring{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:30px}
+  #ring.on{display:flex;animation:flash 1s steps(1,end) infinite}
+  @keyframes flash{0%,49%{background:#0052CB}50%,100%{background:#00AEE6}}
+  #ring .from{font-size:34px;font-weight:800;margin:0 0 8px}
+  #ring .what{font-size:19px;opacity:.9;margin:0 0 40px}
+  #ring button{background:#fff;color:#0B1B2B;border:0;border-radius:14px;
+    padding:17px 46px;font-size:18px;font-weight:700;font-family:inherit;cursor:pointer}
+
+  /* call screen */
+  #call{position:fixed;top:0;right:0;bottom:0;left:0;z-index:70;display:none;
+    flex-direction:column;align-items:center;justify-content:space-between;
+    background:var(--ink);padding:40px 24px;
+    padding-top:calc(60px + env(safe-area-inset-top,0px));
+    padding-bottom:calc(40px + env(safe-area-inset-bottom,0px))}
+  #call.on{display:flex}
+  #call.incoming{animation:flash 1.1s steps(1,end) infinite}
+  #call .top{text-align:center;width:100%}
+  #call .avatar{width:96px;height:96px;border-radius:50%;margin:0 auto 22px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:38px;font-weight:800;color:#06131F}
+  #call .peer{font-size:30px;font-weight:800;margin:0 0 10px}
+  #call .state{font-size:16px;color:var(--muted);margin:0}
+  #call .controls{width:100%;max-width:420px}
+  .callbtns{display:flex;justify-content:center}
+  .rnd{width:72px;height:72px;border-radius:50%;border:0;font-size:26px;
+    cursor:pointer;margin:0 14px;font-family:inherit;color:#fff}
+  .rnd.hang{background:var(--bad)}
+  .rnd.answer{background:var(--ok)}
+  .rnd.mute{background:var(--ink-soft);border:1px solid var(--line)}
+  .rnd.mute.on{background:#fff;color:var(--ink)}
+  .rndlbl{text-align:center;font-size:12px;color:var(--muted);margin-top:10px;min-height:16px}
+
+  .toast{position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(26px + env(safe-area-inset-bottom,0px));
+    background:var(--ink-soft);border:1px solid var(--line);color:var(--text);
+    padding:12px 18px;border-radius:999px;font-size:14px;z-index:80;
+    opacity:0;transition:opacity .2s;pointer-events:none;max-width:88%;text-align:center}
+  .toast.on{opacity:1}
+
+  .status{display:flex;align-items:center;font-size:12px;color:var(--muted)}
+  .status .led{width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:8px}
+  .status.live .led{background:var(--ok)}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="bell">📞</span>
+  <div style="flex:1">
+    <h1>Family Notifyer</h1>
+    <div class="who" id="whoami">—</div>
+  </div>
+  <button class="iconbtn" id="settingsBtn" title="Settings">⚙︎</button>
+</header>
+
+<div id="filewarn" style="display:none;background:#5C2E00;color:#FFD9A8;
+  padding:12px 16px;font-size:13px;line-height:1.5;border-bottom:1px solid #7A3E00">
+  <b>This page is open from a file on your computer.</b>
+  Calls and the invite link both need a real web address — put the file on a
+  free host (GitHub Pages) and open that instead. See SETUP.md, step 1.
+</div>
+<main id="main"></main>
+
+<audio id="remoteAudio" autoplay playsinline></audio>
+
+<div id="ring">
+  <p class="from" id="ringFrom">Someone</p>
+  <p class="what" id="ringWhat">is calling you</p>
+  <button id="ringOk">Got it</button>
+</div>
+
+<div id="call">
+  <div class="top">
+    <div class="avatar" id="callAvatar">?</div>
+    <p class="peer" id="callPeer">—</p>
+    <p class="state" id="callState">Calling…</p>
+  </div>
+  <div class="controls">
+    <div class="callbtns" id="callBtns"></div>
+    <p class="rndlbl" id="callNote"></p>
+  </div>
+</div>
+
+<div class="sheet" id="actSheet">
+  <div class="sheetbody">
+    <h2 id="actTitle">—</h2>
+    <p class="sub">Talk to them, or just get their attention.</p>
+    <button class="btn green" id="doCall">📞&nbsp; Voice call</button>
+    <button class="btn ghost" id="doBuzz">🔔&nbsp; Buzz them instead</button>
+    <button class="btn ghost" data-close="actSheet">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet" id="msgSheet">
+  <div class="sheetbody">
+    <h2 id="msgTitle">Buzz</h2>
+    <p class="sub">Pick what to say. Their phone buzzes straight away.</p>
+    <div id="msgList"></div>
+    <label for="customMsg">Or type something</label>
+    <input type="text" id="customMsg" placeholder="Your own message" autocomplete="off">
+    <button class="btn" id="sendCustom">Send</button>
+    <button class="btn ghost" data-close="msgSheet">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet" id="setupSheet">
+  <div class="sheetbody">
+    <h2 id="setupTitle">Set up your family</h2>
+    <p class="sub">Do this once on one phone, then share the invite link.</p>
+
+    <label for="myName">Who are you?</label>
+    <input type="text" id="myName" placeholder="Your name" autocomplete="off">
+
+    <label>Your colour</label>
+    <div class="swatches" id="swatches"></div>
+
+    <label>Everyone in the family</label>
+    <div id="members"></div>
+    <button class="btn ghost" id="addMember">+ Add a person</button>
+    <button class="btn" id="saveSetup">Save</button>
+
+    <div id="shareArea" style="display:none">
+      <div class="sectiontitle">Invite the others</div>
+      <p class="sub">Send them this link — they just pick their own name.</p>
+      <div class="codebox" id="shareLink"></div>
+      <div class="row">
+        <button class="btn ghost" id="copyLink">Copy link</button>
+        <button class="btn ghost" id="shareNative">Share</button>
+      </div>
+    </div>
+
+    <div class="sectiontitle">Ringing this phone</div>
+    <p class="sub">Install the free <b>ntfy</b> app and subscribe to this topic,
+      so the phone rings when the page is closed.</p>
+    <div class="codebox" id="myTopic">—</div>
+    <div class="row">
+      <button class="btn ghost" id="copyTopic">Copy topic</button>
+      <button class="btn ghost" id="testMe">Test my phone</button>
+    </div>
+
+    <div class="sectiontitle">Relay server</div>
+    <p class="sub">
+      Call audio goes phone to phone. On some mobile networks the two
+      phones cannot reach each other directly and need a relay in the
+      middle. Free credentials from <b>openrelay.metered.ca</b> take two
+      minutes and make calls work everywhere. Leave blank to try without.
+    </p>
+    <label for="turnUrl">TURN server</label>
+    <input type="text" id="turnUrl" placeholder="turn:example.com:80" autocomplete="off">
+    <label for="turnUser">Username</label>
+    <input type="text" id="turnUser" autocomplete="off">
+    <label for="turnPass">Credential</label>
+    <input type="text" id="turnPass" autocomplete="off">
+    <button class="btn ghost" id="saveTurn">Save relay</button>
+
+    <button class="btn ghost" data-close="setupSheet" style="margin-top:22px">Close</button>
+    <button class="btn danger" id="resetAll">Start over</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ==================================================================== *
+ * Family Notifyer — buzz, and real voice calls, over the internet.
+ *
+ * There is no server of ours in this. Call audio goes straight between
+ * the two phones over WebRTC. The only thing a call needs a third party
+ * for is the introduction: each side has to hand the other a
+ * description of itself before any connection exists, and at that
+ * moment neither can reach the other. ntfy - already here for the
+ * buzzing - is a public message bus, so it carries those few setup
+ * messages too.
+ *
+ * Every person therefore has two topics:
+ *   fmn-<house>-<id>      the RING topic. The ntfy app on the phone
+ *                         subscribes to this, and it is what makes the
+ *                         phone make a noise when the page is shut.
+ *   fmn-<house>-<id>-s    the SIGNAL topic. Only this page ever reads
+ *                         it. Keeping call setup off the ring topic is
+ *                         what stops one call firing a dozen
+ *                         notifications as the candidates flow.
+ * ==================================================================== */
+
+var SERVER   = "https://ntfy.sh";
+var STOREKEY = "familyNotifyer.v2";
+var MAXBODY  = 3400;          /* ntfy caps a message at 4096 bytes */
+
+var COLOURS = ["#FF9500","#FF3B30","#FFCC00","#34C759","#00C7BE",
+               "#30B0FF","#5856D6","#AF52DE","#FF2D55","#A2845E"];
+var QUICK = ["Call me", "Come here please", "Dinner is ready",
+             "Are you OK?", "I'm on my way", "Ring me when free"];
+var SAFE = "abcdefghjkmnpqrstuvwxyz23456789";
+var CALLTAG = " is calling you on Notifyer";
+
+var STUN = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" }
+];
+
+var state = null;
+var ringSrc = null, sigSrc = null;
+var audioCtx = null;
+var seen = {};
+var chunks = {};
+
+/* ------------------------------------------------------------ basics */
+
+function $(id){ return document.getElementById(id); }
+function each(nodes, fn){ Array.prototype.slice.call(nodes).forEach(fn); }
+
+function rand(n){
+  var out = "", i, c = window.crypto || window.msCrypto;
+  if (c && c.getRandomValues) {
+    var buf = new Uint32Array(n);
+    c.getRandomValues(buf);
+    for (i = 0; i < n; i++) out += SAFE[buf[i] % SAFE.length];
+    return out;
+  }
+  for (i = 0; i < n; i++) out += SAFE[Math.floor(Math.random()*SAFE.length)];
+  return out;
+}
+
+function toast(text){
+  var t = $("toast");
+  t.textContent = text; t.classList.add("on");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ t.classList.remove("on"); }, 2800);
+}
+
+function load(){
+  try { var r = localStorage.getItem(STOREKEY); return r ? JSON.parse(r) : null; }
+  catch (e) { return null; }
+}
+function save(){
+  try { localStorage.setItem(STOREKEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function ringTopic(id){ return "fmn-" + state.house + "-" + id; }
+function sigTopic(id){  return ringTopic(id) + "-s"; }
+
+function memberById(id){
+  for (var i = 0; i < state.members.length; i++)
+    if (state.members[i].id === id) return state.members[i];
+  return null;
+}
+function nameOf(id){ var m = memberById(id); return m ? m.name : "Someone"; }
+
+/* ------------------------------------------------------- invite link */
+
+function encodeConfig(){
+  var payload = JSON.stringify({ h: state.house, m: state.members,
+                                 t: state.turn || null });
+  var b64 = btoa(unescape(encodeURIComponent(payload)));
+  return b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function decodeConfig(str){
+  try {
+    var b64 = str.replace(/-/g,"+").replace(/_/g,"/");
+    while (b64.length % 4) b64 += "=";
+    var o = JSON.parse(decodeURIComponent(escape(atob(b64))));
+    return (o.h && o.m && o.m.length) ? o : null;
+  } catch (e) { return null; }
+}
+function inviteLink(){
+  return location.origin + location.pathname + "#j=" + encodeConfig();
+}
+
+/* -------------------------------------------------------- publishing */
+
+/* The ring topic. Loud on purpose: priority 5 is what gets a phone to
+   vibrate hard and pop over whatever is on screen. */
+function ringPush(memberId, title, message){
+  var url = SERVER + "/" + encodeURIComponent(ringTopic(memberId))
+          + "?title="  + encodeURIComponent(title)
+          + "&priority=5&tags=telephone_receiver"
+          + "&click="  + encodeURIComponent(location.origin + location.pathname);
+  return fetch(url, { method:"POST", body: message });
+}
+
+/* The signal topic. Priority 1, so that even if somebody subscribed to
+   it by mistake it could never make a noise.
+
+   Messages bigger than one ntfy body get split. An audio-only offer is
+   normally around 2 KB, but a phone with several network interfaces can
+   push it past the limit, and a truncated offer is a call that fails
+   with nothing on screen to explain why. */
+function sendSig(memberId, obj){
+  var body = JSON.stringify(obj);
+  var url  = SERVER + "/" + encodeURIComponent(sigTopic(memberId)) + "?priority=1";
+
+  if (body.length <= MAXBODY) return fetch(url, { method:"POST", body: body });
+
+  var key = rand(6), parts = [], i;
+  for (i = 0; i < body.length; i += MAXBODY) parts.push(body.slice(i, i + MAXBODY));
+  var chain = Promise.resolve();
+  parts.forEach(function(p, idx){
+    chain = chain.then(function(){
+      return fetch(url, { method:"POST", body: JSON.stringify({
+        t:"chunk", k:key, i:idx, n:parts.length, d:p }) });
+    });
+  });
+  return chain;
+}
+
+/* --------------------------------------------------------- listening */
+
+function openRing(){
+  if (ringSrc) ringSrc.close();
+  ringSrc = new EventSource(
+    SERVER + "/" + encodeURIComponent(ringTopic(state.me)) + "/sse");
+  ringSrc.onopen  = function(){ paintStatus(true); };
+  ringSrc.onerror = function(){ paintStatus(false); };
+  ringSrc.onmessage = function(ev){
+    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.event !== "message" || seen[m.id]) return;
+    seen[m.id] = 1;
+    var title = m.title || "Someone";
+    var fresh = !m.time || (Date.now()/1000 - m.time) < 120;
+    remember(title, m.message || "", false, m.time);
+    /* A ring push belonging to a voice call is only there to wake the
+       phone. The call screen is raised by the offer on the signal
+       topic, so showing the buzz overlay too would put two different
+       things on screen for one call. */
+    if (fresh && title.indexOf(CALLTAG) === -1) showBuzz(title, m.message || "");
+  };
+}
+
+function openSignal(){
+  if (sigSrc) sigSrc.close();
+  var topic = encodeURIComponent(sigTopic(state.me));
+  sigSrc = new EventSource(SERVER + "/" + topic + "/sse");
+  sigSrc.onmessage = function(ev){
+    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.event !== "message" || seen[m.id]) return;
+    seen[m.id] = 1;
+    takeSignal(m.message, m.time);
+  };
+
+  /* Catching up, which is the whole point on a phone. The page is
+     usually opened BY the notification, seconds after the offer was
+     sent - by which time a live stream alone has already missed it.
+     ntfy keeps recent messages, so ask for the last two minutes. */
+  fetch(SERVER + "/" + topic + "/json?poll=1&since=2m")
+    .then(function(r){ return r.text(); })
+    .then(function(text){
+      text.split("\n").forEach(function(line){
+        if (!line.trim()) return;
+        var m; try { m = JSON.parse(line); } catch (e) { return; }
+        if (m.event !== "message" || seen[m.id]) return;
+        seen[m.id] = 1;
+        takeSignal(m.message, m.time);
+      });
+    })
+    .catch(function(){});
+}
+
+function takeSignal(raw, when){
+  var msg; try { msg = JSON.parse(raw); } catch (e) { return; }
+
+  if (msg.t === "chunk") {
+    var b = chunks[msg.k] || (chunks[msg.k] = { n: msg.n, got: 0, parts: [] });
+    if (b.parts[msg.i] === undefined) { b.parts[msg.i] = msg.d; b.got++; }
+    if (b.got < b.n) return;
+    delete chunks[msg.k];
+    try { msg = JSON.parse(b.parts.join("")); } catch (e) { return; }
+  }
+
+  /* An offer older than a minute belongs to somebody who gave up.
+     Ringing for it would raise a call screen nobody is waiting on. */
+  if (msg.t === "offer" && when && (Date.now()/1000 - when) > 60) return;
+
+  onSignal(msg);
+}
+
+function paintStatus(live){
+  var el = $("statusLine");
+  if (!el) return;
+  el.classList.toggle("live", !!live);
+  el.querySelector("span:last-child").textContent =
+    live ? "Ready for calls" : "Offline — the ntfy app still rings";
+}
+
+/* ==================================================================== *
+ * Voice calls
+ * ==================================================================== */
+
+var call = null;    /* {id, peer, out, pc, stream, state, t0, timer} */
+
+function iceServers(){
+  var list = STUN.slice();
+  if (state.turn && state.turn.url) {
+    list.push({ urls: state.turn.url,
+                username: state.turn.user || "",
+                credential: state.turn.pass || "" });
+  }
+  return list;
+}
+
+function setCallState(text){ var e = $("callState"); if (e) e.textContent = text; }
+
+function showCallScreen(peerId, incoming){
+  var m = memberById(peerId);
+  $("callPeer").textContent = m ? m.name : "Someone";
+  var av = $("callAvatar");
+  av.textContent = (m && m.name ? m.name.charAt(0) : "?").toUpperCase();
+  av.style.background = (m && m.colour) || "#30B0FF";
+  $("callNote").textContent = "";
+  $("call").classList.add("on");
+  $("call").classList.toggle("incoming", !!incoming);
+  paintCallButtons(incoming);
+}
+
+function hideCallScreen(){
+  $("call").classList.remove("on");
+  $("call").classList.remove("incoming");
+}
+
+function paintCallButtons(incoming){
+  var box = $("callBtns");
+  box.innerHTML = "";
+
+  if (incoming) {
+    var dec = document.createElement("button");
+    dec.className = "rnd hang"; dec.textContent = "✕";
+    dec.onclick = function(){ hangUp("declined"); };
+    var ans = document.createElement("button");
+    ans.className = "rnd answer"; ans.textContent = "📞";
+    ans.onclick = answer;
+    box.appendChild(dec); box.appendChild(ans);
+    $("callNote").textContent = "Decline    ·    Answer";
+    return;
+  }
+
+  var mute = document.createElement("button");
+  mute.className = "rnd mute"; mute.textContent = "🎙";
+  mute.onclick = function(){
+    if (!call || !call.stream) return;
+    var off = false;
+    call.stream.getAudioTracks().forEach(function(t){
+      t.enabled = !t.enabled; off = !t.enabled;
+    });
+    mute.classList.toggle("on", off);
+    $("callNote").textContent = off ? "Microphone off" : "";
+  };
+
+  var hang = document.createElement("button");
+  hang.className = "rnd hang"; hang.textContent = "✕";
+  hang.onclick = function(){ hangUp("ended"); };
+
+  box.appendChild(mute); box.appendChild(hang);
+}
+
+function newPeer(peerId){
+  var pc = new RTCPeerConnection({ iceServers: iceServers() });
+
+  pc.onicecandidate = function(ev){
+    if (!ev.candidate || !call) return;
+    /* Trickled one at a time. Waiting for gathering to finish and
+       sending them inside the offer would add seconds of silence to
+       every call, and on a phone that reads as a call that failed. */
+    sendSig(peerId, { t:"ice", call: call.id, from: state.me,
+      c: { candidate: ev.candidate.candidate,
+           sdpMid: ev.candidate.sdpMid,
+           sdpMLineIndex: ev.candidate.sdpMLineIndex } });
+  };
+
+  pc.ontrack = function(ev){
+    var el = $("remoteAudio");
+    el.srcObject = ev.streams[0];
+    /* Safari will not start audio without a gesture. Placing or
+       answering the call is that gesture, but play() can still be
+       refused, and an unhandled rejection here would surface as an
+       error with no bearing on the call. */
+    var p = el.play();
+    if (p && p.catch) p.catch(function(){});
+  };
+
+  pc.onconnectionstatechange = function(){
+    if (!call || !call.pc) return;
+    var s = call.pc.connectionState;
+    if (s === "connected") {
+      stopTone();
+      call.state = "connected";
+      call.t0 = Date.now();
+      $("call").classList.remove("incoming");
+      startTimer();
+    } else if (s === "failed") {
+      stopTone();
+      $("callNote").textContent = (state.turn && state.turn.url)
+        ? "Could not connect"
+        : "No direct route — add a relay server in Settings";
+      setCallState("Call failed");
+      setTimeout(function(){ hangUp("failed"); }, 2800);
+    } else if (s === "disconnected") {
+      setCallState("Reconnecting…");
+    }
+  };
+
+  return pc;
+}
+
+function startCall(peerId){
+  if (call) { toast("Already on a call"); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast("This browser cannot make calls — open the page in Safari or Chrome");
+    return;
+  }
+  if (!window.isSecureContext) {
+    toast("Calls need the https:// address, not a local file");
+    return;
+  }
+
+  call = { id: rand(8), peer: peerId, out: true, pc: null,
+           stream: null, state: "calling", pending: [] };
+  showCallScreen(peerId, false);
+  setCallState("Asking for the microphone…");
+
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    .then(function(stream){
+      if (!call) { stopStream(stream); return null; }
+      call.stream = stream;
+      call.pc = newPeer(peerId);
+      stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
+      return call.pc.createOffer();
+    })
+    .then(function(offer){
+      if (!offer || !call) return null;
+      return call.pc.setLocalDescription(offer).then(function(){
+        return sendSig(peerId, { t:"offer", call: call.id, from: state.me,
+                                 sdp: call.pc.localDescription.sdp });
+      });
+    })
+    .then(function(){
+      if (!call) return;
+      setCallState("Ringing…");
+      tone();
+      /* Wake their phone, because the page is almost certainly not open
+         on the other side. */
+      ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer")
+        .catch(function(){});
+      remember(nameOf(peerId), "voice call", true);
+      call.giveUp = setTimeout(function(){
+        if (call && call.state === "calling") {
+          stopTone();
+          setCallState("No answer");
+          setTimeout(function(){ hangUp("noanswer"); }, 1800);
+        }
+      }, 45000);
+    })
+    .catch(function(err){
+      toast(err && err.name === "NotAllowedError"
+        ? "Microphone permission was refused"
+        : "Could not start the call");
+      hangUp("failed");
+    });
+}
+
+function onSignal(msg){
+  if (!msg || !msg.t) return;
+
+  if (msg.t === "offer") {
+    if (call) {
+      sendSig(msg.from, { t:"busy", call: msg.call, from: state.me });
+      return;
+    }
+    call = { id: msg.call, peer: msg.from, out: false, pc: null,
+             stream: null, state: "incoming", offer: msg.sdp, pending: [] };
+    showCallScreen(msg.from, true);
+    setCallState("Incoming call");
+    tone();
+    return;
+  }
+
+  if (!call || msg.call !== call.id) return;
+
+  if (msg.t === "answer" && call.pc) {
+    stopTone();
+    setCallState("Connecting…");
+    call.state = "answered";
+    call.pc.setRemoteDescription({ type:"answer", sdp: msg.sdp })
+      .then(drainPending).catch(function(){});
+    return;
+  }
+
+  if (msg.t === "ice") {
+    /* Candidates routinely arrive before the description they belong
+       to. Adding one then throws, and the call silently loses a network
+       path it may have needed, so hold them until there is somewhere to
+       put them. */
+    if (call.pc && call.pc.remoteDescription)
+      call.pc.addIceCandidate(msg.c).catch(function(){});
+    else
+      call.pending.push(msg.c);
+    return;
+  }
+
+  if (msg.t === "busy") {
+    stopTone(); setCallState("They are on another call");
+    setTimeout(function(){ hangUp("busy"); }, 2000); return;
+  }
+
+  if (msg.t === "bye") {
+    stopTone(); setCallState("Call ended");
+    setTimeout(function(){ hangUp(null); }, 900); return;
+  }
+}
+
+function drainPending(){
+  if (!call || !call.pc || !call.pending) return;
+  call.pending.forEach(function(c){ call.pc.addIceCandidate(c).catch(function(){}); });
+  call.pending = [];
+}
+
+function answer(){
+  if (!call || call.state !== "incoming") return;
+  stopTone();
+  setCallState("Asking for the microphone…");
+  $("call").classList.remove("incoming");
+
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    .then(function(stream){
+      if (!call) { stopStream(stream); return null; }
+      call.stream = stream;
+      call.pc = newPeer(call.peer);
+      stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
+      return call.pc.setRemoteDescription({ type:"offer", sdp: call.offer });
+    })
+    .then(function(){
+      if (!call || !call.pc) return null;
+      drainPending();
+      return call.pc.createAnswer();
+    })
+    .then(function(ans){
+      if (!ans || !call) return null;
+      return call.pc.setLocalDescription(ans).then(function(){
+        call.state = "answered";
+        paintCallButtons(false);
+        setCallState("Connecting…");
+        return sendSig(call.peer, { t:"answer", call: call.id,
+                                    from: state.me, sdp: ans.sdp });
+      });
+    })
+    .catch(function(err){
+      toast(err && err.name === "NotAllowedError"
+        ? "Microphone permission was refused"
+        : "Could not answer");
+      hangUp("failed");
+    });
+}
+
+function hangUp(why){
+  stopTone();
+  if (!call) { hideCallScreen(); return; }
+  if (call.giveUp) clearTimeout(call.giveUp);
+  if (call.timer)  clearInterval(call.timer);
+  /* "bye" is only worth sending when there is somebody at the other end
+     expecting one. A call that never connected has nothing to tell. */
+  if (why && why !== "failed" && why !== "noanswer")
+    sendSig(call.peer, { t:"bye", call: call.id, from: state.me })
+      .catch(function(){});
+  if (call.pc) { try { call.pc.close(); } catch (e) {} }
+  stopStream(call.stream);
+  try { $("remoteAudio").srcObject = null; } catch (e) {}
+  if (why === "declined") remember(nameOf(call.peer), "declined", false);
+  call = null;
+  hideCallScreen();
+}
+
+function stopStream(s){
+  if (!s) return;
+  s.getTracks().forEach(function(t){ try { t.stop(); } catch (e) {} });
+}
+
+function startTimer(){
+  if (call.timer) clearInterval(call.timer);
+  setCallState("00:00");
+  call.timer = setInterval(function(){
+    if (!call || !call.t0) return;
+    var s = Math.floor((Date.now() - call.t0)/1000);
+    setCallState(("0"+Math.floor(s/60)).slice(-2)+":"+("0"+(s%60)).slice(-2));
+  }, 500);
+}
+
+/* --------------------------------------------------------- ring tone */
+
+var toneStop = null;
+
+function unlockAudio(){
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) {}
+}
+
+function tone(){
+  unlockAudio();
+  if (!audioCtx) return;
+  stopTone();
+  var on = true;
+  function burst(){
+    if (!on) return;
+    try {
+      var t0 = audioCtx.currentTime, i;
+      for (i = 0; i < 2; i++) {
+        var osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+        osc.type = "sine"; osc.frequency.value = i ? 660 : 880;
+        g.gain.setValueAtTime(0.0001, t0 + i*0.45);
+        g.gain.exponentialRampToValueAtTime(0.22, t0 + i*0.45 + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + i*0.45 + 0.38);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(t0 + i*0.45); osc.stop(t0 + i*0.45 + 0.4);
+      }
+    } catch (e) {}
+    if (navigator.vibrate) navigator.vibrate([400,200,400]);
+  }
+  burst();
+  var iv = setInterval(burst, 2400);
+  toneStop = function(){
+    on = false; clearInterval(iv);
+    if (navigator.vibrate) navigator.vibrate(0);
+  };
+}
+
+function stopTone(){ if (toneStop) { toneStop(); toneStop = null; } }
+
+/* ==================================================================== *
+ * Buzz
+ * ==================================================================== */
+
+function buzz(memberId, message){
+  ringPush(memberId, nameOf(state.me) + " is buzzing you", message)
+    .then(function(r){
+      if (!r.ok) throw new Error("http");
+      toast("Buzzed " + nameOf(memberId) + " 🔔");
+      remember(nameOf(memberId), message, true);
+    })
+    .catch(function(){ toast("Could not reach " + nameOf(memberId)); });
+}
+
+function showBuzz(from, what){
+  $("ringFrom").textContent = from;
+  $("ringWhat").textContent = what || "wants your attention";
+  $("ring").classList.add("on");
+  tone();
+  setTimeout(stopTone, 5000);
+}
+
+/* ------------------------------------------------------------ recent */
+
+function remember(who, what, out, when){
+  state.recent = state.recent || [];
+  state.recent.unshift({ who: who, what: what, out: !!out,
+                         at: when ? when*1000 : Date.now() });
+  state.recent = state.recent.slice(0, 12);
+  save(); paintRecent();
+}
+function timeOf(ms){
+  var d = new Date(ms);
+  return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+}
+
+/* ------------------------------------------------------------- paint */
+
+function paintMain(){
+  var main = $("main");
+  main.innerHTML = "";
+  if (!state || !state.me) { paintWelcome(main); return; }
+
+  $("whoami").textContent = "You are " + nameOf(state.me);
+
+  var hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = "Tap anyone to call or buzz them.";
+  main.appendChild(hint);
+
+  state.members.forEach(function(m){
+    var b = document.createElement("button");
+    b.className = "person" + (m.id === state.me ? " me" : "");
+    var dot = document.createElement("span");
+    dot.className = "dot"; dot.style.background = m.colour;
+    var nm = document.createElement("span");
+    nm.className = "nm"; nm.textContent = m.name;
+    if (m.id === state.me) {
+      var sub = document.createElement("span");
+      sub.className = "sub"; sub.textContent = "this is you";
+      nm.appendChild(sub);
+    }
+    var go = document.createElement("span");
+    go.className = "go"; go.textContent = (m.id === state.me) ? "" : "›";
+    b.appendChild(dot); b.appendChild(nm); b.appendChild(go);
+    if (m.id !== state.me) b.onclick = function(){ openAct(m.id); };
+    main.appendChild(b);
+  });
+
+  var st = document.createElement("div");
+  st.className = "status"; st.id = "statusLine";
+  st.style.marginTop = "18px";
+  st.innerHTML = '<span class="led"></span><span>Connecting…</span>';
+  main.appendChild(st);
+
+  var rt = document.createElement("div");
+  rt.className = "sectiontitle"; rt.textContent = "Recent";
+  main.appendChild(rt);
+  var box = document.createElement("div"); box.id = "recentBox";
+  main.appendChild(box);
+
+  paintRecent();
+  paintStatus(ringSrc && ringSrc.readyState === 1);
+}
+
+function paintRecent(){
+  var box = $("recentBox");
+  if (!box) return;
+  box.innerHTML = "";
+  var list = (state && state.recent) || [];
+  if (!list.length) {
+    var p = document.createElement("p");
+    p.className = "hint"; p.textContent = "Nothing yet.";
+    box.appendChild(p); return;
+  }
+  list.forEach(function(r){
+    var d = document.createElement("div");
+    d.className = "log";
+    d.appendChild(document.createTextNode(r.out ? "→ " : "← "));
+    var b = document.createElement("b"); b.textContent = r.who;
+    d.appendChild(b);
+    d.appendChild(document.createTextNode(
+      (r.what ? " · " + r.what : "") + " · " + timeOf(r.at)));
+    box.appendChild(d);
+  });
+}
+
+function paintWelcome(main){
+  $("whoami").textContent = "not set up yet";
+  var p = document.createElement("p");
+  p.className = "hint";
+  p.textContent = "Nothing set up on this phone yet. Create your family here, " +
+                  "or open the invite link someone sent you.";
+  main.appendChild(p);
+  var b = document.createElement("button");
+  b.className = "btn"; b.textContent = "Set up my family";
+  b.onclick = openSetup;
+  main.appendChild(b);
+}
+
+/* ------------------------------------------------------------ sheets */
+
+var pendingId = null;
+
+function openAct(id){
+  pendingId = id;
+  $("actTitle").textContent = nameOf(id);
+  unlockAudio();                /* this tap is our chance to unlock audio */
+  openSheet("actSheet");
+}
+
+function openMsgSheet(){
+  $("msgTitle").textContent = "Buzz " + nameOf(pendingId);
+  var list = $("msgList"); list.innerHTML = "";
+  QUICK.forEach(function(q){
+    var b = document.createElement("button");
+    b.className = "msgopt"; b.textContent = q;
+    b.onclick = function(){ closeSheet("msgSheet"); buzz(pendingId, q); };
+    list.appendChild(b);
+  });
+  $("customMsg").value = "";
+  openSheet("msgSheet");
+}
+
+var draft = null, chosenColour = COLOURS[0];
+
+function openSetup(){
+  draft = state ? JSON.parse(JSON.stringify(state))
+                : { house: rand(12), me:null, members:[], recent:[], turn:null };
+  if (!draft.members.length) draft.members = [ newMember(""), newMember("") ];
+
+  $("setupTitle").textContent = state ? "Settings" : "Set up your family";
+  $("myName").value = (state && memberById(state.me))
+    ? memberById(state.me).name : "";
+  var t = (state && state.turn) || {};
+  $("turnUrl").value  = t.url  || "";
+  $("turnUser").value = t.user || "";
+  $("turnPass").value = t.pass || "";
+
+  chosenColour = (state && memberById(state.me))
+    ? memberById(state.me).colour : COLOURS[0];
+
+  paintSwatches(); paintMembers(); paintTopic();
+  $("shareArea").style.display = state ? "block" : "none";
+  if (state) $("shareLink").textContent = inviteLink();
+  openSheet("setupSheet");
+}
+
+function newMember(name){
+  return { id: rand(5), name: name,
+           colour: COLOURS[Math.floor(Math.random()*COLOURS.length)] };
+}
+
+function paintSwatches(){
+  var box = $("swatches"); box.innerHTML = "";
+  COLOURS.forEach(function(c){
+    var s = document.createElement("div");
+    s.className = "swatch" + (c === chosenColour ? " sel" : "");
+    s.style.background = c;
+    s.onclick = function(){ chosenColour = c; paintSwatches(); };
+    box.appendChild(s);
+  });
+}
+
+function paintMembers(){
+  var box = $("members"); box.innerHTML = "";
+  draft.members.forEach(function(m, i){
+    var row = document.createElement("div"); row.className = "memberrow";
+    var inp = document.createElement("input");
+    inp.type = "text"; inp.value = m.name;
+    inp.placeholder = "Name"; inp.autocomplete = "off";
+    inp.oninput = function(){ draft.members[i].name = inp.value; };
+    var del = document.createElement("button");
+    del.textContent = "×";
+    del.onclick = function(){ draft.members.splice(i,1); paintMembers(); };
+    row.appendChild(inp); row.appendChild(del); box.appendChild(row);
+  });
+}
+
+function paintTopic(){
+  $("myTopic").textContent = (state && state.me)
+    ? ringTopic(state.me) : "Save first, and your topic appears here.";
+}
+
+function saveSetup(){
+  var myName = $("myName").value.trim();
+  if (!myName) { toast("Put your own name in first"); return; }
+  draft.members = draft.members.filter(function(m){ return m.name.trim(); });
+
+  /* Matched on name rather than appended blindly, so opening Settings
+     twice does not create a second copy of yourself. */
+  var mine = null, i;
+  for (i = 0; i < draft.members.length; i++)
+    if (draft.members[i].name.trim().toLowerCase() === myName.toLowerCase())
+      { mine = draft.members[i]; break; }
+  if (!mine) { mine = newMember(myName); draft.members.push(mine); }
+  mine.name = myName; mine.colour = chosenColour;
+
+  if (draft.members.length < 2) { toast("Add at least one other person"); return; }
+
+  draft.me = mine.id;
+  draft.recent = (state && state.recent) || [];
+  draft.turn = (state && state.turn) || draft.turn || null;
+  state = draft; save();
+
+  paintMain(); openRing(); openSignal(); paintTopic();
+  $("shareArea").style.display = "block";
+  $("shareLink").textContent = inviteLink();
+  toast("Saved");
+}
+
+/* --------------------------------------------------- joining a house */
+
+function tryJoin(){
+  var m = location.hash.match(/[#&]j=([A-Za-z0-9\-_]+)/);
+  if (!m) return false;
+  var cfg = decodeConfig(m[1]);
+  history.replaceState(null, "", location.pathname);
+  if (!cfg) { toast("That invite link looks damaged"); return false; }
+
+  var keep = (state && state.recent) || [];
+  state = { house: cfg.h, me:null, members: cfg.m,
+            recent: keep, turn: cfg.t || null };
+
+  var main = $("main"); main.innerHTML = "";
+  var p = document.createElement("p");
+  p.className = "hint";
+  p.textContent = "You have been invited. Which one are you?";
+  main.appendChild(p);
+
+  state.members.forEach(function(mem){
+    var b = document.createElement("button"); b.className = "person";
+    var dot = document.createElement("span");
+    dot.className = "dot"; dot.style.background = mem.colour;
+    var nm = document.createElement("span");
+    nm.className = "nm"; nm.textContent = mem.name;
+    b.appendChild(dot); b.appendChild(nm);
+    b.onclick = function(){
+      state.me = mem.id; save();
+      paintMain(); openRing(); openSignal();
+      toast("Welcome, " + mem.name);
+      openSetup();
+    };
+    main.appendChild(b);
+  });
+  return true;
+}
+
+/* -------------------------------------------------------------- wire */
+
+function openSheet(id){ $(id).classList.add("on"); }
+function closeSheet(id){ $(id).classList.remove("on"); }
+
+each(document.querySelectorAll("[data-close]"), function(b){
+  b.onclick = function(){ closeSheet(b.getAttribute("data-close")); };
+});
+each(document.querySelectorAll(".sheet"), function(s){
+  s.onclick = function(e){ if (e.target === s) s.classList.remove("on"); };
+});
+
+$("settingsBtn").onclick = openSetup;
+$("addMember").onclick = function(){ draft.members.push(newMember("")); paintMembers(); };
+$("saveSetup").onclick = saveSetup;
+
+$("doCall").onclick = function(){ closeSheet("actSheet"); startCall(pendingId); };
+$("doBuzz").onclick = function(){ closeSheet("actSheet"); openMsgSheet(); };
+
+$("sendCustom").onclick = function(){
+  var t = $("customMsg").value.trim();
+  if (!t) { toast("Type something first"); return; }
+  closeSheet("msgSheet"); buzz(pendingId, t);
+};
+
+$("ringOk").onclick = function(){ $("ring").classList.remove("on"); stopTone(); };
+
+$("copyLink").onclick  = function(){ copy(inviteLink(), "Invite link copied"); };
+$("copyTopic").onclick = function(){
+  if (!state || !state.me) { toast("Save first"); return; }
+  copy(ringTopic(state.me), "Topic copied");
+};
+$("shareNative").onclick = function(){
+  if (navigator.share)
+    navigator.share({ title:"Family Notifyer", url: inviteLink() })
+             .catch(function(){});
+  else copy(inviteLink(), "Invite link copied");
+};
+$("testMe").onclick = function(){
+  if (!state || !state.me) { toast("Save first"); return; }
+  ringPush(state.me, "Test", "If your phone buzzed, you are set up")
+    .then(function(){ toast("Test sent"); })
+    .catch(function(){ toast("Could not send"); });
+};
+$("saveTurn").onclick = function(){
+  if (!state) { toast("Save your family first"); return; }
+  var url = $("turnUrl").value.trim();
+  state.turn = url ? { url:url, user:$("turnUser").value.trim(),
+                       pass:$("turnPass").value.trim() } : null;
+  save();
+  $("shareLink").textContent = inviteLink();
+  toast(url ? "Relay saved — re-share the invite link" : "Relay cleared");
+};
+$("resetAll").onclick = function(){
+  if (!confirm("Forget the family and start over on this phone?")) return;
+  try { localStorage.removeItem(STOREKEY); } catch (e) {}
+  state = null;
+  if (ringSrc) { ringSrc.close(); ringSrc = null; }
+  if (sigSrc)  { sigSrc.close();  sigSrc  = null; }
+  closeSheet("setupSheet"); paintMain();
+};
+
+function copy(text, ok){
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(text)
+      .then(function(){ toast(ok); }, function(){ prompt("Copy this:", text); });
+  else prompt("Copy this:", text);
+}
+
+/* -------------------------------------------------------------- start */
+
+/* file:// gives no shareable link and no microphone, so say it at the
+   top of the page rather than letting the first call fail with a toast
+   the user has to guess at. */
+if (location.protocol === "file:") $("filewarn").style.display = "block";
+
+state = load();
+if (!tryJoin()) paintMain();
+if (state && state.me) { openRing(); openSignal(); }
+
+/* A sleeping phone drops both streams without telling anyone, and the
+   moment that matters is when the screen comes back on - which is
+   exactly when somebody has just tapped a notification about a call. */
+document.addEventListener("visibilitychange", function(){
+  if (document.hidden || !state || !state.me) return;
+  if (!ringSrc || ringSrc.readyState === 2) openRing();
+  if (!sigSrc  || sigSrc.readyState  === 2) openSignal();
+});
+
+window.addEventListener("beforeunload", function(){
+  if (call) { try { hangUp("ended"); } catch (e) {} }
+});
+</script>
+</body>
+</html>
