@@ -369,7 +369,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20r";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20s";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1895,20 +1895,57 @@ $("checkConn").onclick = function(){
       + "confirm.";
   }, 8000);
 
-  fetch(srv() + "/" + encodeURIComponent(ringTopic(state.me))
-        + "/json?poll=1&since=10s")
-    .then(function(r){
+  /* Reading and sending are separate permissions as far as a filtering
+     network is concerned, and this app dies on the sending half. The
+     old version of this check only read, so it happily reported
+     "Reachable" on a network that could not send a single alert -
+     which is worse than no check at all. Both are tested now, and
+     named separately. */
+  var topic = encodeURIComponent(sigTopic(state.me));
+
+  function canRead(){
+    return fetch(srv() + "/" + topic + "/json?poll=1&since=10s")
+      .then(function(r){ return r.ok ? "ok" : ("status " + r.status); })
+      .catch(function(){ return "blocked"; });
+  }
+
+  /* Sent to this phone's own SIGNAL topic, which nothing subscribes to
+     in the ntfy app, at the lowest priority - so a connection test
+     never makes anybody's phone buzz. */
+  function canSend(){
+    return fetch(srv() + "/" + topic + "?priority=1",
+                 { method:"POST", body:"connection test" })
+      .then(function(r){
+        if (r.ok) return "ok";
+        return r.status === 429 ? "throttled" : ("status " + r.status);
+      })
+      .catch(function(){ return "blocked"; });
+  }
+
+  canRead().then(function(read){
+    return canSend().then(function(send){
       clearTimeout(timer);
-      el.textContent = r.ok
-        ? "Reachable — " + srv() + " answered in "
-          + (Date.now() - started) + "ms. Notifications can get through."
-        : "Reached " + srv() + " but it answered " + r.status + ".";
-    })
-    .catch(function(){
-      clearTimeout(timer);
-      el.textContent = "Cannot reach " + srv() + " from this network. "
-        + "Try mobile data — if it works there, your wifi is blocking it.";
+      var ms = Date.now() - started;
+
+      if (read === "ok" && send === "ok") {
+        el.textContent = "Working — " + srv() + " answered in " + ms
+          + "ms, and this network can both receive and send.";
+      } else if (send === "blocked" && read === "ok") {
+        el.textContent = "This network lets the app READ from " + srv()
+          + " but blocks SENDING to it. Calls and buzzes from this "
+          + "network will never reach anyone. Incoming still works.";
+      } else if (send === "throttled") {
+        el.textContent = "Reachable, but " + srv() + " is throttling you "
+          + "right now (too many messages). Wait a few minutes.";
+      } else if (read === "blocked" && send === "blocked") {
+        el.textContent = "Cannot reach " + srv() + " at all from this "
+          + "network — it is being blocked. Try mobile data to compare.";
+      } else {
+        el.textContent = "Read: " + read + " · Send: " + send
+          + " — from " + srv() + ".";
+      }
     });
+  });
 };
 
 $("saveServer").onclick = function(){
