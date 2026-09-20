@@ -287,10 +287,10 @@
       Search <b>ntfy</b> on the App&nbsp;Store or Play&nbsp;Store and install
       it, then come back and tap the button below.
     </p>
-    <button class="btn" id="ntfyOpen">1 · Open the ntfy app and subscribe</button>
-    <p class="sub" style="margin-top:8px">
-      Nothing happened? The app isn't installed yet — get <b>ntfy</b> from the
-      App Store or Play Store, then tap the button again.
+    <button class="btn" id="ntfyOpen">1 · Subscribe this phone</button>
+    <p class="sub" style="margin-top:8px" id="ntfyHow">
+      On Android this opens ntfy with the topic filled in. On iPhone the topic
+      is copied instead — open <b>ntfy</b>, tap <b>+</b>, and paste it.
     </p>
     <button class="btn ghost" id="testMe">2 · Test — this phone should buzz</button>
     <button class="btn ghost" id="notifyBtn">3 · Allow this page to alert me</button>
@@ -354,7 +354,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20j";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20k";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var SERVER   = "https://ntfy.sh";
@@ -519,13 +519,31 @@ function sendSig(memberId, obj){
 
 /* --------------------------------------------------------- listening */
 
+/* When either stream last showed any sign of life.
+ *
+ * A phone that sleeps drops these connections without telling anyone:
+ * readyState still reads OPEN, no error fires, and nothing arrives ever
+ * again - which is exactly the "it only works if I refresh the page"
+ * problem. ntfy sends a keepalive every 45 seconds or so, so silence
+ * past a couple of minutes means the stream is dead however healthy it
+ * claims to be. */
+var lastBeat = { ring: 0, sig: 0 };
+
+function beat(which){ lastBeat[which] = Date.now(); }
+
 function openRing(){
   if (ringSrc) ringSrc.close();
   ringSrc = new EventSource(
     SERVER + "/" + encodeURIComponent(ringTopic(state.me)) + "/sse");
-  ringSrc.onopen  = function(){ paintStatus(true); };
+  beat("ring");
+  ringSrc.onopen  = function(){ beat("ring"); paintStatus(true); };
   ringSrc.onerror = function(){ paintStatus(false); };
+  /* ntfy names these events, so they never reach onmessage - but they
+     are the only proof the connection is still alive between calls. */
+  ringSrc.addEventListener("keepalive", function(){ beat("ring"); });
+  ringSrc.addEventListener("open", function(){ beat("ring"); });
   ringSrc.onmessage = function(ev){
+    beat("ring");
     var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.event !== "message" || seen[m.id]) return;
     seen[m.id] = 1;
@@ -560,7 +578,12 @@ function openSignal(){
   if (sigSrc) sigSrc.close();
   var topic = encodeURIComponent(sigTopic(state.me));
   sigSrc = new EventSource(SERVER + "/" + topic + "/sse");
+  beat("sig");
+  sigSrc.addEventListener("keepalive", function(){ beat("sig"); });
+  sigSrc.addEventListener("open", function(){ beat("sig"); });
+  sigSrc.onopen = function(){ beat("sig"); };
   sigSrc.onmessage = function(ev){
+    beat("sig");
     var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
     if (m.event !== "message" || seen[m.id]) return;
     seen[m.id] = 1;
@@ -773,6 +796,35 @@ function newPeer(peerId){
   return pc;
 }
 
+/* Which path the audio actually took.
+ *
+ * Worth saying out loud, because the relay is a fallback and not a
+ * toll booth: WebRTC always tries the direct route first, so two
+ * phones on the same wifi talk to each other and the relay is never
+ * touched. It only carries the call when there is no direct path -
+ * which is the mobile-data case. Showing which happened turns that
+ * from a claim into something visible. */
+function showRoute(){
+  if (!call || !call.pc || !call.pc.getStats) return;
+  call.pc.getStats(null).then(function(stats){
+    var pairs = {}, cands = {};
+    stats.forEach(function(r){
+      if (r.type === "candidate-pair" && r.state === "succeeded") pairs[r.id] = r;
+      if (r.type === "local-candidate" || r.type === "remote-candidate") cands[r.id] = r;
+    });
+    var ids = Object.keys(pairs);
+    if (!ids.length) return;
+    var p = pairs[ids[0]];
+    var a = cands[p.localCandidateId], b = cands[p.remoteCandidateId];
+    var relayed = (a && a.candidateType === "relay") ||
+                  (b && b.candidateType === "relay");
+    var note = $("callNote");
+    if (note && call && call.state === "connected")
+      note.textContent = relayed ? "Connected through the relay"
+                                 : "Connected directly, phone to phone";
+  }).catch(function(){});
+}
+
 function markConnected(){
   if (!call || call.state === "connected") return;   /* both events fire */
   stopTone();
@@ -783,6 +835,7 @@ function markConnected(){
   $("call").classList.remove("incoming");
   $("callNote").textContent = "";
   startTimer();
+  setTimeout(showRoute, 600);
 }
 
 function markFailed(){
@@ -1689,11 +1742,33 @@ $("copyTopic").onclick = function(){
    text. If the app is not installed nothing happens at all - the
    browser simply ignores a scheme it does not know - which is why the
    line underneath says so. */
+var IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+             (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 $("ntfyOpen").onclick = function(){
   if (!state || !state.me) { toast("Save first"); return; }
   state.ntfy = true; save(); paintNtfyWarn();
-  try { location.href = "ntfy://ntfy.sh/" + ringTopic(state.me); }
-  catch (e) { copy(ringTopic(state.me), "Topic copied — paste it into ntfy"); }
+
+  /* The topic goes on the clipboard either way, so there is always a
+     way forward even when nothing opens. */
+  copy(ringTopic(state.me), "Topic copied");
+
+  /* Only Android registers the ntfy:// scheme. Navigating to it on an
+     iPhone produced "Safari cannot open the page because the address
+     is invalid" - a dead end dressed up as an error, and worse than
+     doing nothing. */
+  if (IS_IOS) {
+    toast("Topic copied — open ntfy, tap +, and paste it");
+    return;
+  }
+  try {
+    var a = document.createElement("a");
+    a.href = "ntfy://ntfy.sh/" + ringTopic(state.me);
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ try { document.body.removeChild(a); } catch (e) {} }, 0);
+  } catch (e) {}
 };
 
 $("ntfyfix").onclick = function(){ openSetup(); };
@@ -1762,14 +1837,34 @@ state = load();
 if (!tryJoin()) paintMain();
 if (state && state.me) { openRing(); openSignal(); }
 
-/* A sleeping phone drops both streams without telling anyone, and the
-   moment that matters is when the screen comes back on - which is
-   exactly when somebody has just tapped a notification about a call. */
+/* Reconnects anything that has gone quiet, whatever it claims about
+   itself. Called on a timer, when the page comes back to the front,
+   and when the network returns - a phone coming off the lift hits all
+   three within a second of each other, and reopening a stream that was
+   already fine costs nothing. */
+function reviveStreams(force){
+  if (!state || !state.me) return;
+  var now = Date.now(), STALE = 110000;
+  if (force || !ringSrc || ringSrc.readyState === 2 ||
+      now - lastBeat.ring > STALE) openRing();
+  if (force || !sigSrc || sigSrc.readyState === 2 ||
+      now - lastBeat.sig > STALE) { openSignal(); }
+}
+
+setInterval(function(){ reviveStreams(false); }, 30000);
+
 document.addEventListener("visibilitychange", function(){
-  if (document.hidden || !state || !state.me) return;
-  if (!ringSrc || ringSrc.readyState === 2) openRing();
-  if (!sigSrc  || sigSrc.readyState  === 2) openSignal();
+  if (document.hidden) return;
+  /* Forced, not checked. Coming back to the page is the one moment the
+     user is definitely waiting on it, and a stream that died while the
+     screen was off will not have noticed yet. */
+  reviveStreams(true);
+  pollSignal();
 });
+
+window.addEventListener("online",  function(){ reviveStreams(true); });
+window.addEventListener("pageshow", function(){ reviveStreams(true); });
+window.addEventListener("focus",   function(){ reviveStreams(false); });
 
 window.addEventListener("beforeunload", function(){
   if (call) { try { hangUp("ended"); } catch (e) {} }
