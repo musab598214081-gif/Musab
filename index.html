@@ -253,6 +253,13 @@
         <button class="btn ghost" id="copyLink">Copy link</button>
         <button class="btn ghost" id="shareNative">Share</button>
       </div>
+
+      <div class="sectiontitle">Your own link</div>
+      <p class="sub">Bookmark this one on this phone. It restores everything —
+        including who you are — if the browser ever forgets. Don't send it to
+        anyone else; it names you.</p>
+      <div class="codebox" id="mineLink"></div>
+      <button class="btn ghost" id="copyMine">Copy my link</button>
     </div>
 
     <div class="sectiontitle">Ringing this phone</div>
@@ -398,6 +405,15 @@ function decodeConfig(str){
 }
 function inviteLink(){
   return location.origin + location.pathname + "#j=" + encodeConfig();
+}
+
+/* The same link with your own name baked in. Worth keeping because
+   phone browsers do throw this storage away - iOS clears a site's data
+   after a stretch of not visiting it - and without this the only way
+   back is to open the family link and pick your name again, which is
+   fine until it happens while you are waiting for a call. */
+function personalLink(){
+  return inviteLink() + "&m=" + state.me;
 }
 
 /* -------------------------------------------------------- publishing */
@@ -1158,7 +1174,8 @@ function openSetup(){
 
   paintSwatches(); paintMembers(); paintTopic(); paintTones();
   $("shareArea").style.display = state ? "block" : "none";
-  if (state) $("shareLink").textContent = inviteLink();
+  if (state) { $("shareLink").textContent = inviteLink();
+               $("mineLink").textContent = personalLink(); }
   openSheet("setupSheet");
 }
 
@@ -1235,7 +1252,14 @@ function saveSetup(){
 
   draft.me = mine.id;
   draft.recent = (state && state.recent) || [];
-  draft.turn = (state && state.turn) || draft.turn || null;
+  /* Read from the boxes rather than from the last saved state, so
+     typing relay details and then pressing Save (instead of Save relay)
+     does not silently throw them away. */
+  var tUrl = $("turnUrl").value.trim();
+  draft.turn = tUrl ? { url: tUrl,
+                        user: $("turnUser").value.trim(),
+                        pass: $("turnPass").value.trim() }
+                    : ((state && state.turn) || draft.turn || null);
   /* Personal, so it stays on this phone and never travels in the
      invite link - everyone picks their own. */
   draft.tone = (state && state.tone) || draft.tone || "classic";
@@ -1244,6 +1268,7 @@ function saveSetup(){
   paintMain(); openRing(); openSignal(); paintTopic();
   $("shareArea").style.display = "block";
   $("shareLink").textContent = inviteLink();
+  $("mineLink").textContent = personalLink();
   toast("Saved");
 }
 
@@ -1256,10 +1281,40 @@ function tryJoin(){
   history.replaceState(null, "", location.pathname);
   if (!cfg) { toast("That invite link looks damaged"); return false; }
 
-  var keep = (state && state.recent) || [];
-  var keepTone = (state && state.tone) || "classic";
-  state = { house: cfg.h, me:null, members: cfg.m,
+  var prev     = state || {};
+  var keep     = prev.recent || [];
+  var keepTone = prev.tone || "classic";
+
+  /* Who you already were, if you were anyone.
+   *
+   * Opening the invite link used to wipe the identity and make you pick
+   * your name again - and people re-open that link constantly, because
+   * it is the one sitting in the family WhatsApp group. Losing your
+   * identity also loses the topic you are listening on, so the phone
+   * quietly stops ringing until somebody notices.
+   *
+   * The link can also name you outright (the personal link below), for
+   * restoring a phone that has forgotten everything. */
+  var named = location.hash.match(/[#&]m=([A-Za-z0-9\-_]+)/);
+  var mine  = null;
+  if (named) mine = named[1];
+  else if (prev.house === cfg.h && prev.me) mine = prev.me;
+
+  /* Only if that person is still on the list - somebody removed from
+     the family should not keep receiving calls. */
+  var stillThere = false, i;
+  for (i = 0; i < cfg.m.length; i++) if (cfg.m[i].id === mine) stillThere = true;
+  if (!stillThere) mine = null;
+
+  state = { house: cfg.h, me: mine, members: cfg.m,
             recent: keep, turn: cfg.t || null, tone: keepTone };
+
+  if (mine) {
+    save();
+    paintMain(); openRing(); openSignal();
+    toast("Welcome back, " + nameOf(mine));
+    return true;
+  }
 
   var main = $("main"); main.innerHTML = "";
   var p = document.createElement("p");
@@ -1313,6 +1368,10 @@ $("sendCustom").onclick = function(){
 $("ringOk").onclick = function(){ $("ring").classList.remove("on"); stopTone(); };
 
 $("copyLink").onclick  = function(){ copy(inviteLink(), "Invite link copied"); };
+$("copyMine").onclick  = function(){
+  if (!state || !state.me) { toast("Save first"); return; }
+  copy(personalLink(), "Your own link copied — bookmark it");
+};
 $("copyTopic").onclick = function(){
   if (!state || !state.me) { toast("Save first"); return; }
   copy(ringTopic(state.me), "Topic copied");
@@ -1336,6 +1395,7 @@ $("saveTurn").onclick = function(){
                        pass:$("turnPass").value.trim() } : null;
   save();
   $("shareLink").textContent = inviteLink();
+  $("mineLink").textContent = personalLink();
   toast(url ? "Relay saved — re-share the invite link" : "Relay cleared");
 };
 $("resetAll").onclick = function(){
