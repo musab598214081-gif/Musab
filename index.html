@@ -300,6 +300,21 @@
     <div class="codebox" id="myTopic">—</div>
     <button class="btn ghost" id="copyTopic">Copy topic</button>
 
+    <div class="sectiontitle">Connection</div>
+    <p class="sub" id="connState">Tap check to see whether this network
+      allows the notification server.</p>
+    <button class="btn ghost" id="checkConn">Check connection</button>
+
+    <label for="serverUrl">Notification server</label>
+    <p class="sub" style="margin:0 0 6px">
+      Leave this alone unless the check above fails on every network you use.
+      Some office and school wifi blocks <b>ntfy.sh</b> outright — if yours
+      does, run your own ntfy and put its address here. It travels in the
+      invite links, so everyone moves together.
+    </p>
+    <input type="text" id="serverUrl" placeholder="https://ntfy.sh" autocomplete="off">
+    <button class="btn ghost" id="saveServer">Save server</button>
+
     <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
 
     <div class="sectiontitle">Ringtone</div>
@@ -354,10 +369,21 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20l";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-20n";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
-var SERVER   = "https://ntfy.sh";
+var DEFAULT_SERVER = "https://ntfy.sh";
+
+/* Which ntfy server this family uses.
+ *
+ * Configurable because ntfy.sh is a single domain, and a network that
+ * blocks it blocks the whole app - which is not a bug anyone can fix
+ * from inside the page. Anyone can run their own ntfy, and pointing
+ * every phone at it is one field. It travels in the invite links, so
+ * the family stays on one server. */
+function srv(){
+  return (state && state.server) || DEFAULT_SERVER;
+}
 var STOREKEY = "familyNotifyer.v2";
 var MAXBODY  = 3400;          /* ntfy caps a message at 4096 bytes */
 
@@ -426,7 +452,8 @@ function nameOf(id){ var m = memberById(id); return m ? m.name : "Someone"; }
 function encodeConfig(){
   var payload = JSON.stringify({ h: state.house, m: state.members,
                                  t: state.turn || null,
-                                 r: state.rev || 0 });
+                                 r: state.rev || 0,
+                                 s: state.server || null });
   var b64 = btoa(unescape(encodeURIComponent(payload)));
   return b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -469,7 +496,7 @@ function personalLink(){ return linkFor(state.me); }
    vibrate hard and pop over whatever is on screen. */
 function ringPush(memberId, title, message, answerable){
   var home = location.origin + location.pathname;
-  var base = SERVER + "/" + encodeURIComponent(ringTopic(memberId))
+  var base = srv() + "/" + encodeURIComponent(ringTopic(memberId))
            + "?title="  + encodeURIComponent(title)
            + "&priority=5&tags=telephone_receiver"
            + "&click="  + encodeURIComponent(home);
@@ -501,7 +528,7 @@ function ringPush(memberId, title, message, answerable){
    with nothing on screen to explain why. */
 function sendSig(memberId, obj){
   var body = JSON.stringify(obj);
-  var url  = SERVER + "/" + encodeURIComponent(sigTopic(memberId)) + "?priority=1";
+  var url  = srv() + "/" + encodeURIComponent(sigTopic(memberId)) + "?priority=1";
 
   if (body.length <= MAXBODY) return fetch(url, { method:"POST", body: body });
 
@@ -534,7 +561,7 @@ function beat(which){ lastBeat[which] = Date.now(); }
 function openRing(){
   if (ringSrc) ringSrc.close();
   ringSrc = new EventSource(
-    SERVER + "/" + encodeURIComponent(ringTopic(state.me)) + "/sse");
+    srv() + "/" + encodeURIComponent(ringTopic(state.me)) + "/sse");
   beat("ring");
   ringSrc.onopen  = function(){ beat("ring"); paintStatus(true); };
   ringSrc.onerror = function(){ paintStatus(false); };
@@ -577,7 +604,7 @@ function openRing(){
 function openSignal(){
   if (sigSrc) sigSrc.close();
   var topic = encodeURIComponent(sigTopic(state.me));
-  sigSrc = new EventSource(SERVER + "/" + topic + "/sse");
+  sigSrc = new EventSource(srv() + "/" + topic + "/sse");
   beat("sig");
   sigSrc.addEventListener("keepalive", function(){ beat("sig"); });
   sigSrc.addEventListener("open", function(){ beat("sig"); });
@@ -599,7 +626,7 @@ function openSignal(){
    ntfy keeps recent messages, so ask for the last two minutes. */
 function pollSignal(){
   if (!state || !state.me) return;
-  fetch(SERVER + "/" + encodeURIComponent(sigTopic(state.me))
+  fetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
         + "/json?poll=1&since=2m")
     .then(function(r){ return r.text(); })
     .then(function(text){
@@ -637,7 +664,8 @@ function paintStatus(live){
   if (!el) return;
   el.classList.toggle("live", !!live);
   el.querySelector("span:last-child").textContent =
-    live ? "Ready for calls" : "Offline — the ntfy app still rings";
+    live ? "Ready for calls"
+         : "Not connected to " + srv() + " — check Settings → Connection";
 }
 
 /* ==================================================================== *
@@ -904,7 +932,10 @@ function callError(err, phase){
   if (name === "SyntaxError" || /ice|turn|server/i.test(text))
     return "Relay server details are not valid — check Settings";
   if (/fetch|network|load failed/i.test(text) || name === "TypeError")
-    return "No internet connection";
+    /* Not "no internet" - the page itself loaded, so there plainly is
+       some. What failed is the one host everything here depends on,
+       and naming it is the difference between a shrug and a fix. */
+    return "Cannot reach " + srv() + " — this network is blocking it";
   return (phase === "answer" ? "Could not answer" : "Could not start the call")
          + (name ? " (" + name + ")" : "");
 }
@@ -1233,7 +1264,9 @@ function buzz(memberId, message){
       toast("Buzzed " + nameOf(memberId) + " 🔔");
       remember(nameOf(memberId), message, true);
     })
-    .catch(function(){ toast("Could not reach " + nameOf(memberId)); });
+    .catch(function(){
+      toast("Could not reach " + srv() + " — this network is blocking it");
+    });
 }
 
 /* The nearest thing to bringing the page forward by itself.
@@ -1423,6 +1456,9 @@ function openSetup(){
     ? memberById(state.me).colour : COLOURS[0];
 
   $("verTag").textContent = VERSION;
+  $("serverUrl").value = (state && state.server) || "";
+  $("connState").textContent = "Tap check to see whether this network "
+    + "allows the notification server.";
   paintNotifyState();
   paintSwatches(); paintMembers(); paintTopic(); paintTones();
   $("shareArea").style.display = state ? "block" : "none";
@@ -1629,7 +1665,8 @@ function broadcastRoster(){
   state.members.forEach(function(m){
     if (m.id === state.me) return;
     sendSig(m.id, { t:"roster", from: state.me, rev: state.rev || 0,
-                    members: state.members, turn: state.turn || null })
+                    members: state.members, turn: state.turn || null,
+                    server: state.server || null })
       .catch(function(){});
   });
 }
@@ -1641,6 +1678,7 @@ function takeRoster(msg){
   state.rev = msg.rev || 0;
   state.members = msg.members;
   state.turn = msg.turn || null;
+  state.server = msg.server || null;
 
   /* If this phone's person is no longer on the list, they have been
      removed. Better to say so than to sit on a topic nobody calls. */
@@ -1690,7 +1728,8 @@ function tryJoin(){
   if (!stillThere) mine = null;
 
   state = { house: cfg.h, me: mine, members: cfg.m, rev: cfg.r || 0,
-            recent: keep, turn: cfg.t || null, tone: keepTone };
+            recent: keep, turn: cfg.t || null, tone: keepTone,
+            server: cfg.s || null };
 
   if (mine) {
     save();
@@ -1793,6 +1832,51 @@ $("ntfyOpen").onclick = function(){
 };
 
 $("ntfyfix").onclick = function(){ openSetup(); };
+
+/* A plain reachability test, so "it is not working" can be answered
+   with which half is not working. */
+$("checkConn").onclick = function(){
+  var el = $("connState");
+  el.textContent = "Checking…";
+  var started = Date.now();
+  var timer = setTimeout(function(){
+    el.textContent = "No answer from " + srv() + " after 8 seconds. This "
+      + "network is almost certainly blocking it — try mobile data to "
+      + "confirm.";
+  }, 8000);
+
+  fetch(srv() + "/" + encodeURIComponent(ringTopic(state.me))
+        + "/json?poll=1&since=10s")
+    .then(function(r){
+      clearTimeout(timer);
+      el.textContent = r.ok
+        ? "Reachable — " + srv() + " answered in "
+          + (Date.now() - started) + "ms. Notifications can get through."
+        : "Reached " + srv() + " but it answered " + r.status + ".";
+    })
+    .catch(function(){
+      clearTimeout(timer);
+      el.textContent = "Cannot reach " + srv() + " from this network. "
+        + "Try mobile data — if it works there, your wifi is blocking it.";
+    });
+};
+
+$("saveServer").onclick = function(){
+  if (!state) { toast("Save your family first"); return; }
+  var v = $("serverUrl").value.trim().replace(/\/+$/, "");
+  if (v && !/^https:\/\/[A-Za-z0-9.\-]+(:\d+)?$/.test(v)) {
+    toast("That should look like https://ntfy.example.com");
+    return;
+  }
+  state.server = (v && v !== DEFAULT_SERVER) ? v : null;
+  state.rev = (state.rev || 0) + 1;
+  save();
+  broadcastRoster();
+  if (state.me) { openRing(); openSignal(); }
+  paintInvites();
+  $("mineLink").textContent = personalLink();
+  toast("Server saved — send everyone their link again");
+};
 
 $("notifyBtn").onclick = function(){
   try {
