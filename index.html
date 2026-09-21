@@ -512,7 +512,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22e";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22f";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1445,21 +1445,47 @@ function adminLink(forId){
          b64u(JSON.stringify(state.adminKey));
 }
 
+/* Taking the admin key from a hand-over or recovery link.
+ *
+ * The key IS the authority - it is what every phone checks signatures
+ * against - so a valid key, on a link addressed to this device's
+ * person, makes this device the admin. It used to also insist that the
+ * family already named this device as admin, and that check failed
+ * whenever the link was opened before the hand-over announcement had
+ * arrived: the new admin's own link was refused, and nobody could
+ * finish the hand-over.
+ *
+ * Taking over is announced, signed, to everyone - which is also what
+ * tells the previous admin's phone to let go of its copy of the key. */
 function takeAdminKey(raw){
-  if (!raw || !state || !state.admin) return;
+  if (!raw || !state || !state.admin || !state.me) return false;
   var jwk;
-  try { jwk = JSON.parse(unb64u(raw)); } catch (e) { return; }
-  if (!jwk || jwk.x !== state.admin.pub.x || jwk.y !== state.admin.pub.y) {
+  try { jwk = JSON.parse(unb64u(raw)); } catch (e) { jwk = null; }
+  if (!jwk || !jwk.d || jwk.x !== state.admin.pub.x || jwk.y !== state.admin.pub.y) {
     toast("That admin link does not belong to this family");
-    return;
-  }
-  if (state.admin.id !== state.me) {
-    toast("That admin link is for " + nameOf(state.admin.id) + ", not this phone");
-    return;
+    return false;
   }
   state.adminKey = jwk;
-  save();
-  toast("Admin control restored on this phone");
+  if (state.admin.id !== state.me) state.admin = { id: state.me, pub: state.admin.pub };
+  bumpRev(); save();
+  broadcastRoster();
+  toast("This device is now the family admin");
+  if ($("setupSheet").classList.contains("on")) openSetup();
+  return true;
+}
+
+/* A hand-over or recovery link pasted into Settings - for a device that
+   cannot simply open it (a laptop the link was not sent to, say). */
+function takeAdminFromText(text){
+  var t = String(text || "").trim();
+  var ak = t.match(/[#&]ak=([A-Za-z0-9\-_]+)/);
+  var who = t.match(/[#&]m=([A-Za-z0-9\-_]+)/);
+  if (!ak) { toast("That is not an admin link — it should end in &ak=…"); return; }
+  if (who && who[1] !== state.me) {
+    toast("That link is for " + nameOf(who[1]) + ", not " + nameOf(state.me));
+    return;
+  }
+  takeAdminKey(ak[1]);
 }
 
 function handOver(toId){
@@ -1505,11 +1531,13 @@ function paintAdmin(){
       else copy(pendingHandover, "Admin link copied");
     });
     button("Copy", "ghost", function(){ copy(pendingHandover, "Admin link copied"); });
+    para("This phone keeps its copy of the key until " + nameOf(state.admin.id) +
+         " opens the link - so if the link goes astray, nothing is lost: " +
+         "come back here and send it again.");
     button("Done — I've sent it", "ghost", function(){
       pendingHandover = null;
-      delete state.adminKey;
-      save(); openSetup();
-      toast(nameOf(state.admin.id) + " manages the family now");
+      openSetup();
+      toast("Waiting for " + nameOf(state.admin.id) + " to open the link");
     });
     return;
   }
@@ -1551,7 +1579,49 @@ function paintAdmin(){
     return;
   }
 
-  para("Managed by " + nameOf(state.admin.id) + ".");
+  var waiting = state.admin.id === state.me && !state.adminKey;
+  var handing = canSign() && state.admin.id !== state.me;
+  if (handing) {
+    para("You're handing the family over to " + nameOf(state.admin.id) + ". " +
+         "Until they open the hand-over link, this phone can still send it again.");
+    button("Show the hand-over link again", "ghost", function(){
+      pendingHandover = adminLink(state.admin.id); paintAdmin();
+    });
+    return;
+  }
+  para(waiting
+    ? "You've been made the family admin. To finish, open the hand-over link " +
+      "you were sent on this device - or paste it here."
+    : "Managed by " + nameOf(state.admin.id) + ". If you have a hand-over or " +
+      "recovery link for " + nameOf(state.me) + ", paste it here.");
+  var wrap = document.createElement("div");
+  wrap.className = "secret";
+  var inp = document.createElement("input");
+  inp.type = "text"; inp.id = "adminPaste"; inp.placeholder = "Paste the admin link";
+  inp.setAttribute("autocomplete", "off"); inp.setAttribute("spellcheck", "false");
+  wrap.appendChild(inp);
+  box.appendChild(wrap);
+  var go = button(waiting ? "Finish taking over" : "Use this link", waiting ? "" : "ghost",
+                  function(){ takeAdminFromText(inp.value); });
+  go.id = "adminPasteGo";
+
+  /* The way out if the key is gone for good - no hand-over link, no
+     recovery link. It only changes THIS phone: the others keep
+     following the old key and ignore it, so it cannot be used to take
+     over anyone else's phone. Done on every phone, the family is
+     unmanaged again and any one of them can become the admin. */
+  var lost = button("Admin key lost for good?", "ghost", function(){
+    if (!confirm("Only if nobody has the admin key any more - no hand-over " +
+                 "link and no recovery link.\n\nThis phone will stop following " +
+                 "the admin. Do the same on every phone in the family, then make " +
+                 "one of them the admin. Continue?")) return;
+    state.admin = null;
+    delete state.adminKey;
+    save(); openSetup();
+    toast("This phone no longer follows an admin — now do the same on the others");
+  });
+  lost.id = "adminLost";
+  lost.style.color = "var(--mist)";
 }
 
 /* A verified update from the admin: it is the family's settings, whole -
@@ -1568,7 +1638,13 @@ function takeSignedFamily(fam){
   state.token = fam.token || null;
   state.admin = fam.admin;
   /* Handed over: the key belongs to the new admin now. */
-  if (state.adminKey && state.admin.id !== state.me && !pendingHandover) delete state.adminKey;
+  /* A signed update that names someone else as admin, arriving from
+     another phone, can only have been signed by a phone holding the
+     key - so the new admin has taken over, and this copy can go. */
+  if (state.adminKey && state.admin.id !== state.me) {
+    delete state.adminKey;
+    pendingHandover = null;
+  }
   var still = state.members.some(function(m){ return m.id === state.me; });
   if (!still) state.me = null;
   save();
@@ -1612,10 +1688,14 @@ function applyLock(){
   }
   var note = $("lockNote");
   note.style.display = locked ? "block" : "none";
-  if (locked) note.innerHTML = "<b>" + escapeHtml(nameOf(state.admin.id)) +
-    " manages this family.</b> Shared settings are shown read-only. You can " +
-    "set up ringing on this phone, copy your topic, choose your ringtone and " +
-    "test the relays.";
+  if (locked) note.innerHTML = (state.admin.id === state.me && !state.adminKey)
+    ? "<b>You've been made the admin, but this device doesn't have the admin " +
+      "key yet.</b> Open the hand-over link you were sent on this device, or " +
+      "paste it under Family admin below. Until then, settings stay read-only."
+    : "<b>" + escapeHtml(nameOf(state.admin.id)) +
+      " manages this family.</b> Shared settings are shown read-only. You can " +
+      "set up ringing on this phone, copy your topic, choose your ringtone and " +
+      "test the relays.";
   $("setupSub").style.display = state ? "none" : "";
 }
 function escapeHtml(t){
@@ -3850,7 +3930,7 @@ function tryJoin(){
             token:  older ? (prev.token || cfg.k || null)
                           : (cfg.k || (same && prev.token) || null) };
   if (state.adminKey === undefined) delete state.adminKey;
-  if (akey) takeAdminKey(akey[1]);
+  if (akey && (!named || named[1] === state.me)) takeAdminKey(akey[1]);
 
   if (mine) {
     save();
