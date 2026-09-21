@@ -352,7 +352,20 @@
     <label for="turnPass">Credential</label>
     <input type="text" id="turnPass" autocomplete="off">
     <button class="btn ghost" id="saveTurn">Save relay</button>
-    <button class="btn ghost" id="testTurn">Test relay on this network</button>
+
+    <div class="sectiontitle">Additional relay (optional)</div>
+    <p class="sub">
+      A second relay, used <b>together with</b> the one above - the call
+      takes whichever connects best, and if one is down or blocked the
+      other carries it. Made for <b>Cloudflare</b> (1,000 GB a month
+      free): deploy the small Worker file that came with this app, then
+      paste its address here.
+    </p>
+    <label for="turn2Url">Cloudflare Worker link</label>
+    <input type="text" id="turn2Url" placeholder="https://family-relay.NAME.workers.dev" autocomplete="off">
+    <button class="btn ghost" id="saveTurn2">Save additional relay</button>
+
+    <button class="btn ghost" id="testTurn">Test relays on this network</button>
 
     <button class="btn ghost" data-close="setupSheet" style="margin-top:22px">Close</button>
     <button class="btn danger" id="resetAll">Start over</button>
@@ -385,7 +398,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-21f";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-21g";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -481,6 +494,7 @@ function snapshot(){
   if (!state) return null;
   return { house: state.house, me: state.me, members: state.members,
            rev: state.rev || 0, turn: state.turn || null,
+           turn2: state.turn2 || null,
            server: state.server || null, token: state.token || null,
            tone: state.tone || "classic", ntfy: !!state.ntfy };
 }
@@ -638,6 +652,7 @@ function nameOf(id){ var m = memberById(id); return m ? m.name : "Someone"; }
 function encodeConfig(){
   var payload = JSON.stringify({ h: state.house, m: state.members,
                                  t: state.turn || null,
+                                 t2: state.turn2 || null,
                                  r: state.rev || 0,
                                  s: state.server || null,
                                  k: state.token || null });
@@ -1068,68 +1083,118 @@ function tidyRelayLink(raw){
          .test(u) ? u : "";
 }
 
-var relayCache = { servers: [], at: 0, link: "" };
+/* The additional relay: a link to your own Cloudflare Worker, which
+   hands out fresh Cloudflare TURN credentials (see the Worker file).
+   Any https address is accepted - the Worker lives wherever you
+   deployed it - but nothing with spaces or quotes in it. */
+function tidyWorkerLink(raw){
+  var u = String(raw || "").trim().replace(/^["'\s]+|["',\s]+$/g, "");
+  return /^https:\/\/[A-Za-z0-9.\-]+(:\d+)?(\/[A-Za-z0-9._~\-\/]*)?(\?[A-Za-z0-9._~\-=&%]*)?$/
+         .test(u) ? u : "";
+}
 
-function ensureRelay(){
-  var link = state && state.turn && state.turn.api;
-  if (!link) return Promise.resolve(false);
-  /* Kept for an hour; the call must not wait on it when it is fresh. */
-  if (relayCache.link === link && relayCache.servers.length &&
-      Date.now() - relayCache.at < 3600000) return Promise.resolve(true);
-  var fetched = netFetch(link, {}, 2).then(function(r){
+/* Fetched relay details, one entry per link, kept on the phone so a
+   call can start at once. Cloudflare's credentials expire (at most 48
+   hours; the Worker asks for 24), so anything older than 20 hours is
+   never used, and anything older than an hour is refreshed. */
+var relayCache = {};
+try {
+  var cachedRelay = JSON.parse(localStorage.getItem("fmn-relays") || "{}");
+  if (cachedRelay && typeof cachedRelay === "object") relayCache = cachedRelay;
+} catch (e) {}
+
+function relayLinks(){
+  var out = [];
+  if (state && state.turn && state.turn.api) out.push(state.turn.api);
+  if (state && state.turn2 && state.turn2.api) out.push(state.turn2.api);
+  return out;
+}
+
+function cachedServers(link){
+  var e = relayCache[link];
+  return (e && e.servers && e.servers.length &&
+          Date.now() - e.at < 20 * 3600000) ? e.servers : [];
+}
+
+function fetchRelay(link){
+  return netFetch(link, {}, 2).then(function(r){
     return r.ok ? r.json() : [];
-  }).then(function(list){
-    var servers = (Array.isArray(list) ? list : []).filter(function(x){
-      return x && x.urls;
-    });
+  }).then(function(body){
+    /* Open Relay answers with a list; Cloudflare (via the Worker, or
+       raw) with { iceServers: [...] }. Either is fine. */
+    var list = Array.isArray(body) ? body
+             : (body && Array.isArray(body.iceServers)) ? body.iceServers : [];
+    var servers = list.filter(function(x){ return x && x.urls; }).map(function(x){
+      /* Port 53 is blocked by browsers and only ever times out. */
+      var urls = [].concat(x.urls).filter(function(u){ return !/:53(\?|$)/.test(u); });
+      var copy = { urls: urls };
+      if (x.username) copy.username = x.username;
+      if (x.credential) copy.credential = x.credential;
+      return copy;
+    }).filter(function(x){ return x.urls.length; });
     if (servers.length) {
-      relayCache = { servers: servers, at: Date.now(), link: link };
-      try { localStorage.setItem("fmn-relay", JSON.stringify(relayCache)); } catch (e) {}
+      relayCache[link] = { servers: servers, at: Date.now() };
+      try { localStorage.setItem("fmn-relays", JSON.stringify(relayCache)); } catch (e) {}
     }
     return servers.length > 0;
   }).catch(function(){ return false; });
-  /* Never hold a call up for more than four seconds over it: a cached
-     copy (below) or the direct route is better than a wait. */
-  var cap = new Promise(function(res){ setTimeout(function(){ res(false); }, 4000); });
-  return Promise.race([fetched, cap]);
 }
-try {
-  var cachedRelay = JSON.parse(localStorage.getItem("fmn-relay") || "null");
-  if (cachedRelay && cachedRelay.servers) relayCache = cachedRelay;
-} catch (e) {}
+
+function ensureRelay(){
+  var links = relayLinks();
+  if (!links.length) return Promise.resolve(false);
+  var jobs = links.map(function(link){
+    var e = relayCache[link];
+    if (e && e.servers && e.servers.length && Date.now() - e.at < 3600000)
+      return Promise.resolve(true);
+    return fetchRelay(link);
+  });
+  /* Never hold a call up for more than four seconds over it: a cached
+     copy or the direct route is better than a wait. */
+  var cap = new Promise(function(res){ setTimeout(function(){ res(false); }, 4000); });
+  return Promise.race([Promise.all(jobs).then(function(r){
+    return r.some(Boolean);
+  }), cap]);
+}
+
+function fixedRelayServer(){
+  var url = state && state.turn && tidyTurn(state.turn.url);
+  if (!url) return null;
+  /* Many office, school and hotel networks block everything except
+     ordinary web traffic on port 443. The same relay reached over
+     TCP and TLS on 443 gets through those, so it is offered that way
+     as well - unused routes cost nothing. */
+  var host = url.replace(/^turns?:/i, "").replace(/\?.*$/, "")
+                .replace(/:\d+$/, "");
+  var urls = [url];
+  ["turn:" + host + ":443?transport=tcp",
+   "turns:" + host + ":443?transport=tcp"].forEach(function(u){
+    if (urls.indexOf(u) === -1) urls.push(u);
+  });
+  return { urls: urls, username: state.turn.user || "",
+           credential: state.turn.pass || "" };
+}
 
 function hasRelay(){
-  if (!state || !state.turn) return false;
-  if (state.turn.api) return relayCache.link === state.turn.api &&
-                             relayCache.servers.length > 0;
-  return !!tidyTurn(state.turn.url);
+  if (!state) return false;
+  if (fixedRelayServer()) return true;
+  return relayLinks().some(function(link){ return cachedServers(link).length > 0; });
 }
 
+/* Every relay that is set up, together. The phone gathers an address
+   from each and the call takes whichever path works best - so a second
+   relay is a spare, not a replacement: if one is down or blocked on
+   this network, the other carries the call. */
 function iceServers(){
   var list = STUN.slice();
-  if (state && state.turn && state.turn.api) {
-    return relayCache.link === state.turn.api
-         ? list.concat(relayCache.servers) : list;
-  }
-  var url = state.turn && tidyTurn(state.turn.url);
-  if (url) {
-    /* Many office, school and hotel networks block everything except
-       ordinary web traffic on port 443. The same relay reached over
-       TCP and TLS on 443 gets through those, so it is offered that way
-       as well - unused routes cost nothing. */
-    var host = url.replace(/^turns?:/i, "").replace(/\?.*$/, "")
-                  .replace(/:\d+$/, "");
-    var urls = [url];
-    ["turn:" + host + ":443?transport=tcp",
-     "turns:" + host + ":443?transport=tcp"].forEach(function(u){
-      if (urls.indexOf(u) === -1) urls.push(u);
-    });
-    list.push({ urls: urls,
-                username: state.turn.user || "",
-                credential: state.turn.pass || "" });
-  }
+  var fixed = fixedRelayServer();
+  if (fixed) list.push(fixed);
+  relayLinks().forEach(function(link){
+    list = list.concat(cachedServers(link));
+  });
   return list;
 }
+
 
 function setCallState(text){ var e = $("callState"); if (e) e.textContent = text; }
 
@@ -2398,6 +2463,7 @@ function openSetup(){
     ? memberById(state.me).name : "";
   var t = (state && state.turn) || {};
   $("turnUrl").value  = t.api || t.url || "";
+  $("turn2Url").value = ((state && state.turn2) || {}).api || "";
   $("turnUser").value = t.user || "";
   $("turnPass").value = t.pass || "";
 
@@ -2586,6 +2652,10 @@ function saveSetup(){
                         user: $("turnUser").value.trim(),
                         pass: $("turnPass").value.trim() }
                     : ((state && state.turn) || draft.turn || null);
+  /* The additional relay, read from its own box for the same reason. */
+  var t2Link = tidyWorkerLink($("turn2Url").value);
+  draft.turn2 = t2Link ? { api: t2Link }
+              : ($("turn2Url").value.trim() ? ((state && state.turn2) || null) : null);
   /* Personal, so it stays on this phone and never travels in the
      invite link - everyone picks their own. */
   draft.tone = (state && state.tone) || draft.tone || "classic";
@@ -2632,6 +2702,7 @@ function broadcastRoster(){
     if (m.id === state.me) return;
     sendSig(m.id, { t:"roster", from: state.me, rev: state.rev || 0,
                     members: state.members, turn: state.turn || null,
+                    turn2: state.turn2 || null,
                     server: srv(), token: state.token || null })
       .catch(function(){});
   });
@@ -2646,6 +2717,10 @@ function takeRoster(msg){
   /* A phone that simply has no token yet must not erase ours - that
      is how a saved token kept vanishing after a family update. */
   state.turn = msg.turn || state.turn || null;
+  /* Only ever filled in from a roster, never emptied by one - the same
+     rule as the token: a phone that simply has not got it yet must not
+     erase it everywhere else. */
+  if (msg.turn2) state.turn2 = msg.turn2;
   if (msg.server) state.server = (msg.server === DEFAULT_SERVER) ? null : msg.server;
   if (msg.token) state.token = msg.token;
 
@@ -2732,6 +2807,8 @@ function tryJoin(){
             recent: keep, tone: keepTone, ntfy: same && !!prev.ntfy,
             turn:   older ? (prev.turn || cfg.t || null)
                           : (cfg.t || (same && prev.turn) || null),
+            turn2:  older ? (prev.turn2 || cfg.t2 || null)
+                          : (cfg.t2 || (same && prev.turn2) || null),
             server: older ? (prev.server || null) : (cfg.s || null),
             token:  older ? (prev.token || cfg.k || null)
                           : (cfg.k || (same && prev.token) || null) };
@@ -2978,7 +3055,7 @@ $("saveTurn").onclick = function(){
     bumpRev(); save(); broadcastRoster(); paintInvites();
     $("mineLink").textContent = personalLink();
     toast("Checking the relay link…");
-    ensureRelay().then(function(ok){
+    fetchRelay(link).then(function(ok){
       toast(ok ? "Relay saved and working — sent to the family"
                : "Saved, but the link did not answer — check it");
     });
@@ -3007,26 +3084,48 @@ $("saveTurn").onclick = function(){
   $("mineLink").textContent = personalLink();
   toast(url ? "Relay saved — re-share the invite link" : "Relay cleared");
 };
-/* Asks the relay for an address, relay-only, the way a call would. If
-   one comes back this network can reach it - and says over what, since
-   "TLS on 443" is the route that survives the strictest networks. */
-$("testTurn").onclick = function(){
-  if (!state || !state.turn) { toast("Save a relay first"); return; }
-  toast("Testing the relay…");
-  ensureRelay().then(function(){
-    if (!hasRelay()) { toast("The relay link did not answer"); return; }
+$("saveTurn2").onclick = function(){
+  if (!state) { toast("Save your family first"); return; }
+  var raw = $("turn2Url").value.trim();
+  if (!raw) {
+    state.turn2 = null;
+    bumpRev(); save(); broadcastRoster(); paintInvites();
+    $("mineLink").textContent = personalLink();
+    toast("Additional relay removed on this phone");
+    return;
+  }
+  var link = tidyWorkerLink(raw);
+  if (!link) {
+    toast("That should be the Worker's https:// address, e.g. " +
+          "https://family-relay.NAME.workers.dev");
+    return;
+  }
+  state.turn2 = { api: link };
+  state.preferRelay = false;
+  bumpRev(); save(); broadcastRoster(); paintInvites();
+  $("mineLink").textContent = personalLink();
+  toast("Checking the additional relay…");
+  fetchRelay(link).then(function(ok){
+    toast(ok ? "Additional relay saved and working — sent to the family"
+             : "Saved, but the Worker did not answer — check its address " +
+               "and that its secrets are set");
+  });
+};
+
+/* Asks one relay for an address, relay-only, the way a call would. If
+   one comes back this network can reach it - and says over what. */
+function probeRelay(servers){
+  return new Promise(function(res){
     var pc, found = [], done = false;
     function finish(){
       if (done) return; done = true;
       try { pc.close(); } catch (e) {}
-      toast(found.length
-        ? "Relay works on this network (" + found.join(", ") + ")"
-        : "The relay cannot be reached from this network");
+      res(found);
     }
     try {
-      pc = new RTCPeerConnection({ iceServers: iceServers(),
+      pc = new RTCPeerConnection({ iceServers: servers,
                                    iceTransportPolicy: "relay" });
-    } catch (e) { toast("Relay details are not valid"); return; }
+    } catch (e) { res(null); return; }
     pc.createDataChannel("t");
     pc.onicecandidate = function(ev){
       if (!ev.candidate) { finish(); return; }
@@ -3039,6 +3138,34 @@ $("testTurn").onclick = function(){
     pc.createOffer().then(function(o){ return pc.setLocalDescription(o); })
       .catch(finish);
     setTimeout(finish, 8000);
+  });
+}
+
+/* Each relay tested on its own, so the answer says which one works
+   here - "one of them works" would hide a dead spare. */
+$("testTurn").onclick = function(){
+  if (!state || !(state.turn || state.turn2)) { toast("Save a relay first"); return; }
+  toast("Testing the relays…");
+  var relays = [];
+  var fixed = fixedRelayServer();
+  if (fixed) relays.push({ name: "Main relay", servers: function(){ return [fixed]; } });
+  if (state.turn && state.turn.api)
+    relays.push({ name: "Main relay", link: state.turn.api });
+  if (state.turn2 && state.turn2.api)
+    relays.push({ name: "Cloudflare", link: state.turn2.api });
+  Promise.all(relays.map(function(r){
+    var get = r.link ? fetchRelay(r.link).then(function(){ return cachedServers(r.link); })
+                     : Promise.resolve(r.servers());
+    return get.then(function(servers){
+      if (!servers || !servers.length) return r.name + ": link did not answer";
+      return probeRelay(servers).then(function(found){
+        return r.name + (found === null ? ": details not valid"
+                        : found.length ? ": works (" + found.join(", ") + ")"
+                        : ": not reachable here");
+      });
+    });
+  })).then(function(lines){
+    toast(lines.join("  ·  "));
   });
 };
 
