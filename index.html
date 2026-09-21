@@ -382,7 +382,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-21a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-21b";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -679,7 +679,20 @@ function personalLink(){ return linkFor(state.me); }
 /* The ring topic. Loud on purpose: priority 5 is what gets a phone to
    vibrate hard and pop over whatever is on screen. */
 function ringPush(memberId, title, message, answerable){
+  /* Where tapping the notification (or its Answer button) goes.
+     It used to be the bare page address - and the browser that opens
+     it is often not the one this family was set up in (the Home Screen
+     copy on an iPhone keeps its own storage, and Android may open a
+     different browser). That copy knows nothing, so it showed the
+     setup screen in the middle of a call.
+     Now it is the recipient's own personal link: the family, the
+     token, the relay and "this is you" all ride along, so whatever
+     opens it lands straight on the ready page and picks up the call. */
   var home = location.origin + location.pathname;
+  try {
+    var mine = linkFor(memberId);
+    if (mine.length < 3500) home = mine;
+  } catch (e) {}
   var base = srv() + "/" + encodeURIComponent(ringTopic(memberId))
            + "?title="  + encodeURIComponent(title)
            + "&priority=5&tags=telephone_receiver"
@@ -2121,6 +2134,10 @@ function tryJoin(){
   var m = location.hash.match(/[#&]j=([A-Za-z0-9\-_]+)/);
   if (!m) return false;
   var cfg = decodeConfig(m[1]);
+  /* Read who the link is for BEFORE tidying the address bar. The old
+     order wiped the address first, so the "this is you" part of every
+     personal link was lost and the phone asked "Which one are you?". */
+  var named = location.hash.match(/[#&]m=([A-Za-z0-9\-_]+)/);
   history.replaceState(null, "", location.pathname);
   if (!cfg) { toast("That invite link looks damaged"); return false; }
 
@@ -2138,7 +2155,6 @@ function tryJoin(){
    *
    * The link can also name you outright (the personal link below), for
    * restoring a phone that has forgotten everything. */
-  var named = location.hash.match(/[#&]m=([A-Za-z0-9\-_]+)/);
   var mine  = null;
   if (named) mine = named[1];
   else if (prev.house === cfg.h && prev.me) mine = prev.me;
