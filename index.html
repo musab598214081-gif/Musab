@@ -6,15 +6,27 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0B1B2B">
+<meta name="theme-color" content="#0F1B2A">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 <title>Family Notifyer</title>
-<link rel="manifest" href='data:application/json,{"name":"Family Notifyer","short_name":"Notifyer","display":"standalone","background_color":"%230B1B2B","theme_color":"%230B1B2B","start_url":"."}'>
+<link rel="manifest" href='data:application/json,{"name":"Family Notifyer","short_name":"Notifyer","display":"standalone","background_color":"%230F1B2A","theme_color":"%230F1B2A","start_url":"."}'>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%93%9E%3C%2Ftext%3E%3C%2Fsvg%3E">
 <style>
+  /* The family doorbell.
+     Night-blue house, brass for the app's own actions, and every
+     person's own colour for everything about them - their avatar, and
+     the ripple that fills the screen when they call. */
   :root{
-    --ink:#0B1B2B; --ink-soft:#16293D; --line:#22384F;
-    --bg:#0B1B2B; --card:#16293D; --text:#FFFFFF; --muted:#93A9C0;
-    --accent:#00AEE6; --ok:#34C759; --warn:#FF9500; --bad:#FF3B30;
+    --night:#0F1B2A; --hearth:#172638; --seam:#26394E;
+    --mist:#9CB0C4; --paper:#F3F6F9; --brass:#E8B04B; --brass-ink:#2A1C02;
+    --go:#2FBF71; --stop:#E5484D; --amber:#F0A13A;
+    /* kept for anything still reading the old names */
+    --ink:var(--night); --ink-soft:var(--hearth); --line:var(--seam);
+    --bg:var(--night); --card:var(--hearth); --text:var(--paper); --muted:var(--mist);
+    --accent:var(--brass); --ok:var(--go); --warn:var(--amber); --bad:var(--stop);
+    --who:#5B8DEF; --who-a:rgba(91,141,239,.35);
     box-sizing:border-box;
     padding-top:env(safe-area-inset-top,0px);
     padding-bottom:env(safe-area-inset-bottom,0px);
@@ -22,165 +34,218 @@
   *,*::before,*::after{box-sizing:inherit}
   html,body{height:100%;margin:0}
   body{
-    background:var(--bg); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--night); color:var(--paper);
+    font-family:"Rubik",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Arabic",sans-serif;
     -webkit-font-smoothing:antialiased; display:flex; flex-direction:column;
+    font-size:15px; line-height:1.4;
   }
-  header{
-    padding:16px 18px 12px; display:flex; align-items:center;
-    border-bottom:1px solid var(--line); flex:0 0 auto;
-  }
-  header .bell{font-size:22px;line-height:1;margin-right:12px}
-  header h1{font-size:17px;margin:0;font-weight:700}
-  header .who{font-size:12px;color:var(--muted)}
-  .iconbtn{background:none;border:0;color:var(--muted);font-size:20px;
-    padding:6px 8px;cursor:pointer;border-radius:8px}
-  .iconbtn:active{background:var(--card)}
+  button{font-family:inherit}
+  :focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 
-  main{flex:1 1 auto;overflow-y:auto;padding:14px 14px 28px}
-  .hint{color:var(--muted);font-size:13px;line-height:1.45;margin:0 0 14px}
+  header{padding:14px 18px 10px; display:flex; align-items:center; flex:0 0 auto}
+  header .bell{width:36px;height:36px;margin-right:12px;flex:0 0 auto}
+  header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.1px}
+  header .who{font-size:13px;color:var(--mist)}
+  .iconbtn{background:none;border:0;color:var(--mist);padding:8px;cursor:pointer;
+    border-radius:12px;display:flex}
+  .iconbtn:active{background:var(--hearth)}
+  .iconbtn svg{width:24px;height:24px}
 
-  .person{
-    display:flex;align-items:center;width:100%;text-align:left;
-    background:var(--card);border:1px solid var(--line);border-radius:14px;
-    padding:14px 16px;margin-bottom:10px;color:var(--text);
-    font-size:16px;font-family:inherit;cursor:pointer;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .person:active{transform:scale(.985)}
-  .person .dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;margin-right:14px}
-  .person .nm{flex:1;font-weight:600}
-  .person .sub{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
-  .person .go{color:var(--muted);font-size:18px}
+  main{flex:1 1 auto;overflow-y:auto;padding:6px 16px 32px}
+  /* On a laptop the page keeps a phone's reading width, centred,
+     instead of cards stretched across the whole screen. */
+  main{padding-left:max(16px, calc((100% - 600px) / 2));
+       padding-right:max(16px, calc((100% - 600px) / 2))}
+  header{width:100%;max-width:632px;margin:0 auto}
+  @media (min-width:700px){ .greet{font-size:34px;margin-top:22px} }
+  .hint{color:var(--mist);font-size:14px;line-height:1.5;margin:0 0 14px}
+  .greet{font-size:30px;font-weight:700;line-height:1.15;margin:10px 2px 18px;letter-spacing:-.3px}
+
+  /* A person: their colour, their name, and the two things you do. */
+  .person{display:flex;align-items:center;width:100%;text-align:left;
+    background:var(--hearth);border:0;border-radius:20px;padding:12px 12px 12px 14px;
+    margin-bottom:10px;color:var(--paper);cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .person:active{background:#1C2E43}
+  .person .dot{width:48px;height:48px;border-radius:50%;flex:0 0 auto;margin-right:14px;
+    display:flex;align-items:center;justify-content:center;font-weight:700;
+    font-size:18px;color:#0F1B2A}
+  .person .nm{flex:1;min-width:0;font-weight:500;font-size:17px}
+  .person .sub{display:block;font-weight:400;font-size:13px;color:var(--mist);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .person .sub.missed{color:#FF8589}
+  .person .go{display:flex;gap:8px;margin-left:8px}
+  .qa{width:46px;height:46px;border-radius:50%;border:0;display:flex;align-items:center;
+    justify-content:center;cursor:pointer;flex:0 0 auto}
+  .qa svg{width:22px;height:22px}
+  .qa.buzz{background:#22364D;color:var(--brass)}
+  .qa.ring{background:var(--go);color:#062414}
+  .qa:active{transform:scale(.94)}
   .person.me{opacity:.55}
 
-  .sectiontitle{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;
-    color:var(--muted);margin:22px 4px 10px;font-weight:700}
-  .log{font-size:13px;color:var(--muted);padding:8px 4px;border-bottom:1px solid var(--line)}
-  .log b{color:var(--text);font-weight:600}
+  .sectiontitle{font-size:15px;color:var(--paper);margin:26px 2px 8px;font-weight:700}
+  .sheetbody .sectiontitle{margin-top:28px}
+  .log{display:flex;align-items:center;font-size:14px;color:var(--mist);
+    padding:11px 2px;border-bottom:1px solid var(--seam);cursor:default}
+  .log.tap{cursor:pointer}
+  .log .ic{width:30px;flex:0 0 auto;display:flex}
+  .log .ic svg{width:18px;height:18px}
+  .log .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .log .tm{margin-left:10px;font-size:13px;flex:0 0 auto}
+  .log b{color:var(--paper);font-weight:500}
+  .log.missed .ic, .log.missed .tx{color:#FF8589}
+  .log.missed b{color:#FF8589}
 
-  .sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(4,12,20,.72);
+  .sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(5,11,18,.7);
     display:none;align-items:flex-end;justify-content:center;z-index:40}
   .sheet.on{display:flex}
-  .sheetbody{background:var(--ink-soft);width:100%;max-width:560px;
-    border-radius:18px 18px 0 0;padding:20px 18px;
-    padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  .sheetbody{background:var(--hearth);width:100%;max-width:560px;
+    border-radius:24px 24px 0 0;padding:22px 18px;
+    padding-bottom:calc(22px + env(safe-area-inset-bottom,0px));
     max-height:88%;overflow-y:auto}
-  .sheetbody h2{margin:0 0 4px;font-size:18px}
-  .sheetbody p.sub{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.45}
-  label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:600}
-  input[type=text]{width:100%;padding:13px 14px;border-radius:11px;
-    border:1px solid var(--line);background:var(--ink);color:var(--text);
+  .sheetbody h2{margin:0 0 4px;font-size:22px;font-weight:700}
+  .sheetbody p.sub{margin:0 0 16px;color:var(--mist);font-size:14px;line-height:1.5}
+  label{display:block;font-size:13px;color:var(--mist);margin:14px 0 6px;font-weight:500}
+  input[type=text],input[type=password]{width:100%;padding:13px 14px;border-radius:14px;
+    border:1px solid var(--seam);background:var(--night);color:var(--paper);
     font-size:16px;font-family:inherit}
-  input[type=text]:focus{outline:2px solid var(--accent);outline-offset:-1px}
-  .btn{width:100%;padding:15px;border-radius:12px;border:0;font-size:16px;
-    font-weight:700;font-family:inherit;margin-top:14px;cursor:pointer;
-    background:var(--accent);color:#04202B}
-  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
-  .btn.green{background:var(--ok);color:#04220E}
-  .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+  input[type=text]:focus,input[type=password]:focus{outline:2px solid var(--brass);outline-offset:-1px}
+  /* Secrets: shown as dots until Show is pressed. */
+  .secret{display:flex;gap:8px}
+  .secret input{flex:1;min-width:0}
+  .secret input.masked{-webkit-text-security:disc;text-security:disc}
+  .secret button{flex:0 0 auto;background:transparent;border:1px solid var(--seam);
+    color:var(--mist);border-radius:14px;padding:0 14px;font-size:14px;cursor:pointer}
+  .btn{width:100%;padding:15px;border-radius:16px;border:0;font-size:16px;
+    font-weight:500;margin-top:12px;cursor:pointer;
+    background:var(--brass);color:var(--brass-ink)}
+  .btn.ghost{background:transparent;color:var(--paper);border:1px solid var(--seam)}
+  .btn.green{background:var(--go);color:#062414}
+  .btn.danger{background:transparent;color:var(--stop);border:1px solid var(--seam)}
   .btn:active{opacity:.85}
   .row{display:flex}
   .row .btn{flex:1}
   .row .btn + .btn{margin-left:10px}
 
   .msgopt{display:block;width:100%;text-align:left;padding:14px 16px;margin-bottom:8px;
-    background:var(--ink);border:1px solid var(--line);border-radius:12px;
-    color:var(--text);font-size:16px;font-family:inherit;cursor:pointer}
-  .msgopt:active{border-color:var(--accent)}
+    background:var(--night);border:1px solid var(--seam);border-radius:16px;
+    color:var(--paper);font-size:16px;cursor:pointer}
+  .msgopt:active{border-color:var(--brass)}
 
   .swatches{display:flex;flex-wrap:wrap;margin-top:6px}
-  .swatch{width:34px;height:34px;border-radius:50%;border:3px solid transparent;
+  .swatch{width:36px;height:36px;border-radius:50%;border:3px solid transparent;
     cursor:pointer;margin:0 10px 10px 0}
-  .swatch.sel{border-color:#fff}
+  .swatch.sel{border-color:var(--paper)}
 
   .memberrow{display:flex;align-items:center;margin-bottom:8px}
   .memberrow input{flex:1;margin-right:8px}
-  .memberrow button{background:transparent;border:1px solid var(--line);color:var(--bad);
-    border-radius:10px;width:44px;height:46px;font-size:18px;cursor:pointer;flex:0 0 auto}
+  .memberrow button{background:transparent;border:1px solid var(--seam);color:var(--stop);
+    border-radius:14px;width:46px;height:48px;font-size:18px;cursor:pointer;flex:0 0 auto}
 
-  .codebox{background:var(--ink);border:1px solid var(--line);border-radius:11px;
-    padding:12px 14px;font-family:ui-monospace,Menlo,Consolas,monospace;
-    font-size:13px;word-break:break-all;color:var(--muted);line-height:1.5}
+  .codebox{background:var(--night);border:1px solid var(--seam);border-radius:14px;
+    padding:12px 14px;font-size:14px;word-break:break-all;color:var(--mist);line-height:1.5}
 
-  /* buzz overlay */
-  #ring{position:fixed;top:0;right:0;bottom:0;left:0;z-index:60;display:none;
-    flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;padding:30px}
-  #ring.on{display:flex;animation:flash .95s steps(1,end) infinite}
-  /* Four hard cuts rather than two.
-     Eased back from .62s, which read as a strobe rather than a ring -
-     fast enough to be unmissable is not the same as fast enough to be
-     unpleasant, and this sits on screen for up to 45 seconds.
-     steps(1,end) is what makes it a flash instead of a fade - a
-     crossfade between colours reads as a gentle pulse, which is the
-     opposite of what an incoming call wants. Every stop stays dark
-     enough for white text to survive it. */
-  @keyframes flash{
-    0%   { background:#0052CB }
-    25%  { background:#00AEE6 }
-    50%  { background:#062744 }
-    75%  { background:#00AEE6 }
-    100% { background:#0052CB }
+  /* ---------------------------------------------------------------
+     The ring.
+     Used to be a hard strobe through four blues. Now the caller's own
+     colour blooms from the middle of the screen and ripples outwards -
+     you know who it is before you read the name. Still never still, so
+     it cannot be missed; calm enough to sit on screen for 45 seconds. */
+  #ring,#call{position:fixed;top:0;right:0;bottom:0;left:0;display:none;
+    flex-direction:column;align-items:center;background:var(--night);overflow:hidden;
+    isolation:isolate}
+  #ring{z-index:60;justify-content:center;text-align:center;padding:30px}
+  #ring.on,#call.on{display:flex}
+  #ring::before,#call::before{content:"";position:absolute;inset:-20%;z-index:-2;
+    background:radial-gradient(circle at 50% 34%, var(--who-a) 0%, rgba(15,27,42,0) 62%);
+    opacity:.9}
+  #ring.on::before,#call.incoming::before{animation:breathe 2.4s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.06)}}
+
+  .halo{position:relative;width:132px;height:132px;margin:0 auto 26px;flex:0 0 auto}
+  .halo .wave{position:absolute;inset:0;border-radius:50%;border:2px solid var(--who);
+    opacity:0;z-index:-1}
+  #ring.on .wave,#call.incoming .wave{animation:ripple 2.4s cubic-bezier(.2,.6,.3,1) infinite}
+  .halo .wave:nth-child(2){animation-delay:.8s !important}
+  .halo .wave:nth-child(3){animation-delay:1.6s !important}
+  @keyframes ripple{0%{transform:scale(.85);opacity:.9} 100%{transform:scale(2.9);opacity:0}}
+  .halo .avatar,#ring .avatar{position:absolute;inset:0;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:46px;font-weight:700;color:#0F1B2A;background:var(--who);
+    box-shadow:0 0 0 8px var(--who-a)}
+
+  @media (prefers-reduced-motion: reduce){
+    #ring.on::before,#call.incoming::before{animation:none;opacity:1}
+    #ring.on .wave,#call.incoming .wave{animation:none;opacity:.35;transform:scale(1.35)}
+    .halo .wave:nth-child(2){transform:scale(1.7) !important;opacity:.2 !important}
+    .halo .wave:nth-child(3){display:none}
   }
-  /* The avatar breathes against the flashing, so the screen is still
-     moving for anyone who cannot see the colour change. */
-  @keyframes pulse{
-    0%,100% { transform:scale(1);    box-shadow:0 0 0 0   rgba(255,255,255,.55) }
-    50%     { transform:scale(1.09); box-shadow:0 0 0 22px rgba(255,255,255,0) }
-  }
-  #ring .from{font-size:34px;font-weight:800;margin:0 0 8px}
-  #ring .what{font-size:19px;opacity:.9;margin:0 0 40px}
-  #ring button{background:#fff;color:#0B1B2B;border:0;border-radius:14px;
-    padding:17px 46px;font-size:18px;font-weight:700;font-family:inherit;cursor:pointer}
+
+  #ring .from{font-size:34px;font-weight:700;margin:0 0 6px;letter-spacing:-.3px}
+  #ring .kind{font-size:15px;color:var(--mist);margin:0 0 18px}
+  #ring .what{font-size:21px;margin:0 auto 40px;max-width:22ch;line-height:1.35}
+  #ring button{background:var(--paper);color:var(--night);border:0;border-radius:999px;
+    padding:16px 52px;font-size:17px;font-weight:700;cursor:pointer}
 
   /* call screen */
-  #call{position:fixed;top:0;right:0;bottom:0;left:0;z-index:70;display:none;
-    flex-direction:column;align-items:center;justify-content:space-between;
-    background:var(--ink);padding:40px 24px;
-    padding-top:calc(60px + env(safe-area-inset-top,0px));
+  #call{z-index:70;justify-content:space-between;padding:40px 24px;
+    padding-top:calc(64px + env(safe-area-inset-top,0px));
     padding-bottom:calc(40px + env(safe-area-inset-bottom,0px))}
-  #call.on{display:flex}
-  #call.incoming{animation:flash .95s steps(1,end) infinite}
-  #call.incoming .avatar{animation:pulse 1.6s ease-in-out infinite}
-  #ring.on .from{animation:pulse 1.6s ease-in-out infinite}
   #call .top{text-align:center;width:100%}
-  #call .avatar{width:96px;height:96px;border-radius:50%;margin:0 auto 22px;
-    display:flex;align-items:center;justify-content:center;
-    font-size:38px;font-weight:800;color:#06131F}
-  #call .peer{font-size:30px;font-weight:800;margin:0 0 10px}
-  #call .state{font-size:16px;color:var(--muted);margin:0}
+  #call .avatar{width:auto;height:auto;margin:0}
+  #call .peer{font-size:32px;font-weight:700;margin:0 0 8px;letter-spacing:-.3px}
+  #call .state{font-size:17px;color:var(--mist);margin:0;font-variant-numeric:tabular-nums}
+  .qual{display:inline-flex;align-items:flex-end;gap:3px;height:14px;margin-top:12px;
+    visibility:hidden}
+  .qual.on{visibility:visible}
+  .qual span{width:4px;border-radius:2px;background:var(--seam)}
+  .qual span:nth-child(1){height:5px} .qual span:nth-child(2){height:9px}
+  .qual span:nth-child(3){height:14px}
+  .qual.q1 span:nth-child(1){background:var(--stop)}
+  .qual.q2 span:nth-child(-n+2){background:var(--amber)}
+  .qual.q3 span{background:var(--go)}
   #call .controls{width:100%;max-width:420px}
-  .callbtns{display:flex;justify-content:center}
-  .rnd{width:72px;height:72px;border-radius:50%;border:0;font-size:26px;
-    cursor:pointer;margin:0 14px;font-family:inherit;color:#fff}
-  .rnd.hang{background:var(--bad)}
-  .rnd.answer{background:var(--ok)}
-  .rnd.mute{background:var(--ink-soft);border:1px solid var(--line)}
-  .rnd.mute.on{background:#fff;color:var(--ink)}
-  .rndlbl{text-align:center;font-size:12px;color:var(--muted);margin-top:10px;min-height:16px}
+  .callbtns{display:flex;justify-content:center;align-items:flex-start}
+  .cb{display:flex;flex-direction:column;align-items:center;margin:0 12px;
+    font-size:13px;color:var(--mist)}
+  .rnd{width:72px;height:72px;border-radius:50%;border:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:var(--paper);margin-bottom:8px}
+  .rnd svg{width:30px;height:30px}
+  .rnd.hang{background:var(--stop)}
+  .rnd.answer{background:var(--go);color:#062414}
+  .rnd.mute,.rnd.spk{background:rgba(255,255,255,.1)}
+  .rnd.mute.on,.rnd.spk.on{background:var(--paper);color:var(--night)}
+  .rnd:active{transform:scale(.95)}
+  .rndlbl{text-align:center;font-size:13px;color:var(--mist);margin-top:14px;min-height:18px}
 
   .toast{position:fixed;left:50%;transform:translateX(-50%);
     bottom:calc(26px + env(safe-area-inset-bottom,0px));
-    background:var(--ink-soft);border:1px solid var(--line);color:var(--text);
+    background:#22364D;color:var(--paper);
     padding:12px 18px;border-radius:999px;font-size:14px;z-index:80;
     opacity:0;transition:opacity .2s;pointer-events:none;max-width:88%;text-align:center}
   .toast.on{opacity:1}
 
-  .status{display:flex;align-items:center;font-size:12px;color:var(--muted)}
-  .status .led{width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:8px}
-  .status.live .led{background:var(--ok)}
+  .status{display:flex;align-items:center;font-size:13px;color:var(--mist);margin:6px 2px 0}
+  .status .led{width:8px;height:8px;border-radius:50%;background:var(--mist);margin-right:8px}
+  .status.live .led{background:var(--go);box-shadow:0 0 0 3px rgba(47,191,113,.2)}
 </style>
 </head>
 <body>
 
 <header>
-  <span class="bell">📞</span>
+  <svg class="bell" viewBox="0 0 36 36" aria-hidden="true">
+    <rect width="36" height="36" rx="11" fill="#E8B04B"/>
+    <path d="M9 16.5 18 9l9 7.5" fill="none" stroke="#2A1C02" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M13.5 24.5h9c-.9-1-1.4-2.4-1.4-4.2v-1.4a3.1 3.1 0 0 0-6.2 0v1.4c0 1.8-.5 3.2-1.4 4.2Z" fill="#2A1C02"/>
+    <circle cx="18" cy="27" r="1.4" fill="#2A1C02"/>
+  </svg>
   <div style="flex:1">
     <h1>Family Notifyer</h1>
     <div class="who" id="whoami">—</div>
   </div>
-  <button class="iconbtn" id="settingsBtn" title="Settings">⚙︎</button>
+  <button class="iconbtn" id="settingsBtn" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+  </button>
 </header>
 
 <div id="filewarn" style="display:none;background:#5C2E00;color:#FFD9A8;
@@ -199,7 +264,7 @@
   search for it on the App&nbsp;Store or Play&nbsp;Store. It's the doorbell;
   this page is the phone.
   <button id="ntfyfix" style="background:#00AEE6;color:#04202B;border:0;
-    border-radius:8px;padding:7px 12px;font-weight:700;font-family:inherit;
+    border-radius:8px;padding:7px 12px;font-weight:700;font-family:inherit;background:#E8B04B !important;color:#2A1C02 !important;
     font-size:13px;margin-left:6px;cursor:pointer">Set it up</button>
 </div>
 <main id="main"></main>
@@ -207,16 +272,21 @@
 <audio id="remoteAudio" autoplay playsinline></audio>
 
 <div id="ring">
+  <div class="halo"><span class="wave"></span><span class="wave"></span><span class="wave"></span>
+    <div class="avatar" id="ringAvatar">?</div></div>
   <p class="from" id="ringFrom">Someone</p>
-  <p class="what" id="ringWhat">is calling you</p>
+  <p class="kind" id="ringKind">is buzzing you</p>
+  <p class="what" id="ringWhat">wants your attention</p>
   <button id="ringOk">Got it</button>
 </div>
 
 <div id="call">
   <div class="top">
-    <div class="avatar" id="callAvatar">?</div>
+    <div class="halo"><span class="wave"></span><span class="wave"></span><span class="wave"></span>
+      <div class="avatar" id="callAvatar">?</div></div>
     <p class="peer" id="callPeer">—</p>
     <p class="state" id="callState">Calling…</p>
+    <div class="qual" id="callQual" title="Call quality"><span></span><span></span><span></span></div>
   </div>
   <div class="controls">
     <div class="callbtns" id="callBtns"></div>
@@ -228,8 +298,8 @@
   <div class="sheetbody">
     <h2 id="actTitle">—</h2>
     <p class="sub">Talk to them, or just get their attention.</p>
-    <button class="btn green" id="doCall">📞&nbsp; Voice call</button>
-    <button class="btn ghost" id="doBuzz">🔔&nbsp; Buzz them instead</button>
+    <button class="btn green" id="doCall">Call</button>
+    <button class="btn ghost" id="doBuzz">Buzz them instead</button>
     <button class="btn ghost" data-close="actSheet">Cancel</button>
   </div>
 </div>
@@ -325,7 +395,7 @@
       tokens → Create</b>, and paste the <code>tk_…</code> token here. It
       travels in the invite links so the whole family uses it.
     </p>
-    <input type="text" id="tokenVal" placeholder="tk_..." autocomplete="off">
+    <input type="text" id="tokenVal" data-secret="1" placeholder="tk_..." autocomplete="off">
     <button class="btn ghost" id="saveToken">Save token</button>
 
     <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
@@ -346,11 +416,11 @@
       username or password needed with the link.
     </p>
     <label for="turnUrl">Relay link, or TURN server</label>
-    <input type="text" id="turnUrl" placeholder="https://NAME.metered.live/api/v1/turn/credentials?apiKey=…" autocomplete="off">
+    <input type="text" id="turnUrl" data-secret="1" placeholder="https://NAME.metered.live/api/v1/turn/credentials?apiKey=…" autocomplete="off">
     <label for="turnUser">Username</label>
-    <input type="text" id="turnUser" autocomplete="off">
+    <input type="text" id="turnUser" data-secret="1" autocomplete="off">
     <label for="turnPass">Credential</label>
-    <input type="text" id="turnPass" autocomplete="off">
+    <input type="text" id="turnPass" data-secret="1" autocomplete="off">
     <button class="btn ghost" id="saveTurn">Save relay</button>
 
     <div class="sectiontitle">Additional relay (optional)</div>
@@ -362,10 +432,11 @@
       paste its address here.
     </p>
     <label for="turn2Url">Cloudflare Worker link</label>
-    <input type="text" id="turn2Url" placeholder="https://family-relay.NAME.workers.dev" autocomplete="off">
+    <input type="text" id="turn2Url" data-secret="1" placeholder="https://family-relay.NAME.workers.dev" autocomplete="off">
     <button class="btn ghost" id="saveTurn2">Save additional relay</button>
 
     <button class="btn ghost" id="testTurn">Test relays on this network</button>
+    <p class="sub" id="relayUsage" style="margin-top:10px"></p>
 
     <button class="btn ghost" data-close="setupSheet" style="margin-top:22px">Close</button>
     <button class="btn danger" id="resetAll">Start over</button>
@@ -398,7 +469,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-21g";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -473,7 +544,10 @@ function toast(text){
   var t = $("toast");
   t.textContent = text; t.classList.add("on");
   clearTimeout(toast._t);
-  toast._t = setTimeout(function(){ t.classList.remove("on"); }, 2800);
+  /* Long enough to read: a test result naming two relays and a reason
+     is not a two-second message. */
+  var ms = Math.min(12000, Math.max(2800, String(text).length * 70));
+  toast._t = setTimeout(function(){ t.classList.remove("on"); }, ms);
 }
 
 /* ---------------------------------------------------------- storage
@@ -1116,9 +1190,34 @@ function cachedServers(link){
           Date.now() - e.at < 20 * 3600000) ? e.servers : [];
 }
 
+/* Why the last fetch of each link failed, in words - shown by Test
+   relays, so "did not answer" becomes something that can be fixed. */
+var relayErrors = {};
+
 function fetchRelay(link){
-  return netFetch(link, {}, 2).then(function(r){
-    return r.ok ? r.json() : [];
+  relayErrors[link] = "";
+  return netFetch(link, {}, 1).then(function(r){
+    return r.text().then(function(text){
+      var body = null;
+      try { body = JSON.parse(text); } catch (e) {}
+      if (!r.ok) {
+        /* The Worker says what is wrong in an "error" field. */
+        relayErrors[link] = (body && body.error) ? body.error
+          : "it answered with error " + r.status;
+        return [];
+      }
+      if (body === null) {
+        relayErrors[link] = /hello world/i.test(text)
+          ? "it is still the starter Worker - paste in the relay code and Deploy"
+          : "it answered, but not with relay details - is the relay code deployed?";
+        return [];
+      }
+      return body;
+    });
+  }, function(){
+    relayErrors[link] = "could not reach it - check the address, and that " +
+                        "the Worker is deployed";
+    return [];
   }).then(function(body){
     /* Open Relay answers with a list; Cloudflare (via the Worker, or
        raw) with { iceServers: [...] }. Either is fine. */
@@ -1132,6 +1231,8 @@ function fetchRelay(link){
       if (x.credential) copy.credential = x.credential;
       return copy;
     }).filter(function(x){ return x.urls.length; });
+    if (!servers.length && !relayErrors[link])
+      relayErrors[link] = "it answered without any relay addresses";
     if (servers.length) {
       relayCache[link] = { servers: servers, at: Date.now() };
       try { localStorage.setItem("fmn-relays", JSON.stringify(relayCache)); } catch (e) {}
@@ -1198,12 +1299,56 @@ function iceServers(){
 
 function setCallState(text){ var e = $("callState"); if (e) e.textContent = text; }
 
+/* ------------------------------------------------------------ look */
+
+var ICON = {
+  phone: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1Z"/></svg>',
+  end:   '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1a1 1 0 0 1-.56.9 11.5 11.5 0 0 0-2.66 1.85 1 1 0 0 1-1.4 0L.29 13.08a1 1 0 0 1 0-1.41A16.9 16.9 0 0 1 12 7c4.54 0 8.66 1.78 11.71 4.67a1 1 0 0 1 0 1.41l-2.48 2.49a1 1 0 0 1-1.4 0 11.3 11.3 0 0 0-2.67-1.85 1 1 0 0 1-.56-.9v-3.1A15 15 0 0 0 12 9Z"/></svg>',
+  bell:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16h12c-1.1-1.2-1.7-2.8-1.7-4.9V9.5a4.3 4.3 0 0 0-8.6 0v1.6C7.7 13.2 7.1 14.8 6 16Z"/><path d="M10.2 19a2 2 0 0 0 3.6 0"/></svg>',
+  mic:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  micoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 10V6a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 4.6 2.5M5 11a7 7 0 0 0 11.3 5.5M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>',
+  spk:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  cross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  inArr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7 7 17M7 9v8h8"/></svg>',
+  outArr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>'
+};
+
+function initials(name){
+  var parts = String(name || "?").trim().split(/\s+/);
+  var a = (parts[0] || "?").charAt(0);
+  var b = parts.length > 1 ? parts[parts.length - 1].charAt(0) : "";
+  return (a + b).toUpperCase();
+}
+
+/* The person's colour, and a see-through version of it, for the screen
+   that fills when they call or buzz. */
+function paintWho(el, hex){
+  var h = String(hex || "#5B8DEF").replace("#", "");
+  if (h.length === 3) h = h.replace(/(.)/g, "$1$1");
+  var n = parseInt(h, 16);
+  if (isNaN(n)) n = 0x5B8DEF;
+  el.style.setProperty("--who", "#" + h);
+  el.style.setProperty("--who-a", "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) +
+                                  "," + (n & 255) + ",.42)");
+}
+
+function memberByTitle(title){
+  var t = String(title || "");
+  var best = null;
+  ((state && state.members) || []).forEach(function(m){
+    if (m.name && t.indexOf(m.name) === 0 && (!best || m.name.length > best.name.length))
+      best = m;
+  });
+  return best;
+}
+
 function showCallScreen(peerId, incoming){
   var m = memberById(peerId);
   $("callPeer").textContent = m ? m.name : "Someone";
   var av = $("callAvatar");
-  av.textContent = (m && m.name ? m.name.charAt(0) : "?").toUpperCase();
-  av.style.background = (m && m.colour) || "#30B0FF";
+  av.textContent = initials(m ? m.name : "?");
+  paintWho($("call"), m && m.colour);
+  $("callQual").className = "qual";
   $("callNote").textContent = "";
   $("call").classList.add("on");
   $("call").classList.toggle("incoming", !!incoming);
@@ -1219,41 +1364,108 @@ function paintCallButtons(incoming){
   var box = $("callBtns");
   box.innerHTML = "";
 
+  function add(cls, icon, label, onclick){
+    var wrap = document.createElement("div");
+    wrap.className = "cb";
+    var b = document.createElement("button");
+    b.className = "rnd " + cls;
+    b.innerHTML = icon;
+    b.setAttribute("aria-label", label);
+    b.onclick = onclick;
+    var t = document.createElement("span");
+    t.textContent = label;
+    wrap.appendChild(b); wrap.appendChild(t);
+    box.appendChild(wrap);
+    return { button: b, label: t };
+  }
+
   if (incoming) {
-    var dec = document.createElement("button");
-    dec.className = "rnd hang"; dec.textContent = "✕";
-    dec.onclick = function(){ tellMyOtherCopies("declined"); hangUp("declined"); };
-    var ans = document.createElement("button");
-    ans.className = "rnd answer"; ans.textContent = "📞";
-    ans.onclick = answer;
-    box.appendChild(dec); box.appendChild(ans);
-    $("callNote").textContent = "Decline    ·    Answer";
+    add("hang", ICON.cross, "Decline",
+        function(){ tellMyOtherCopies("declined"); hangUp("declined"); });
+    add("answer", ICON.phone, "Answer", answer);
+    $("callNote").textContent = "";
     return;
   }
 
   /* Cleared here, not just when a call starts. Answering repaints these
-     buttons but left the incoming caption sitting underneath them, so
-     the screen read "Decline / Answer" under a mute and a hang-up. */
+     buttons but left the incoming caption sitting underneath them. */
   $("callNote").textContent = "";
 
-  var mute = document.createElement("button");
-  mute.className = "rnd mute"; mute.textContent = "🎙";
-  mute.onclick = function(){
+  var mute = add("mute", ICON.mic, "Mute", null);
+  mute.button.onclick = function(){
     if (!call || !call.stream) return;
     var off = false;
     call.stream.getAudioTracks().forEach(function(t){
       t.enabled = !t.enabled; off = !t.enabled;
     });
     call.muted = off;
-    mute.classList.toggle("on", off);
-    $("callNote").textContent = off ? "Microphone off" : "";
+    mute.button.classList.toggle("on", off);
+    mute.button.innerHTML = off ? ICON.micoff : ICON.mic;
+    mute.label.textContent = off ? "Unmute" : "Mute";
+    $("callNote").textContent = off ? "Your microphone is off" : "";
   };
 
-  var hang = document.createElement("button");
-  hang.className = "rnd hang"; hang.textContent = "✕";
-  hang.onclick = function(){ hangUp("ended"); };
+  var spk = add("spk", ICON.spk, "Speaker", null);
+  spk.button.onclick = function(){
+    setSpeaker(!speakerOn);
+    spk.button.classList.toggle("on", speakerOn);
+  };
+  spk.button.classList.toggle("on", speakerOn);
 
-  box.appendChild(mute); box.appendChild(hang);
+  add("hang", ICON.end, "End", function(){ hangUp("ended"); });
+}
+
+/* Speaker.
+ *
+ * A web page cannot flip a phone between its earpiece and its
+ * loudspeaker the way the phone app can - that switch belongs to the
+ * phone. What a page CAN do is pick an audio output where the browser
+ * offers a choice (laptops, some Android phones), and play the voice
+ * louder. So Speaker does both: it moves the sound to a loudspeaker if
+ * one is offered, and lifts the volume either way. */
+var speakerOn = false, boost = null;
+
+function setSpeaker(on){
+  speakerOn = !!on;
+  var el = $("remoteAudio");
+  if (el.setSinkId && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+    navigator.mediaDevices.enumerateDevices().then(function(list){
+      var outs = list.filter(function(d){ return d.kind === "audiooutput"; });
+      var loud = outs.filter(function(d){
+        return /speaker|loud/i.test(d.label) && !/ear|receiver|handset/i.test(d.label);
+      })[0];
+      var ear = outs.filter(function(d){ return /ear|receiver|handset/i.test(d.label); })[0];
+      var target = speakerOn ? loud : (ear || outs.filter(function(d){
+        return d.deviceId === "default"; })[0]);
+      if (target) el.setSinkId(target.deviceId).catch(function(){});
+    }).catch(function(){});
+  }
+  setBoost(speakerOn);
+  if (call) $("callNote").textContent = speakerOn ? "Speaker on — louder" : "";
+}
+
+function setBoost(on){
+  var el = $("remoteAudio");
+  try {
+    if (on) {
+      unlockAudio();
+      if (!audioCtx || !el.srcObject || boost) return;
+      var src = audioCtx.createMediaStreamSource(el.srcObject);
+      var gain = audioCtx.createGain();
+      gain.gain.value = 2.2;
+      src.connect(gain); gain.connect(audioCtx.destination);
+      /* The element keeps playing, silently: some browsers only feed a
+         call's audio onward while it is attached to one. */
+      el.muted = true;
+      boost = { src: src, gain: gain };
+    } else if (boost) {
+      try { boost.src.disconnect(); boost.gain.disconnect(); } catch (e) {}
+      boost = null;
+      el.muted = false;
+    }
+  } catch (e) {
+    boost = null; el.muted = false;
+  }
 }
 
 function newPeer(peerId){
@@ -1555,6 +1767,7 @@ function startCall(peerId){
             + " from this network";
         });
       remember(nameOf(peerId), "voice call", true);
+      call.logAt = state.recent[0].at;
       call.giveUp = setTimeout(function(){
         if (call && call.state === "calling") {
           stopTone();
@@ -1761,11 +1974,13 @@ function answer(){
 function hangUp(why){
   stopTone();
   releaseAwake();
+  if (speakerOn || boost) { speakerOn = false; setBoost(false); }
   if (!call) { hideCallScreen(); return; }
   if (call.recoverTimer) clearTimeout(call.recoverTimer);
   if (call.recoverDeadline) clearTimeout(call.recoverDeadline);
   if (call.ringTimer) clearTimeout(call.ringTimer);
   if (call.audioTimer) clearInterval(call.audioTimer);
+  finishUsage();
   if (call.giveUp)   clearTimeout(call.giveUp);
   if (call.watchdog) clearTimeout(call.watchdog);
   if (call.iceTimer) clearTimeout(call.iceTimer);
@@ -2012,6 +2227,8 @@ function watchAudio(){
     if (!call || call.id !== id || !call.pc) return;
     if (call.state !== "connected" || call.recovering) { stalls = 0; return; }
     call.pc.getStats(null).then(function(stats){
+      sampleUsage(stats);
+      sampleQuality(stats);
       var got = 0;
       stats.forEach(function(r){
         if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio"))
@@ -2030,6 +2247,166 @@ function watchAudio(){
       if (stalls === 3) noSound();
     }).catch(function(){});
   }, 2000);
+}
+
+/* ---------------------------------------------------------- usage
+ *
+ * What each call used, and which way it went.
+ *
+ * Read from the same statistics the sound check reads every two
+ * seconds, so the numbers are there even when the other phone hangs up
+ * first and the connection closes before this side can ask. Data is
+ * split by route as it happens: a call that starts direct and moves to
+ * the relay is counted on each for the part it spent there. */
+
+function routeOf(stats){
+  var pair = null, cands = {}, transport = null;
+  stats.forEach(function(r){
+    if (r.type === "transport") transport = r;
+    if (r.type === "local-candidate" || r.type === "remote-candidate") cands[r.id] = r;
+  });
+  if (transport && transport.selectedCandidatePairId)
+    pair = stats.get ? stats.get(transport.selectedCandidatePairId) : null;
+  if (!pair) stats.forEach(function(r){
+    if (r.type === "candidate-pair" && (r.selected || r.nominated) &&
+        r.state === "succeeded") pair = pair || r;
+  });
+  if (!pair) return "";
+  var mine = cands[pair.localCandidateId] || {};
+  var theirs = cands[pair.remoteCandidateId] || {};
+  if (mine.candidateType === "relay") {
+    var url = String(mine.url || "");
+    if (/cloudflare/i.test(url)) return "Cloudflare";
+    return "Main relay";
+  }
+  /* Their phone is on a relay and this one is not: the data still went
+     through a relay, just not one this phone's allowance pays for. */
+  if (theirs.candidateType === "relay") return "their relay";
+  return "direct";
+}
+
+function sampleUsage(stats){
+  if (!call) return;
+  var u = call.usage = call.usage || { last: 0, by: {} };
+  var total = 0, seen = false;
+  stats.forEach(function(r){
+    if (r.type === "transport" && typeof r.bytesSent === "number") {
+      total += (r.bytesSent || 0) + (r.bytesReceived || 0); seen = true;
+    }
+  });
+  if (!seen) stats.forEach(function(r){
+    if (r.type === "candidate-pair" && r.state === "succeeded")
+      total += (r.bytesSent || 0) + (r.bytesReceived || 0);
+  });
+  var route = routeOf(stats) || u.route || "direct";
+  var delta = total - u.last;
+  if (delta < 0) delta = total;              /* counters restarted */
+  u.by[route] = (u.by[route] || 0) + delta;
+  u.last = total;
+  u.route = route;
+}
+
+/* Three bars, from the round trip and the share of voice packets lost
+   since the last look - the two things you actually hear. */
+function sampleQuality(stats){
+  if (!call) return;
+  var rtt = null, lost = 0, got = 0;
+  stats.forEach(function(r){
+    if (r.type === "candidate-pair" && r.state === "succeeded" &&
+        typeof r.currentRoundTripTime === "number" && (r.nominated || r.selected || rtt === null))
+      rtt = r.currentRoundTripTime;
+    if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio")) {
+      lost += r.packetsLost || 0; got += r.packetsReceived || 0;
+    }
+  });
+  var q = call.q || { lost: 0, got: 0 };
+  var dl = lost - q.lost, dg = got - q.got;
+  call.q = { lost: lost, got: got };
+  var loss = (dl + dg) > 0 ? dl / (dl + dg) : 0;
+  var level = 3;
+  if ((rtt !== null && rtt > 0.35) || loss > 0.03) level = 2;
+  if ((rtt !== null && rtt > 0.7) || loss > 0.1 || dg === 0) level = 1;
+  var el = $("callQual");
+  if (el) el.className = "qual on q" + level;
+}
+
+function fmtBytes(n){
+  if (n >= 1073741824) return (n / 1073741824).toFixed(2) + " GB";
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB";
+  return Math.max(1, Math.round(n / 1024)) + " KB";
+}
+
+function fmtLength(ms){
+  var s = Math.round(ms / 1000);
+  if (s < 60) return s + " s";
+  var m = Math.floor(s / 60);
+  if (m < 60) return m + " min";
+  return Math.floor(m / 60) + " h " + (m % 60) + " min";
+}
+
+function monthKey(){
+  var d = new Date();
+  return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2);
+}
+
+function finishUsage(){
+  if (!call || !call.t0 || call.usageDone) return;
+  call.usageDone = true;
+  var u = call.usage || { by: {} };
+  var total = 0, relayed = 0, via = [];
+  Object.keys(u.by).forEach(function(route){
+    var n = u.by[route] || 0;
+    total += n;
+    if (route !== "direct" && n > 0) {
+      relayed += n;
+      if (via.indexOf(route) === -1) via.push(route);
+    }
+  });
+  var how = !total ? "" :
+            relayed === 0 ? "direct" :
+            relayed >= total * 0.9 ? "via " + via.join(" + ") :
+            "partly via " + via.join(" + ");
+  var what = "voice call · " + fmtLength(Date.now() - call.t0) +
+             (how ? " · " + how : "") + (total ? " · " + fmtBytes(total) : "");
+
+  /* The entry written when the call was placed becomes the full one;
+     an answered call gets its own. */
+  var entry = null;
+  (state.recent || []).forEach(function(r){
+    if (!entry && call.logAt && r.at === call.logAt) entry = r;
+  });
+  if (entry) { entry.what = what; save(); paintRecent(); }
+  else remember(nameOf(call.peer), what, !!call.out);
+
+  /* This phone's running total for the month, per relay - kept on this
+     phone only; it is what this phone used, not the whole family. */
+  var month = monthKey();
+  if (!state.usage || state.usage.month !== month)
+    state.usage = { month: month, calls: 0, direct: 0, relay: {} };
+  state.usage.calls++;
+  Object.keys(u.by).forEach(function(route){
+    var n = u.by[route] || 0;
+    if (route === "direct") state.usage.direct += n;
+    else state.usage.relay[route] = (state.usage.relay[route] || 0) + n;
+  });
+  save();
+}
+
+function paintUsage(){
+  var el = $("relayUsage");
+  if (!el) return;
+  var u = state && state.usage;
+  if (!u || u.month !== monthKey() || !u.calls) {
+    el.textContent = "No calls yet this month.";
+    return;
+  }
+  var parts = Object.keys(u.relay).filter(function(k){ return u.relay[k] > 0; })
+    .map(function(k){ return k + " " + fmtBytes(u.relay[k]); });
+  el.textContent = "This month on this phone: " + u.calls + " call" +
+    (u.calls === 1 ? "" : "s") + " · through relays: " +
+    (parts.length ? parts.join(" · ") : "none") +
+    (u.direct ? " · direct: " + fmtBytes(u.direct) : "") +
+    ". Free: Cloudflare 1,000 GB, Open Relay 20 GB a month.";
 }
 
 function noSound(){
@@ -2319,7 +2696,13 @@ function askNotify(){
 }
 
 function showBuzz(from, what){
-  $("ringFrom").textContent = from;
+  var m = memberByTitle(from);
+  var name = m ? m.name : String(from || "Someone");
+  var rest = m ? String(from).slice(m.name.length).trim() : "";
+  $("ringFrom").textContent = name;
+  $("ringKind").textContent = rest || "is buzzing you";
+  $("ringAvatar").textContent = initials(name);
+  paintWho($("ring"), m && m.colour);
   $("ringWhat").textContent = what || "wants your attention";
   $("ring").classList.add("on");
   tone();
@@ -2343,6 +2726,37 @@ function timeOf(ms){
 
 /* ------------------------------------------------------------- paint */
 
+function greeting(){
+  var h = new Date().getHours();
+  return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+function ago(ms){
+  var m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return m + " min ago";
+  var h = Math.round(m / 60);
+  if (h < 24) return h + " h ago";
+  var d = Math.round(h / 24);
+  return d === 1 ? "yesterday" : d + " days ago";
+}
+
+/* The latest thing between you and one person, in a few words. */
+function lastWith(name){
+  var r = ((state && state.recent) || []).filter(function(x){ return x.who === name; })[0];
+  if (!r) return null;
+  var what = String(r.what || "");
+  var missed = /missed/i.test(what) && !r.out;
+  var text = missed ? "Missed call" :
+             /^voice call/.test(what) ? (r.out ? "You called" : "Called you") :
+             /tap to answer/i.test(what) ? "Called you" :
+             r.out ? "You buzzed: " + what : "Buzzed you: " + what;
+  var len = what.match(/voice call · ([^·]+)/);
+  var dur = len ? len[1].trim() : "";
+  if (/^\d+ (s|min)$|^\d+ h \d+ min$/.test(dur)) text += " · " + dur;
+  return { text: text + " · " + ago(r.at), missed: missed };
+}
+
 function paintMain(){
   var main = $("main");
   main.innerHTML = "";
@@ -2350,33 +2764,61 @@ function paintMain(){
 
   $("whoami").textContent = "You are " + nameOf(state.me);
 
-  var hint = document.createElement("p");
-  hint.className = "hint";
-  hint.textContent = "Tap anyone to call or buzz them.";
-  main.appendChild(hint);
+  var hello = document.createElement("p");
+  hello.className = "greet";
+  hello.textContent = greeting() + ", " + String(nameOf(state.me)).split(/\s+/)[0];
+  main.appendChild(hello);
 
-  state.members.forEach(function(m){
-    var b = document.createElement("button");
-    b.className = "person" + (m.id === state.me ? " me" : "");
+  var others = state.members.filter(function(m){ return m.id !== state.me; });
+  if (!others.length) {
+    var none = document.createElement("p");
+    none.className = "hint";
+    none.textContent = "Nobody else here yet. Add your family in Settings, then send each of them their link.";
+    main.appendChild(none);
+  }
+
+  others.forEach(function(m){
+    var card = document.createElement("div");
+    card.className = "person";
+    card.setAttribute("data-who", m.name);
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
     var dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = m.colour;
+    dot.textContent = initials(m.name);
     var nm = document.createElement("span");
     nm.className = "nm"; nm.textContent = m.name;
-    if (m.id === state.me) {
-      var sub = document.createElement("span");
-      sub.className = "sub"; sub.textContent = "this is you";
-      nm.appendChild(sub);
-    }
+    var last = lastWith(m.name);
+    var sub = document.createElement("span");
+    sub.className = "sub" + (last && last.missed ? " missed" : "");
+    sub.textContent = last ? last.text : "Tap to call or buzz";
+    nm.appendChild(sub);
+
     var go = document.createElement("span");
-    go.className = "go"; go.textContent = (m.id === state.me) ? "" : "›";
-    b.appendChild(dot); b.appendChild(nm); b.appendChild(go);
-    if (m.id !== state.me) b.onclick = function(){ openAct(m.id); };
-    main.appendChild(b);
+    go.className = "go";
+    var bz = document.createElement("button");
+    bz.className = "qa buzz"; bz.innerHTML = ICON.bell;
+    bz.setAttribute("aria-label", "Buzz " + m.name);
+    bz.onclick = function(ev){
+      ev.stopPropagation(); pendingId = m.id; unlockAudio(); openMsgSheet();
+    };
+    var cl = document.createElement("button");
+    cl.className = "qa ring"; cl.innerHTML = ICON.phone;
+    cl.setAttribute("aria-label", "Call " + m.name);
+    cl.onclick = function(ev){
+      ev.stopPropagation(); unlockAudio(); askNotify(); startCall(m.id);
+    };
+    go.appendChild(bz); go.appendChild(cl);
+
+    card.appendChild(dot); card.appendChild(nm); card.appendChild(go);
+    card.onclick = function(){ openAct(m.id); };
+    card.onkeydown = function(ev){ if (ev.key === "Enter") openAct(m.id); };
+    main.appendChild(card);
   });
 
   var st = document.createElement("div");
   st.className = "status"; st.id = "statusLine";
-  st.style.marginTop = "18px";
+  st.style.marginTop = "14px";
   st.innerHTML = '<span class="led"></span><span>Connecting…</span>';
   main.appendChild(st);
 
@@ -2391,24 +2833,45 @@ function paintMain(){
   paintStatus(streamLive());
 }
 
+function paintCardNotes(){
+  Array.prototype.forEach.call(document.querySelectorAll(".person[data-who]"), function(card){
+    var sub = card.querySelector(".sub");
+    if (!sub) return;
+    var last = lastWith(card.getAttribute("data-who"));
+    sub.className = "sub" + (last && last.missed ? " missed" : "");
+    sub.textContent = last ? last.text : "Tap to call or buzz";
+  });
+}
+
 function paintRecent(){
+  paintCardNotes();
   var box = $("recentBox");
   if (!box) return;
   box.innerHTML = "";
   var list = (state && state.recent) || [];
   if (!list.length) {
     var p = document.createElement("p");
-    p.className = "hint"; p.textContent = "Nothing yet.";
+    p.className = "hint"; p.textContent = "Calls and buzzes show up here.";
     box.appendChild(p); return;
   }
   list.forEach(function(r){
+    var what = String(r.what || "");
+    var missed = /missed/i.test(what) && !r.out;
     var d = document.createElement("div");
-    d.className = "log";
-    d.appendChild(document.createTextNode(r.out ? "→ " : "← "));
+    d.className = "log" + (missed ? " missed" : "");
+    var ic = document.createElement("span");
+    ic.className = "ic"; ic.innerHTML = r.out ? ICON.outArr : ICON.inArr;
+    var tx = document.createElement("span"); tx.className = "tx";
     var b = document.createElement("b"); b.textContent = r.who;
-    d.appendChild(b);
-    d.appendChild(document.createTextNode(
-      (r.what ? " · " + r.what : "") + " · " + timeOf(r.at)));
+    tx.appendChild(b);
+    tx.appendChild(document.createTextNode(what ? "  " + what : ""));
+    var tm = document.createElement("span"); tm.className = "tm";
+    tm.textContent = timeOf(r.at);
+    d.appendChild(ic); d.appendChild(tx); d.appendChild(tm);
+    /* Tapping someone's line is the quickest way back to them. */
+    var m = ((state && state.members) || []).filter(function(x){
+      return x.name === r.who && x.id !== state.me; })[0];
+    if (m) { d.className += " tap"; d.onclick = function(){ openAct(m.id); }; }
     box.appendChild(d);
   });
 }
@@ -2464,6 +2927,7 @@ function openSetup(){
   var t = (state && state.turn) || {};
   $("turnUrl").value  = t.api || t.url || "";
   $("turn2Url").value = ((state && state.turn2) || {}).api || "";
+  paintUsage();
   $("turnUser").value = t.user || "";
   $("turnPass").value = t.pass || "";
 
@@ -2478,7 +2942,7 @@ function openSetup(){
   paintNotifyState();
   paintSwatches(); paintMembers(); paintTopic(); paintTones();
   $("shareArea").style.display = state ? "block" : "none";
-  if (state) { paintInvites(); $("mineLink").textContent = personalLink(); }
+  if (state) { paintInvites(); $("mineLink").textContent = maskLink(personalLink()); }
   openSheet("setupSheet");
 }
 
@@ -2543,7 +3007,7 @@ function paintInvites(){
 
     var code = document.createElement("div");
     code.className = "codebox";
-    code.textContent = linkFor(m.id);
+    code.textContent = maskLink(linkFor(m.id));
 
     var btns = document.createElement("div");
     btns.className = "row";
@@ -2621,8 +3085,47 @@ function paintNtfyWarn(){
 
 function paintTopic(){
   $("myTopic").textContent = (state && state.me)
-    ? ringTopic(state.me) : "Save first, and your topic appears here.";
+    ? hideMiddle(ringTopic(state.me)) : "Save first, and your topic appears here.";
 }
+
+/* Links and topics are keys: anyone who reads one can ring you or sign
+   in as you. So they are shown shortened and hidden, and only ever
+   copied or shared whole - never displayed whole. */
+function hideMiddle(t){
+  t = String(t || "");
+  return t.length <= 10 ? "•••••" : t.slice(0, 6) + "••••••" + t.slice(-2);
+}
+function maskLink(url){
+  var u = String(url || "");
+  var cut = u.indexOf("#");
+  return (cut === -1 ? u : u.slice(0, cut)) + "#•••••••• (hidden — use Copy)";
+}
+
+/* Secret boxes: dots until Show is pressed, and back to dots on Hide. */
+function maskSecrets(){
+  var dotsWork = window.CSS && CSS.supports &&
+                 CSS.supports("-webkit-text-security", "disc");
+  Array.prototype.forEach.call(document.querySelectorAll("input[data-secret]"), function(inp){
+    if (inp.parentNode.classList.contains("secret")) return;
+    var wrap = document.createElement("div");
+    wrap.className = "secret";
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    inp.setAttribute("autocomplete", "off");
+    inp.setAttribute("spellcheck", "false");
+    function hide(){ if (dotsWork) inp.classList.add("masked"); else inp.type = "password"; }
+    function show(){ if (dotsWork) inp.classList.remove("masked"); else inp.type = "text"; }
+    hide();
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = "Show";
+    b.onclick = function(){
+      var hidden = dotsWork ? inp.classList.contains("masked") : inp.type === "password";
+      if (hidden) { show(); b.textContent = "Hide"; } else { hide(); b.textContent = "Show"; }
+    };
+    wrap.appendChild(b);
+  });
+}
+maskSecrets();
 
 function saveSetup(){
   var myName = $("myName").value.trim();
@@ -2682,7 +3185,7 @@ function saveSetup(){
   paintMain(); openStreams(); paintTopic();
   $("shareArea").style.display = "block";
   paintInvites();
-  $("mineLink").textContent = personalLink();
+  $("mineLink").textContent = maskLink(personalLink());
   toast("Saved");
 }
 
@@ -3007,7 +3510,7 @@ $("saveToken").onclick = function(){
   broadcastRoster();
   if (state.me) { openStreams(); }
   paintInvites();
-  $("mineLink").textContent = personalLink();
+  $("mineLink").textContent = maskLink(personalLink());
   toast(t ? "Token saved — and sent to the rest of the family" : "Token cleared");
 };
 
@@ -3025,7 +3528,7 @@ $("saveServer").onclick = function(){
   broadcastRoster();
   if (state.me) { openStreams(); }
   paintInvites();
-  $("mineLink").textContent = personalLink();
+  $("mineLink").textContent = maskLink(personalLink());
   toast("Server saved — send everyone their link again");
 };
 
@@ -3053,7 +3556,7 @@ $("saveTurn").onclick = function(){
     state.turn = { api: link };
     state.preferRelay = false;
     bumpRev(); save(); broadcastRoster(); paintInvites();
-    $("mineLink").textContent = personalLink();
+    $("mineLink").textContent = maskLink(personalLink());
     toast("Checking the relay link…");
     fetchRelay(link).then(function(ok){
       toast(ok ? "Relay saved and working — sent to the family"
@@ -3081,7 +3584,7 @@ $("saveTurn").onclick = function(){
   save();
   broadcastRoster();
   paintInvites();
-  $("mineLink").textContent = personalLink();
+  $("mineLink").textContent = maskLink(personalLink());
   toast(url ? "Relay saved — re-share the invite link" : "Relay cleared");
 };
 $("saveTurn2").onclick = function(){
@@ -3090,7 +3593,7 @@ $("saveTurn2").onclick = function(){
   if (!raw) {
     state.turn2 = null;
     bumpRev(); save(); broadcastRoster(); paintInvites();
-    $("mineLink").textContent = personalLink();
+    $("mineLink").textContent = maskLink(personalLink());
     toast("Additional relay removed on this phone");
     return;
   }
@@ -3103,12 +3606,12 @@ $("saveTurn2").onclick = function(){
   state.turn2 = { api: link };
   state.preferRelay = false;
   bumpRev(); save(); broadcastRoster(); paintInvites();
-  $("mineLink").textContent = personalLink();
+  $("mineLink").textContent = maskLink(personalLink());
   toast("Checking the additional relay…");
   fetchRelay(link).then(function(ok){
     toast(ok ? "Additional relay saved and working — sent to the family"
-             : "Saved, but the Worker did not answer — check its address " +
-               "and that its secrets are set");
+             : "Saved, but the Worker is not working yet: " +
+               (relayErrors[link] || "no answer"));
   });
 };
 
@@ -3157,7 +3660,8 @@ $("testTurn").onclick = function(){
     var get = r.link ? fetchRelay(r.link).then(function(){ return cachedServers(r.link); })
                      : Promise.resolve(r.servers());
     return get.then(function(servers){
-      if (!servers || !servers.length) return r.name + ": link did not answer";
+      if (!servers || !servers.length)
+        return r.name + ": " + (relayErrors[r.link] || "link did not answer");
       return probeRelay(servers).then(function(found){
         return r.name + (found === null ? ": details not valid"
                         : found.length ? ": works (" + found.join(", ") + ")"
