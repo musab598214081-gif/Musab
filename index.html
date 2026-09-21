@@ -340,16 +340,19 @@
     <p class="sub">
       Call audio goes phone to phone. On some mobile networks the two
       phones cannot reach each other directly and need a relay in the
-      middle. Free credentials from <b>openrelay.metered.ca</b> take two
-      minutes and make calls work everywhere. Leave blank to try without.
+      middle. Free from <b>openrelay.metered.ca</b> (20 GB a month): sign
+      up, create a TURN credential, and paste the <b>credentials link</b>
+      it shows - the one ending in <code>?apiKey=…</code> - below. No
+      username or password needed with the link.
     </p>
-    <label for="turnUrl">TURN server</label>
-    <input type="text" id="turnUrl" placeholder="turn:example.com:80" autocomplete="off">
+    <label for="turnUrl">Relay link, or TURN server</label>
+    <input type="text" id="turnUrl" placeholder="https://NAME.metered.live/api/v1/turn/credentials?apiKey=…" autocomplete="off">
     <label for="turnUser">Username</label>
     <input type="text" id="turnUser" autocomplete="off">
     <label for="turnPass">Credential</label>
     <input type="text" id="turnPass" autocomplete="off">
     <button class="btn ghost" id="saveTurn">Save relay</button>
+    <button class="btn ghost" id="testTurn">Test relay on this network</button>
 
     <button class="btn ghost" data-close="setupSheet" style="margin-top:22px">Close</button>
     <button class="btn danger" id="resetAll">Start over</button>
@@ -382,7 +385,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-21e";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-21f";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1054,8 +1057,60 @@ function tidyTurn(raw){
   return /^turns?:[A-Za-z0-9.\-]+(:\d+)?(\?transport=(udp|tcp))?$/i.test(u) ? u : "";
 }
 
+/* The Open Relay (Metered) credentials link:
+   https://NAME.metered.live/api/v1/turn/credentials?apiKey=KEY
+   One link instead of three fields, and the credentials behind it are
+   fetched fresh - so they never go stale, and nothing needs copying
+   out of a dashboard again. */
+function tidyRelayLink(raw){
+  var u = String(raw || "").trim().replace(/^["'\s]+|["',\s]+$/g, "");
+  return /^https:\/\/[A-Za-z0-9.\-]+\/api\/v1\/turn\/credentials\?apiKey=[A-Za-z0-9_\-]+$/i
+         .test(u) ? u : "";
+}
+
+var relayCache = { servers: [], at: 0, link: "" };
+
+function ensureRelay(){
+  var link = state && state.turn && state.turn.api;
+  if (!link) return Promise.resolve(false);
+  /* Kept for an hour; the call must not wait on it when it is fresh. */
+  if (relayCache.link === link && relayCache.servers.length &&
+      Date.now() - relayCache.at < 3600000) return Promise.resolve(true);
+  var fetched = netFetch(link, {}, 2).then(function(r){
+    return r.ok ? r.json() : [];
+  }).then(function(list){
+    var servers = (Array.isArray(list) ? list : []).filter(function(x){
+      return x && x.urls;
+    });
+    if (servers.length) {
+      relayCache = { servers: servers, at: Date.now(), link: link };
+      try { localStorage.setItem("fmn-relay", JSON.stringify(relayCache)); } catch (e) {}
+    }
+    return servers.length > 0;
+  }).catch(function(){ return false; });
+  /* Never hold a call up for more than four seconds over it: a cached
+     copy (below) or the direct route is better than a wait. */
+  var cap = new Promise(function(res){ setTimeout(function(){ res(false); }, 4000); });
+  return Promise.race([fetched, cap]);
+}
+try {
+  var cachedRelay = JSON.parse(localStorage.getItem("fmn-relay") || "null");
+  if (cachedRelay && cachedRelay.servers) relayCache = cachedRelay;
+} catch (e) {}
+
+function hasRelay(){
+  if (!state || !state.turn) return false;
+  if (state.turn.api) return relayCache.link === state.turn.api &&
+                             relayCache.servers.length > 0;
+  return !!tidyTurn(state.turn.url);
+}
+
 function iceServers(){
   var list = STUN.slice();
+  if (state && state.turn && state.turn.api) {
+    return relayCache.link === state.turn.api
+         ? list.concat(relayCache.servers) : list;
+  }
   var url = state.turn && tidyTurn(state.turn.url);
   if (url) {
     /* Many office, school and hotel networks block everything except
@@ -1139,7 +1194,10 @@ function paintCallButtons(incoming){
 function newPeer(peerId){
   var pc;
   try {
-    pc = new RTCPeerConnection({ iceServers: iceServers() });
+    var config = { iceServers: iceServers() };
+    /* Relay only, when this call is known to need it - see noSound. */
+    if (call && call.forcedRelay && hasRelay()) config.iceTransportPolicy = "relay";
+    pc = new RTCPeerConnection(config);
   } catch (e) {
     /* Bad relay details should cost you the relay, not the call. Try
        again on STUN alone and say so, because a call that works on
@@ -1257,6 +1315,7 @@ function markConnected(){
   call.t0 = Date.now();
   keepAwake();
   prioritiseAudio();
+  watchAudio();
   $("call").classList.remove("incoming");
   $("callNote").textContent = "";
   startTimer();
@@ -1265,10 +1324,12 @@ function markConnected(){
 
 function markFailed(){
   if (!call || call.state === "connected" || call.state === "failed") return;
+  /* The relay itself did not work - do not keep insisting on it. */
+  if (call.forcedRelay && state.preferRelay) { state.preferRelay = false; save(); }
   call.state = "failed";
   stopTone();
   if (call.watchdog) { clearTimeout(call.watchdog); call.watchdog = null; }
-  $("callNote").textContent = (state.turn && state.turn.url)
+  $("callNote").textContent = (state.turn && (state.turn.url || state.turn.api))
     ? "Could not connect — the relay did not answer either"
     : "No route between the phones — add a relay server in Settings";
   setCallState("Call failed");
@@ -1376,9 +1437,13 @@ function startCall(peerId){
   setCallState("Asking for the microphone…");
   $("callNote").textContent = "Your browser should be asking to allow it";
 
-  micStream()
-    .then(function(stream){
+  Promise.all([micStream(), ensureRelay()])
+    .then(function(got){
+      var stream = got[0];
       if (!call) { stopStream(stream); return null; }
+      /* A phone that has needed the relay before goes straight to it,
+         rather than sitting through six silent seconds again. */
+      call.forcedRelay = !!(state.preferRelay && hasRelay());
       call.stream = stream;
       watchMic(stream);
       call.pc = newPeer(peerId);
@@ -1389,7 +1454,7 @@ function startCall(peerId){
       if (!offer || !call) return null;
       return call.pc.setLocalDescription(offer).then(function(){
         return sendSig(peerId, { t:"offer", call: call.id, from: state.me,
-                                 sentAt: Date.now(),
+                                 sentAt: Date.now(), relay: !!call.forcedRelay,
                                  sdp: call.pc.localDescription.sdp })
           .then(function(r){ if (call) call.offerSent = true; return r; });
       });
@@ -1480,7 +1545,8 @@ function onSignal(msg){
       return;
     }
     call = { id: msg.call, peer: msg.from, out: false, pc: null,
-             stream: null, state: "incoming", offer: msg.sdp, pending: [] };
+             stream: null, state: "incoming", offer: msg.sdp, pending: [],
+             wantRelay: !!msg.relay };
     showCallScreen(msg.from, true);
     setCallState("Incoming call");
     tone();
@@ -1548,6 +1614,7 @@ function onSignal(msg){
     return;
   }
   if (msg.t === "restart") { if (call.out) restartIce(); return; }
+  if (msg.t === "relay") { goRelay(false); return; }
 
   if (msg.t === "busy") {
     stopTone(); setCallState("They are on another call");
@@ -1593,9 +1660,11 @@ function answer(){
   $("callNote").textContent = "Your browser should be asking to allow it";
   $("call").classList.remove("incoming");
 
-  micStream()
-    .then(function(stream){
+  Promise.all([micStream(), ensureRelay()])
+    .then(function(got){
+      var stream = got[0];
       if (!call) { stopStream(stream); return null; }
+      call.forcedRelay = !!((call.wantRelay || state.preferRelay) && hasRelay());
       call.stream = stream;
       watchMic(stream);
       call.pc = newPeer(call.peer);
@@ -1631,6 +1700,7 @@ function hangUp(why){
   if (call.recoverTimer) clearTimeout(call.recoverTimer);
   if (call.recoverDeadline) clearTimeout(call.recoverDeadline);
   if (call.ringTimer) clearTimeout(call.ringTimer);
+  if (call.audioTimer) clearInterval(call.audioTimer);
   if (call.giveUp)   clearTimeout(call.giveUp);
   if (call.watchdog) clearTimeout(call.watchdog);
   if (call.iceTimer) clearTimeout(call.iceTimer);
@@ -1857,6 +1927,80 @@ try {
         setTimeout(swapMic, 600);
     });
 } catch (e) {}
+
+/* Is any sound actually arriving?
+ *
+ * "Connected" only means the two phones can exchange a handshake. On
+ * some networks - UAE mobile data among them - the handshake gets
+ * through and the voice packets are filtered out, so the call shows
+ * connected, the timer runs, and neither side hears a thing. Nothing
+ * used to notice.
+ *
+ * So every two seconds this counts the voice packets that have arrived.
+ * A phone sends about fifty a second even in silence, and even muted,
+ * so none arriving for six seconds means the path is blocked, not quiet. */
+function watchAudio(){
+  if (!call || !call.pc || !call.pc.getStats) return;
+  var id = call.id, last = -1, stalls = 0;
+  if (call.audioTimer) clearInterval(call.audioTimer);
+  call.audioTimer = setInterval(function(){
+    if (!call || call.id !== id || !call.pc) return;
+    if (call.state !== "connected" || call.recovering) { stalls = 0; return; }
+    call.pc.getStats(null).then(function(stats){
+      var got = 0;
+      stats.forEach(function(r){
+        if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio"))
+          got += r.packetsReceived || 0;
+      });
+      if (got > last) {
+        if (stalls >= 3 && call && !call.recovering) {
+          $("callNote").textContent = call.forcedRelay
+            ? "Connected through the relay" : "";
+        }
+        stalls = 0;
+      } else {
+        stalls++;
+      }
+      last = got;
+      if (stalls === 3) noSound();
+    }).catch(function(){});
+  }, 2000);
+}
+
+function noSound(){
+  if (!call) return;
+  if (hasRelay() && !call.forcedRelay) {
+    /* Both phones switch, so each reaches its own nearest relay over
+       ordinary secure web traffic, which is what gets through. */
+    sendSig(call.peer, { t:"relay", call: call.id, from: state.me })
+      .catch(function(){});
+    goRelay(true);
+    return;
+  }
+  $("callNote").textContent = call.forcedRelay
+    ? "No sound through the relay either — try wifi"
+    : "No sound is getting through — this network blocks direct calls. " +
+      "Add a relay in Settings.";
+}
+
+function goRelay(ours){
+  if (!call || !call.pc || call.forcedRelay || !hasRelay()) return;
+  call.forcedRelay = true;
+  /* Remembered on this phone: its network needs the relay, so the next
+     call starts there. */
+  if (!state.preferRelay) { state.preferRelay = true; save(); }
+  try {
+    call.pc.setConfiguration({ iceServers: iceServers(),
+                               iceTransportPolicy: "relay" });
+  } catch (e) {}
+  $("callNote").textContent = "No sound was getting through — switching to the relay";
+  if (call.state === "connected") {
+    call.recovering = true;
+    setCallState("Reconnecting…");
+    if (call.out) restartIce();
+    beginRecovery(8000);
+  }
+}
 
 /* Keeping the screen on for the length of a call. A phone that locks
    mid-conversation can suspend the page and the audio with it. */
@@ -2253,7 +2397,7 @@ function openSetup(){
   $("myName").value = (state && memberById(state.me))
     ? memberById(state.me).name : "";
   var t = (state && state.turn) || {};
-  $("turnUrl").value  = t.url  || "";
+  $("turnUrl").value  = t.api || t.url || "";
   $("turnUser").value = t.user || "";
   $("turnPass").value = t.pass || "";
 
@@ -2436,7 +2580,9 @@ function saveSetup(){
      typing relay details and then pressing Save (instead of Save relay)
      does not silently throw them away. */
   var tUrl = tidyTurn($("turnUrl").value);
-  draft.turn = tUrl ? { url: tUrl,
+  var tLink = tidyRelayLink($("turnUrl").value);
+  if (tLink) tUrl = "";
+  draft.turn = tLink ? { api: tLink } : tUrl ? { url: tUrl,
                         user: $("turnUser").value.trim(),
                         pass: $("turnPass").value.trim() }
                     : ((state && state.turn) || draft.turn || null);
@@ -2825,6 +2971,24 @@ $("testMe").onclick = function(){
 $("saveTurn").onclick = function(){
   if (!state) { toast("Save your family first"); return; }
   var raw = $("turnUrl").value.trim();
+  var link = tidyRelayLink(raw);
+  if (link) {
+    state.turn = { api: link };
+    state.preferRelay = false;
+    bumpRev(); save(); broadcastRoster(); paintInvites();
+    $("mineLink").textContent = personalLink();
+    toast("Checking the relay link…");
+    ensureRelay().then(function(ok){
+      toast(ok ? "Relay saved and working — sent to the family"
+               : "Saved, but the link did not answer — check it");
+    });
+    return;
+  }
+  if (/^https?:/i.test(raw) && /metered|apiKey/i.test(raw)) {
+    toast("That link is not complete — copy the whole credentials link, " +
+          "ending in ?apiKey=…");
+    return;
+  }
   if (raw && !tidyTurn(raw)) {
     toast("That does not look like a TURN address — it should be like " +
           "turn:name.metered.live:443");
@@ -2843,6 +3007,41 @@ $("saveTurn").onclick = function(){
   $("mineLink").textContent = personalLink();
   toast(url ? "Relay saved — re-share the invite link" : "Relay cleared");
 };
+/* Asks the relay for an address, relay-only, the way a call would. If
+   one comes back this network can reach it - and says over what, since
+   "TLS on 443" is the route that survives the strictest networks. */
+$("testTurn").onclick = function(){
+  if (!state || !state.turn) { toast("Save a relay first"); return; }
+  toast("Testing the relay…");
+  ensureRelay().then(function(){
+    if (!hasRelay()) { toast("The relay link did not answer"); return; }
+    var pc, found = [], done = false;
+    function finish(){
+      if (done) return; done = true;
+      try { pc.close(); } catch (e) {}
+      toast(found.length
+        ? "Relay works on this network (" + found.join(", ") + ")"
+        : "The relay cannot be reached from this network");
+    }
+    try {
+      pc = new RTCPeerConnection({ iceServers: iceServers(),
+                                   iceTransportPolicy: "relay" });
+    } catch (e) { toast("Relay details are not valid"); return; }
+    pc.createDataChannel("t");
+    pc.onicecandidate = function(ev){
+      if (!ev.candidate) { finish(); return; }
+      var c = ev.candidate.candidate || "";
+      if (/ typ relay/.test(c)) {
+        var how = / tcp /i.test(c) ? "TCP" : "UDP";
+        if (found.indexOf(how) === -1) found.push(how);
+      }
+    };
+    pc.createOffer().then(function(o){ return pc.setLocalDescription(o); })
+      .catch(finish);
+    setTimeout(finish, 8000);
+  });
+};
+
 $("resetAll").onclick = function(){
   if (!confirm("Forget the family and start over on this phone?")) return;
   wipeStorage();
@@ -2871,6 +3070,7 @@ if (!tryJoin()) paintMain();
 if (state && state.me) { openStreams(); }
 
 restoreFromIdb();
+ensureRelay();
 
 /* Reconnects anything that has gone quiet. Called on a timer, when the
    page comes back to the front, and when the network returns. It only
