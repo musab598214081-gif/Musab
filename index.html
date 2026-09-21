@@ -382,7 +382,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-21d";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-21e";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -693,10 +693,17 @@ function ringPush(memberId, title, message, answerable){
     var mine = linkFor(memberId);
     if (mine.length < 3500) home = mine;
   } catch (e) {}
+  /* Marked as coming from a notification, so the page does not greet
+     you with "Welcome back" in the middle of a call - and the Answer
+     button's copy says "answer", so pressing it answers, rather than
+     opening the page to ring all over again. */
+  var join = home.indexOf("#") === -1 ? "#" : "&";
+  var fromNote = home + join + "n=1";
+  var answerIt = fromNote + "&ans=1";
   var base = srv() + "/" + encodeURIComponent(ringTopic(memberId))
            + "?title="  + encodeURIComponent(title)
            + "&priority=5&tags=telephone_receiver"
-           + "&click="  + encodeURIComponent(home)
+           + "&click="  + encodeURIComponent(fromNote)
            + authParam();
 
   /* An Answer button right on the notification.
@@ -705,7 +712,7 @@ function ringPush(memberId, title, message, answerable){
   var url = base;
   if (answerable) {
     url += "&actions=" + encodeURIComponent(
-      "view, Answer, " + home + ", clear=true");
+      "view, Answer, " + answerIt + ", clear=true");
   }
 
   function go(u){
@@ -1095,7 +1102,7 @@ function paintCallButtons(incoming){
   if (incoming) {
     var dec = document.createElement("button");
     dec.className = "rnd hang"; dec.textContent = "✕";
-    dec.onclick = function(){ hangUp("declined"); };
+    dec.onclick = function(){ tellMyOtherCopies("declined"); hangUp("declined"); };
     var ans = document.createElement("button");
     ans.className = "rnd answer"; ans.textContent = "📞";
     ans.onclick = answer;
@@ -1438,6 +1445,18 @@ function startCall(peerId){
 function onSignal(msg){
   if (!msg || !msg.t) return;
 
+  if (msg.t === "elsewhere") {
+    if (msg.tab !== TAB_ID && call && call.id === msg.call &&
+        call.state === "incoming") {
+      stopTone();
+      setCallState(msg.what === "answered" ? "Answered on another screen"
+                                           : "Declined");
+      if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
+      setTimeout(function(){ hangUp(null); }, 900);
+    }
+    return;
+  }
+
   if (msg.t === "offer") {
     /* Both of you pressed call at the same moment. Each phone was
        "calling", so each told the other it was busy and nobody got
@@ -1455,6 +1474,7 @@ function onSignal(msg){
       }
       return;                                       /* they will pick up ours */
     }
+    if (call && call.id === msg.call) return;       /* same call, seen again */
     if (call) {
       sendSig(msg.from, { t:"busy", call: msg.call, from: state.me });
       return;
@@ -1477,6 +1497,12 @@ function onSignal(msg){
         setTimeout(function(){ hangUp(null); }, 1200);
       }
     }, Math.max(3000, 50000 - age));
+
+    /* Opened by the notification's Answer button: that was the answer. */
+    if (autoAnswerUntil > Date.now()) {
+      autoAnswerUntil = 0;
+      setTimeout(function(){ if (call && call.state === "incoming") answer(); }, 50);
+    }
     if (document.hidden)
       systemNotify(nameOf(msg.from) + " is calling", "Tap to answer");
     return;
@@ -1548,8 +1574,19 @@ function drainPending(){
   call.pending = [];
 }
 
+/* Opening the notification can leave two copies of the page open - the
+   one that was already ringing and the one the notification opened.
+   Both listen on your topic, so a note posted there reaches the other
+   copy and it stops ringing, instead of carrying on for nobody. */
+function tellMyOtherCopies(what){
+  if (!call) return;
+  sendSig(state.me, { t:"elsewhere", call: call.id, what: what,
+                      tab: TAB_ID, from: state.me }).catch(function(){});
+}
+
 function answer(){
   if (!call || call.state !== "incoming") return;
+  tellMyOtherCopies("answered");
   if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
   stopTone();
   setCallState("Asking for the microphone…");
@@ -2481,6 +2518,24 @@ function takeRoster(msg){
 
 /* --------------------------------------------------- joining a house */
 
+var TAB_ID = rand(8);
+
+/* What the notification asked for, read from the address. */
+var autoAnswerUntil = 0;
+var openedFromNote  = false;
+function readIntent(){
+  var h = location.hash || "";
+  openedFromNote = /[#&]n=1(&|$)/.test(h);
+  if (/[#&]ans=1(&|$)/.test(h)) {
+    /* The offer may still be on its way - the page has only just
+       opened. Answer it when it lands, if that is within a minute. */
+    autoAnswerUntil = Date.now() + 60000;
+    if (call && call.state === "incoming") { autoAnswerUntil = 0; answer(); }
+  }
+  if ((openedFromNote || autoAnswerUntil) && !/[#&]j=/.test(h))
+    history.replaceState(null, "", location.pathname);
+}
+
 function tryJoin(){
   var m = location.hash.match(/[#&]j=([A-Za-z0-9\-_]+)/);
   if (!m) return false;
@@ -2538,7 +2593,9 @@ function tryJoin(){
   if (mine) {
     save();
     paintMain(); openStreams();
-    toast("Welcome back, " + nameOf(mine));
+    /* Not when a call brought you here - a greeting on top of a ringing
+       screen reads like something went wrong. */
+    if (!openedFromNote) toast("Welcome back, " + nameOf(mine));
     return true;
   }
 
@@ -2809,6 +2866,7 @@ function copy(text, ok){
 if (location.protocol === "file:") $("filewarn").style.display = "block";
 
 state = load();
+readIntent();
 if (!tryJoin()) paintMain();
 if (state && state.me) { openStreams(); }
 
@@ -2855,7 +2913,23 @@ window.addEventListener("pageshow", function(ev){
 });
 
 window.addEventListener("beforeunload", function(){
-  if (call) { try { hangUp("ended"); } catch (e) {} }
+  if (!call) return;
+  /* A ringing page that closes is very often being REPLACED - by the
+     copy the notification's Answer button opened. Hanging up here told
+     the caller "call ended" at the very moment you were answering, and
+     the new page opened to a dead call. So a call that is only ringing
+     is left alone: the new page picks it up. A call in progress, or one
+     you are placing, is still ended properly. */
+  if (call.state === "incoming") { stopTone(); return; }
+  try { hangUp("ended"); } catch (e) {}
+});
+
+/* The notification can also open into a page that is already open,
+   changing only the part after the # - no reload, so nothing above
+   would notice. Read it here as well. */
+window.addEventListener("hashchange", function(){
+  readIntent();
+  if (/[#&]j=/.test(location.hash)) tryJoin();
 });
 </script>
 </body>
