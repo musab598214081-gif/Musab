@@ -116,10 +116,18 @@
   .log.tap{cursor:pointer}
   .log .ic{width:30px;flex:0 0 auto;display:flex}
   .log .ic svg{width:18px;height:18px}
-  .log .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .log .tx{flex:1;min-width:0}
+  /* Name on the first line, the whole story on the second - wrapping if
+     it must. On a phone the one-line version cut the call's route and
+     data off at "via Cloudflare · ...", which was the part worth reading. */
+  .log .tx .det{display:block;font-size:13px;color:var(--mist);margin-top:2px;
+    line-height:1.4;overflow-wrap:anywhere}
+  .log{align-items:flex-start}
+  .log .ic{padding-top:2px}
+  .log .tm{padding-top:1px}
   .log .tm{margin-left:10px;font-size:13px;flex:0 0 auto}
   .log b{color:var(--paper);font-weight:500}
-  .log.missed .ic, .log.missed .tx{color:#FF8589}
+  .log.missed .ic, .log.missed .tx, .log.missed .det{color:#FF8589}
   .log.missed b{color:#FF8589}
 
   .sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(5,11,18,.7);
@@ -409,6 +417,11 @@
     <div class="codebox" id="myTopic">—</div>
     <button class="btn ghost" id="copyTopic">Copy topic</button>
 
+    <div class="sectiontitle">Microphone</div>
+    <p class="sub" id="micState">—</p>
+    <p class="notice" id="micHow" style="display:none"></p>
+    <button class="btn ghost" id="micAllow">Allow the microphone now</button>
+
     <div class="sectiontitle">Connection</div>
     <p class="sub" id="connState">Tap check to see whether this network
       allows the notification server.</p>
@@ -520,7 +533,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22g";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22h";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -2158,6 +2171,89 @@ function micStream(){
   return Promise.race([media, timeout]);
 }
 
+/* ---------------------------------------------------------- microphone
+ *
+ * A web page cannot give itself lasting permission for the microphone -
+ * the browser keeps that decision. Chrome on Android and on a computer
+ * remember "Allow"; Safari on an iPhone asks on every visit unless the
+ * person tells it to allow this site. So this says which is happening,
+ * and how to stop the question where it can be stopped. */
+
+function isIOS(){
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function isAndroid(){ return /Android/i.test(navigator.userAgent); }
+
+function micPermission(){
+  try {
+    if (navigator.permissions && navigator.permissions.query)
+      return navigator.permissions.query({ name: "microphone" })
+        .then(function(r){ return r.state; })
+        .catch(function(){ return "unknown"; });
+  } catch (e) {}
+  return Promise.resolve("unknown");
+}
+
+function micSteps(){
+  if (isIOS()) return "<b>To stop the question on this iPhone:</b> in Safari, tap " +
+    "<b>aA</b> (or the page menu) beside the address, then <b>Website Settings</b> → " +
+    "<b>Microphone</b> → <b>Allow</b>. From a Home Screen icon, it's the " +
+    "iPhone <b>Settings</b> app → <b>Apps</b> → <b>Safari</b> → " +
+    "<b>Microphone</b> → <b>Allow</b>.";
+  if (isAndroid()) return "<b>On Android:</b> when asked, choose <b>Allow</b> - not " +
+    "\"Only this time\", which asks again next call. To change it later, tap the " +
+    "icon beside the address → <b>Permissions</b> → <b>Microphone</b> → <b>Allow</b>.";
+  return "<b>On a computer:</b> click the icon beside the address → " +
+    "<b>Microphone</b> → <b>Allow</b>. The browser remembers it.";
+}
+
+function paintMicState(){
+  var el = $("micState"), how = $("micHow");
+  if (!el) return;
+  micPermission().then(function(st){
+    el.textContent =
+      st === "granted" ? "Allowed - calls start without asking." :
+      st === "denied"  ? "Blocked - calls can't use the microphone until it's allowed again." :
+      st === "prompt"  ? "This browser asks each time a call starts." :
+      isIOS() ? "Safari may ask each time a call starts." :
+      "The browser decides whether to ask when a call starts.";
+    var needed = st !== "granted";
+    how.style.display = needed ? "block" : "none";
+    if (needed) how.innerHTML = micSteps();
+    $("micAllow").style.display = st === "granted" ? "none" : "";
+  });
+}
+
+/* Asked for here, at a calm moment, rather than as a call rings - and
+   given straight back: the microphone is not kept open. */
+function micAllowNow(){
+  micStream().then(function(stream){
+    stopStream(stream);
+    toast(isIOS() ? "Allowed for now — to stop Safari asking again, follow the steps shown"
+                  : "Microphone allowed");
+    paintMicState();
+  }).catch(function(err){
+    toast(err && err.name === "NotAllowedError"
+      ? "The microphone was refused — follow the steps shown to allow it"
+      : "Couldn't reach the microphone");
+    paintMicState();
+  });
+}
+
+/* After the first call on a phone that asked, say once where to stop
+   the question - the moment it is fresh in mind. */
+function micTipAfterCall(){
+  if (!state || state.micTip) return;
+  micPermission().then(function(st){
+    if (st === "granted") return;
+    state.micTip = true; save();
+    setTimeout(function(){
+      toast("Tired of the microphone question? Settings → Microphone shows how to stop it");
+    }, 1500);
+  });
+}
+
 function callError(err, phase){
   var name = (err && err.name) || "";
   var text = (err && err.message) || "";
@@ -2478,6 +2574,7 @@ function hangUp(why){
   stopTone();
   releaseAwake();
   if (speakerOn || boost) { speakerOn = false; setBoost(false); }
+  if (call && call.t0) micTipAfterCall();
   if (!call) { hideCallScreen(); return; }
   if (call.recoverTimer) clearTimeout(call.recoverTimer);
   if (call.recoverDeadline) clearTimeout(call.recoverDeadline);
@@ -3458,7 +3555,11 @@ function recentRow(r){
   var tx = document.createElement("span"); tx.className = "tx";
   var b = document.createElement("b"); b.textContent = r.who;
   tx.appendChild(b);
-  tx.appendChild(document.createTextNode(what ? "  " + what : ""));
+  if (what) {
+    var det = document.createElement("span");
+    det.className = "det"; det.textContent = what;
+    tx.appendChild(det);
+  }
   var tm = document.createElement("span"); tm.className = "tm";
   tm.textContent = timeOf(r.at);
   d.appendChild(ic); d.appendChild(tx); d.appendChild(tm);
@@ -3529,6 +3630,7 @@ function openSetup(){
     ? memberById(state.me).colour : COLOURS[0];
 
   $("verTag").textContent = VERSION;
+  paintMicState();
   $("serverUrl").value = (state && state.server) || "";
   $("tokenVal").value  = (state && state.token) || "";
   $("connState").textContent = "Tap check to see whether this network "
@@ -4345,6 +4447,8 @@ $("testTurn").onclick = function(){
     toast(lines.join("  ·  "));
   });
 };
+
+$("micAllow").onclick = micAllowNow;
 
 $("resetAll").onclick = function(){
   if (!confirm("Forget the family and start over on this phone?")) return;
