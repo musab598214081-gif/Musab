@@ -382,7 +382,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-20w";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-21a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -426,11 +426,12 @@ var CALLTAG = " is calling you on Notifyer";
 
 var STUN = [
   { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" }
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" }
 ];
 
 var state = null;
-var ringSrc = null, sigSrc = null;
+var stream = null;
 var audioCtx = null;
 var seen = {};
 var chunks = {};
@@ -459,12 +460,164 @@ function toast(text){
   toast._t = setTimeout(function(){ t.classList.remove("on"); }, 2800);
 }
 
-function load(){
-  try { var r = localStorage.getItem(STOREKEY); return r ? JSON.parse(r) : null; }
-  catch (e) { return null; }
+/* ---------------------------------------------------------- storage
+ *
+ * The settings used to live in localStorage alone, and a phone throws
+ * that away more often than you would think: iOS clears it after a
+ * week of not visiting, Private Browsing refuses it outright, and a
+ * page added to the Home Screen gets its own separate copy. Any one of
+ * those looked like "the token did not save".
+ *
+ * Now every save goes to three places - localStorage, IndexedDB and a
+ * cookie - and loading takes whichever copy is newest. Losing all
+ * three at once is far rarer than losing one. */
+
+var saveWarned = false;
+
+function snapshot(){
+  if (!state) return null;
+  return { house: state.house, me: state.me, members: state.members,
+           rev: state.rev || 0, turn: state.turn || null,
+           server: state.server || null, token: state.token || null,
+           tone: state.tone || "classic", ntfy: !!state.ntfy };
 }
+
+function b64u(str){
+  return btoa(unescape(encodeURIComponent(str)))
+    .replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function unb64u(str){
+  var b = str.replace(/-/g,"+").replace(/_/g,"/");
+  while (b.length % 4) b += "=";
+  return decodeURIComponent(escape(atob(b)));
+}
+
+function cookieRead(){
+  try {
+    var m = document.cookie.match(/(?:^|;\s*)fmn=([^;]+)/);
+    if (!m) return null;
+    var o = JSON.parse(unb64u(m[1]));
+    return (o && o.house) ? o : null;
+  } catch (e) { return null; }
+}
+function cookieWrite(obj){
+  try {
+    if (!obj) {
+      document.cookie = "fmn=; max-age=0; path=/; SameSite=Lax";
+      return true;
+    }
+    var v = b64u(JSON.stringify(obj));
+    if (v.length > 3800) return false;          /* cookies stop at ~4 KB */
+    document.cookie = "fmn=" + v + "; max-age=34560000; path=/; SameSite=Lax"
+      + (location.protocol === "https:" ? "; Secure" : "");
+    return document.cookie.indexOf("fmn=") !== -1;
+  } catch (e) { return false; }
+}
+
+function idbOpen(){
+  return new Promise(function(res, rej){
+    if (!window.indexedDB) { rej(new Error("no indexedDB")); return; }
+    var r;
+    try { r = indexedDB.open("familyNotifyer", 1); } catch (e) { rej(e); return; }
+    r.onupgradeneeded = function(){ r.result.createObjectStore("kv"); };
+    r.onsuccess = function(){ res(r.result); };
+    r.onerror = function(){ rej(r.error); };
+  });
+}
+function idbPut(val){
+  return idbOpen().then(function(db){
+    return new Promise(function(res){
+      try {
+        var tx = db.transaction("kv", "readwrite");
+        if (val === null) tx.objectStore("kv").delete(STOREKEY);
+        else tx.objectStore("kv").put(val, STOREKEY);
+        tx.oncomplete = function(){ res(true); };
+        tx.onerror = tx.onabort = function(){ res(false); };
+      } catch (e) { res(false); }
+    });
+  }).catch(function(){ return false; });
+}
+function idbGet(){
+  return idbOpen().then(function(db){
+    return new Promise(function(res){
+      try {
+        var q = db.transaction("kv", "readonly").objectStore("kv").get(STOREKEY);
+        q.onsuccess = function(){ res(q.result || null); };
+        q.onerror = function(){ res(null); };
+      } catch (e) { res(null); }
+    });
+  }).catch(function(){ return null; });
+}
+
+function load(){
+  var a = null, b = cookieRead();
+  try { var r = localStorage.getItem(STOREKEY); a = r ? JSON.parse(r) : null; }
+  catch (e) { a = null; }
+  if (!a) return b;
+  if (b && b.house === a.house && (b.rev || 0) > (a.rev || 0)) {
+    b.recent = a.recent || [];
+    return b;
+  }
+  if (b && !a.token && b.token && b.house === a.house) a.token = b.token;
+  return a;
+}
+
 function save(){
-  try { localStorage.setItem(STOREKEY, JSON.stringify(state)); } catch (e) {}
+  var okLocal = false;
+  try {
+    localStorage.setItem(STOREKEY, JSON.stringify(state));
+    okLocal = localStorage.getItem(STOREKEY) !== null;
+  } catch (e) { okLocal = false; }
+  var okCookie = cookieWrite(snapshot());
+  idbPut(state ? JSON.parse(JSON.stringify(state)) : null);
+  if (!okLocal && !okCookie && !saveWarned) {
+    saveWarned = true;
+    toast("This browser is refusing to save — turn off Private Browsing");
+  }
+  /* Asks the browser not to clear this site's data when space runs low
+     or after a quiet week. Granted silently where it is supported. */
+  try {
+    if (navigator.storage && navigator.storage.persist && !save._asked) {
+      save._asked = true;
+      navigator.storage.persist().catch(function(){});
+    }
+  } catch (e) {}
+}
+
+function wipeStorage(){
+  try { localStorage.removeItem(STOREKEY); } catch (e) {}
+  cookieWrite(null);
+  idbPut(null);
+}
+
+/* The copy in IndexedDB can only be read asynchronously, so it is
+   checked just after start-up and adopted if it is newer than what
+   loaded - or if nothing loaded at all. */
+function restoreFromIdb(){
+  idbGet().then(function(saved){
+    if (!saved || !saved.house) return;
+    if (state && state.house === saved.house) {
+      var changed = false;
+      if (!state.token && saved.token) { state.token = saved.token; changed = true; }
+      if ((saved.rev || 0) > (state.rev || 0)) {
+        saved.recent = state.recent || saved.recent || [];
+        state = saved; changed = true;
+      }
+      if (changed) { save(); paintMain(); if (state.me) openStreams(); }
+      return;
+    }
+    if (!state) {
+      state = saved; save(); paintMain();
+      if (state.me) openStreams();
+    }
+  });
+}
+
+/* A revision that is also a clock reading. Two phones editing
+   separately used to land on the same small number, and the second
+   edit was then ignored everywhere as "not newer". */
+function bumpRev(){
+  state.rev = Math.max((state.rev || 0) + 1, Date.now());
 }
 
 function ringTopic(id){ return "fmn-" + state.house + "-" + id; }
@@ -542,30 +695,16 @@ function ringPush(memberId, title, message, answerable){
       "view, Answer, " + home + ", clear=true");
   }
 
-  if (cooling())
-    return Promise.resolve({ ok:false, status:429, cooling:true });
-
-  function attempt(u, tries){
-    return fetch(u, { method:"POST", body: message }).then(function(r){
-      if (r.ok) return r;
-      noteStatus(r);
-      /* 429 is "slow down", not "no". The allowance refills steadily,
-         so a short wait usually turns a refusal into a delivery -
-         and a ring that arrives three seconds late is a working call,
-         while one that is dropped is a missed one. */
-      if (r.status === 429 && tries > 0) {
-        return new Promise(function(res){
-          setTimeout(function(){ res(attempt(u, tries - 1)); }, 3500);
-        });
-      }
+  function go(u){
+    return netFetch(u, { method:"POST", body: message }, 5).then(function(r){
       /* If ntfy ever rejects the action format, the ring itself still
          has to go out - a notification with no button beats no
          notification at all. */
-      if (u !== base) return attempt(base, tries);
+      if (!r.ok && r.status !== 429 && u !== base) return go(base);
       return r;
     });
   }
-  return attempt(url, 2);
+  return go(url);
 }
 
 /* The signal topic. Priority 1, so that even if somebody subscribed to
@@ -576,20 +715,20 @@ function ringPush(memberId, title, message, answerable){
    push it past the limit, and a truncated offer is a call that fails
    with nothing on screen to explain why. */
 function sendSig(memberId, obj){
-  if (cooling()) return Promise.reject(new Error("cooling"));
   var body = JSON.stringify(obj);
   var url  = srv() + "/" + encodeURIComponent(sigTopic(memberId))
            + "?priority=1" + authParam();
 
-  if (body.length <= MAXBODY) return fetch(url, { method:"POST", body: body });
+  if (body.length <= MAXBODY)
+    return netFetch(url, { method:"POST", body: body }, 5);
 
   var key = rand(6), parts = [], i;
   for (i = 0; i < body.length; i += MAXBODY) parts.push(body.slice(i, i + MAXBODY));
   var chain = Promise.resolve();
   parts.forEach(function(p, idx){
     chain = chain.then(function(){
-      return fetch(url, { method:"POST", body: JSON.stringify({
-        t:"chunk", k:key, i:idx, n:parts.length, d:p }) });
+      return netFetch(url, { method:"POST", body: JSON.stringify({
+        t:"chunk", k:key, i:idx, n:parts.length, d:p }) }, 5);
     });
   });
   return chain;
@@ -597,141 +736,226 @@ function sendSig(memberId, obj){
 
 /* --------------------------------------------------------- listening */
 
-/* When either stream last showed any sign of life.
+/* ------------------------------------------------ network, patiently
  *
- * A phone that sleeps drops these connections without telling anyone:
- * readyState still reads OPEN, no error fires, and nothing arrives ever
- * again - which is exactly the "it only works if I refresh the page"
- * problem. ntfy sends a keepalive every 45 seconds or so, so silence
- * past a couple of minutes means the stream is dead however healthy it
- * claims to be. */
-var lastBeat = { ring: 0, sig: 0 };
-
-/* When the server told us to stop, and until when.
+ * The old version stopped talking to the server for five minutes the
+ * moment it was told "too many requests", and put a "Paused" bar up.
+ * That is gone. A refused or dropped request is now simply tried
+ * again a moment later, quietly, a few times, with the gaps growing -
+ * and the page never freezes itself.
  *
- * This is the piece that was missing, and without it waiting did not
- * work. A throttled connection is retried by the browser every few
- * seconds automatically, and every retry is another request against
- * the very allowance that is trying to refill - so the page sat there
- * quietly holding the bucket empty while the user waited for it to
- * fill. The only cure is to stop talking to the server entirely for a
- * while, streams included. */
-var coolUntil = 0;
-
-function cooling(){ return Date.now() < coolUntil; }
-
-function enterCooldown(mins){
-  var until = Date.now() + (mins || 5) * 60000;
-  if (until <= coolUntil) return;
-  coolUntil = until;
-  if (ringSrc) { ringSrc.close(); ringSrc = null; }
-  if (sigSrc)  { sigSrc.close();  sigSrc  = null; }
-  paintCool();
+ * Every request also has a time limit. On a weak or filtered network a
+ * request can hang for minutes without failing, which is what made
+ * the page look suspended. */
+function netFetch(url, opts, tries){
+  tries = tries || 1;
+  var delay = 800;
+  function once(){
+    var ctl = window.AbortController ? new AbortController() : null;
+    var o = {};
+    for (var k in (opts || {})) o[k] = opts[k];
+    if (ctl) o.signal = ctl.signal;
+    var t = ctl ? setTimeout(function(){ ctl.abort(); }, 15000) : null;
+    return fetch(url, o).then(function(r){ if (t) clearTimeout(t); return r; },
+                             function(e){ if (t) clearTimeout(t); throw e; });
+  }
+  function attempt(left){
+    return once().then(function(r){
+      if (r.ok || left <= 1) return r;
+      if (r.status === 429 || r.status >= 500) {
+        return wait().then(function(){ return attempt(left - 1); });
+      }
+      return r;
+    }, function(err){
+      if (left <= 1) throw err;
+      return wait().then(function(){ return attempt(left - 1); });
+    });
+  }
+  function wait(){
+    var d = delay + Math.random() * 400;
+    delay = Math.min(delay * 2, 8000);
+    return new Promise(function(res){ setTimeout(res, d); });
+  }
+  return attempt(tries);
 }
 
-function paintCool(){
-  var el = $("coolbar");
-  if (!el) return;
-  if (!cooling()) {
-    el.style.display = "none";
+/* Kept as harmless stubs so nothing that still asks can freeze the page. */
+function cooling(){ return false; }
+function noteStatus(r){ return r; }
+function paintCool(){ var el = $("coolbar"); if (el) el.style.display = "none"; }
+
+/* --------------------------------------------------------- listening
+ *
+ * One connection now carries both topics (ntfy accepts "a,b"), so a
+ * phone keeps a single stream open instead of two - half the requests
+ * against the allowance, all day long.
+ *
+ * And it no longer depends on that stream working. Some networks -
+ * hotel and office wifi, a few mobile carriers - hold streamed
+ * responses back, so the connection "opens" and then nothing ever
+ * arrives. If the stream cannot prove it is alive, the page switches
+ * to asking the server every few seconds instead, which works on any
+ * network that can load a web page, and tries the stream again later. */
+
+var lastBeatAt  = 0;       /* last sign of life from the stream */
+var mode        = "sse";   /* "sse" or "poll" */
+var sseFails    = 0;
+var staleCount  = 0;
+var retryDelay  = 1000;
+var retryTimer  = null;
+var pollTimer   = null;
+var lastPollAt  = 0;
+var upgradeTimer = null;
+var hiddenAt    = 0;
+
+function beat(){ lastBeatAt = Date.now(); }
+
+function topicsPath(){
+  return encodeURIComponent(ringTopic(state.me)) + ","
+       + encodeURIComponent(sigTopic(state.me));
+}
+
+function streamLive(){
+  if (mode === "poll") return Date.now() - lastPollAt < 60000;
+  return !!(stream && stream.readyState === 1 &&
+            Date.now() - lastBeatAt < 110000);
+}
+
+function closeStreams(){
+  if (stream) { try { stream.close(); } catch (e) {} stream = null; }
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+}
+
+function dispatch(m, catchingUp){
+  if (!m || m.event !== "message" || !m.id || seen[m.id]) return;
+  seen[m.id] = 1;
+  if (m.topic === sigTopic(state.me)) takeSignal(m.message, m.time);
+  else if (!catchingUp) onRingMsg(m);
+}
+
+function openStreams(){
+  if (!state || !state.me) return;
+  closeStreams();
+  if (upgradeTimer) { clearTimeout(upgradeTimer); upgradeTimer = null; }
+
+  if (mode === "poll" || !window.EventSource) {
+    mode = "poll";
+    pollLoop(true);
+    /* Every ten minutes, see whether the stream works again - the
+       phone may have moved to a friendlier network. */
+    upgradeTimer = setTimeout(function(){
+      mode = "sse"; sseFails = 0; staleCount = 0; openStreams();
+    }, 600000);
     return;
   }
-  var left = Math.ceil((coolUntil - Date.now()) / 1000);
-  var mm = Math.floor(left / 60), ss = left % 60;
-  el.style.display = "block";
-  el.innerHTML = "";
-  el.appendChild(document.createTextNode(
-    "Paused for " + mm + ":" + ("0" + ss).slice(-2) + " — " + srv()
-    + " asked us to slow down. Nothing is being sent until then, so the "
-    + "allowance can refill. "));
-  var b = document.createElement("button");
-  b.textContent = "Try now";
-  b.style.cssText = "background:#FFD9A8;color:#5C2E00;border:0;border-radius:8px;"
-    + "padding:6px 12px;font-weight:700;font-family:inherit;font-size:13px;"
-    + "margin-left:8px;cursor:pointer";
-  b.onclick = function(){ coolUntil = 0; paintCool(); reviveStreams(true);
-                          toast("Trying again"); };
-  el.appendChild(b);
-}
 
-setInterval(function(){
-  if (!coolUntil) return;
-  if (cooling()) { paintCool(); return; }
-  coolUntil = 0;
-  paintCool();
-  reviveStreams(true);
-  toast("Ready again");
-}, 1000);
+  var es, proven = false;
+  try {
+    es = new EventSource(srv() + "/" + topicsPath() + "/sse?_=1" + authParam());
+  } catch (e) { mode = "poll"; openStreams(); return; }
+  stream = es;
+  beat();
 
-/* Anything that reports being throttled trips the same switch. */
-function noteStatus(r){
-  if (r && r.status === 429) enterCooldown(5);
-  return r;
-}
+  /* Headers arriving is not proof - a buffering network sends those
+     and then holds everything else. ntfy's own "open" event, with data
+     in it, is the proof. */
+  var guard = setTimeout(function(){
+    if (proven || es !== stream) return;
+    sseFails++;
+    if (sseFails >= 2) mode = "poll";
+    openStreams();
+  }, 12000);
 
-function beat(which){ lastBeat[which] = Date.now(); }
+  function proof(){
+    beat();
+    if (proven) return;
+    proven = true; clearTimeout(guard);
+    sseFails = 0; retryDelay = 1000;
+    paintStatus(true);
+  }
 
-function openRing(){
-  if (ringSrc) ringSrc.close();
-  ringSrc = new EventSource(
-    srv() + "/" + encodeURIComponent(ringTopic(state.me))
-    + "/sse?_=1" + authParam());
-  beat("ring");
-  ringSrc.onopen  = function(){ beat("ring"); paintStatus(true); };
-  ringSrc.onerror = function(){ paintStatus(false); };
-  /* ntfy names these events, so they never reach onmessage - but they
-     are the only proof the connection is still alive between calls. */
-  ringSrc.addEventListener("keepalive", function(){ beat("ring"); });
-  ringSrc.addEventListener("open", function(){ beat("ring"); });
-  ringSrc.onmessage = function(ev){
-    beat("ring");
+  es.addEventListener("open", function(ev){ if (ev && ev.data) proof(); });
+  es.addEventListener("keepalive", proof);
+  es.onmessage = function(ev){
+    proof();
     var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.event !== "message" || seen[m.id]) return;
-    seen[m.id] = 1;
-    var title = m.title || "Someone";
-    var fresh = !m.time || (Date.now()/1000 - m.time) < 120;
-    remember(title, m.message || "", false, m.time);
-    /* A ring push belonging to a voice call is only there to wake the
-       phone. The call screen is raised by the offer on the signal
-       topic, so showing the buzz overlay too would put two different
-       things on screen for one call. */
-    if (title.indexOf(CALLTAG) === -1) {
-      if (fresh) showBuzz(title, m.message || "");
-      return;
-    }
-
-    /* A call push landed. The call screen is supposed to be raised by
-       the offer on the signal topic - but if that stream dropped while
-       the phone slept, the offer is sitting on the server unread and
-       the phone does nothing at all. Go and look for it, and if there
-       is still no call a few seconds later, at least say somebody
-       tried rather than staying silent. */
-    if (!fresh || call) return;
-    pollSignal();
-    setTimeout(function(){ if (!call) pollSignal(); }, 1500);
-    setTimeout(function(){
-      if (!call) showBuzz(title, "Tried to call you — tap to call back");
-    }, 5000);
+    dispatch(m, false);
   };
-}
-
-function openSignal(){
-  if (sigSrc) sigSrc.close();
-  var topic = encodeURIComponent(sigTopic(state.me));
-  sigSrc = new EventSource(srv() + "/" + topic + "/sse?_=1" + authParam());
-  beat("sig");
-  sigSrc.addEventListener("keepalive", function(){ beat("sig"); });
-  sigSrc.addEventListener("open", function(){ beat("sig"); });
-  sigSrc.onopen = function(){ beat("sig"); };
-  sigSrc.onmessage = function(ev){
-    beat("sig");
-    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.event !== "message" || seen[m.id]) return;
-    seen[m.id] = 1;
-    takeSignal(m.message, m.time);
+  es.onerror = function(){
+    if (es !== stream) return;
+    clearTimeout(guard);
+    paintStatus(false);
+    /* Reconnection is handled here rather than left to the browser,
+       which retries every three seconds forever - exactly the kind of
+       hammering that gets a network throttled. */
+    try { es.close(); } catch (e) {}
+    stream = null;
+    if (!proven) { sseFails++; if (sseFails >= 2) mode = "poll"; }
+    scheduleReconnect();
   };
 
   pollSignal();
+}
+
+function scheduleReconnect(){
+  if (retryTimer) clearTimeout(retryTimer);
+  var d = retryDelay + Math.random() * 500;
+  retryDelay = Math.min(retryDelay * 2, 30000);
+  retryTimer = setTimeout(function(){ retryTimer = null; openStreams(); }, d);
+}
+
+/* Polling mode: ask the server what is new. "since" is a relative
+   window the server works out itself, so a phone whose clock is wrong
+   still gets every message; overlap is harmless because every message
+   is only ever handled once. */
+function pollLoop(first){
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  if (!state || !state.me || mode !== "poll") return;
+  var gap = lastPollAt ? Math.ceil((Date.now() - lastPollAt) / 1000) + 15 : 60;
+  var since = Math.min(Math.max(gap, 20), 120) + "s";
+  netFetch(srv() + "/" + topicsPath() + "/json?poll=1&since=" + since
+           + authParam(), {}, 2)
+    .then(function(r){
+      if (!r.ok) { paintStatus(false); return; }
+      return r.text().then(function(text){
+        lastPollAt = Date.now();
+        paintStatus(true);
+        text.split("\n").forEach(function(line){
+          if (!line.trim()) return;
+          var m; try { m = JSON.parse(line); } catch (e) { return; }
+          dispatch(m, false);
+        });
+      });
+    })
+    .catch(function(){ paintStatus(false); })
+    .then(function(){
+      if (mode !== "poll") return;
+      pollTimer = setTimeout(function(){ pollLoop(false); },
+                             document.hidden ? 30000 : 7000);
+    });
+}
+
+function onRingMsg(m){
+  var title = m.title || "Someone";
+  var fresh = !m.time || (Date.now()/1000 - m.time) < 120;
+  remember(title, m.message || "", false, m.time);
+  /* A ring push belonging to a voice call is only there to wake the
+     phone. The call screen is raised by the offer on the signal
+     topic, so showing the buzz overlay too would put two different
+     things on screen for one call. */
+  if (title.indexOf(CALLTAG) === -1) {
+    if (fresh) showBuzz(title, m.message || "");
+    return;
+  }
+  /* A call push landed but no offer yet - the stream may have missed
+     it while the phone slept. Go and look for it. */
+  if (!fresh || call) return;
+  pollSignal();
+  setTimeout(function(){ if (!call) pollSignal(); }, 1500);
+  setTimeout(function(){
+    if (!call) showBuzz(title, "Tried to call you — tap to call back");
+  }, 5000);
 }
 
 /* Catching up, which is the whole point on a phone. The page is
@@ -739,10 +963,10 @@ function openSignal(){
    sent - by which time a live stream alone has already missed it.
    ntfy keeps recent messages, so ask for the last two minutes. */
 function pollSignal(){
-  if (!state || !state.me || cooling()) return;
-  fetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
-        + "/json?poll=1&since=2m" + authParam())
-    .then(function(r){ return r.text(); })
+  if (!state || !state.me) return;
+  netFetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
+        + "/json?poll=1&since=2m" + authParam(), {}, 2)
+    .then(function(r){ return r.ok ? r.text() : ""; })
     .then(function(text){
       text.split("\n").forEach(function(line){
         if (!line.trim()) return;
@@ -809,7 +1033,18 @@ function iceServers(){
   var list = STUN.slice();
   var url = state.turn && tidyTurn(state.turn.url);
   if (url) {
-    list.push({ urls: url,
+    /* Many office, school and hotel networks block everything except
+       ordinary web traffic on port 443. The same relay reached over
+       TCP and TLS on 443 gets through those, so it is offered that way
+       as well - unused routes cost nothing. */
+    var host = url.replace(/^turns?:/i, "").replace(/\?.*$/, "")
+                  .replace(/:\d+$/, "");
+    var urls = [url];
+    ["turn:" + host + ":443?transport=tcp",
+     "turns:" + host + ":443?transport=tcp"].forEach(function(u){
+      if (urls.indexOf(u) === -1) urls.push(u);
+    });
+    list.push({ urls: urls,
                 username: state.turn.user || "",
                 credential: state.turn.pass || "" });
   }
@@ -1124,8 +1359,8 @@ function startCall(peerId){
         .then(function(r){
           if (r && r.ok) return;
           var why = (r && r.status === 429)
-            ? "ntfy.sh is rate-limiting this network — it refills in a few "
-              + "minutes, or use mobile data"
+            ? (state.token ? "the notification server is overloaded"
+                           : "add your ntfy token in Settings to fix this")
             : "the server answered " + (r ? r.status : "?");
           if (call) $("callNote").textContent =
             "Their phone will not ring — " + why;
@@ -1543,7 +1778,7 @@ function paintMain(){
 
   paintRecent();
   paintNtfyWarn();
-  paintStatus(ringSrc && ringSrc.readyState === 1);
+  paintStatus(streamLive());
 }
 
 function paintRecent(){
@@ -1807,13 +2042,27 @@ function saveSetup(){
   /* Personal, so it stays on this phone and never travels in the
      invite link - everyone picks their own. */
   draft.tone = (state && state.tone) || draft.tone || "classic";
+  /* Token and server are read from their boxes too. The form was a
+     copy of the settings taken when it opened, so pressing Save here
+     after "Save token" used to put the old, empty token back. */
+  var tok = $("tokenVal").value.trim();
+  if (tok && tok.indexOf("tk_") !== 0) {
+    toast("An ntfy token starts with tk_"); return;
+  }
+  draft.token = tok || (state && state.token) || null;
+  var sv = $("serverUrl").value.trim().replace(/\/+$/, "");
+  if (sv && !/^https:\/\/[A-Za-z0-9.\-]+(:\d+)?$/.test(sv)) {
+    toast("That server should look like https://ntfy.example.com"); return;
+  }
+  draft.server = (sv && sv !== DEFAULT_SERVER) ? sv : null;
+  draft.ntfy = !!(state && state.ntfy);
   state = draft;
-  state.rev = (state.rev || 0) + 1;
+  bumpRev();
   save();
   broadcastRoster();
 
   askNotify();
-  paintMain(); openRing(); openSignal(); paintTopic();
+  paintMain(); openStreams(); paintTopic();
   $("shareArea").style.display = "block";
   paintInvites();
   $("mineLink").textContent = personalLink();
@@ -1836,7 +2085,7 @@ function broadcastRoster(){
     if (m.id === state.me) return;
     sendSig(m.id, { t:"roster", from: state.me, rev: state.rev || 0,
                     members: state.members, turn: state.turn || null,
-                    server: state.server || null, token: state.token || null })
+                    server: srv(), token: state.token || null })
       .catch(function(){});
   });
 }
@@ -1847,9 +2096,11 @@ function takeRoster(msg){
 
   state.rev = msg.rev || 0;
   state.members = msg.members;
-  state.turn = msg.turn || null;
-  state.server = msg.server || null;
-  state.token = msg.token || null;
+  /* A phone that simply has no token yet must not erase ours - that
+     is how a saved token kept vanishing after a family update. */
+  state.turn = msg.turn || state.turn || null;
+  if (msg.server) state.server = (msg.server === DEFAULT_SERVER) ? null : msg.server;
+  if (msg.token) state.token = msg.token;
 
   /* If this phone's person is no longer on the list, they have been
      removed. Better to say so than to sit on a topic nobody calls. */
@@ -1860,7 +2111,7 @@ function takeRoster(msg){
 
   save();
   paintMain();
-  if (state.me) { openRing(); openSignal(); toast("Family list updated"); }
+  if (state.me) { openStreams(); toast("Family list updated"); }
   else toast("You were removed from the family");
 }
 
@@ -1894,17 +2145,32 @@ function tryJoin(){
 
   /* Only if that person is still on the list - somebody removed from
      the family should not keep receiving calls. */
+  /* The link in the family chat is often older than this phone's
+     settings - sent before the token was added, say. Opening it used to
+     overwrite everything with the link's version, token included. Now
+     the newer copy wins, and a token is never dropped for a link that
+     simply does not carry one. */
+  var same  = prev.house === cfg.h;
+  var older = same && (prev.rev || 0) > (cfg.r || 0);
+  var members = (older && prev.members && prev.members.length)
+              ? prev.members : cfg.m;
+
   var stillThere = false, i;
-  for (i = 0; i < cfg.m.length; i++) if (cfg.m[i].id === mine) stillThere = true;
+  for (i = 0; i < members.length; i++) if (members[i].id === mine) stillThere = true;
   if (!stillThere) mine = null;
 
-  state = { house: cfg.h, me: mine, members: cfg.m, rev: cfg.r || 0,
-            recent: keep, turn: cfg.t || null, tone: keepTone,
-            server: cfg.s || null, token: cfg.k || null };
+  state = { house: cfg.h, me: mine, members: members,
+            rev: older ? prev.rev : (cfg.r || 0),
+            recent: keep, tone: keepTone, ntfy: same && !!prev.ntfy,
+            turn:   older ? (prev.turn || cfg.t || null)
+                          : (cfg.t || (same && prev.turn) || null),
+            server: older ? (prev.server || null) : (cfg.s || null),
+            token:  older ? (prev.token || cfg.k || null)
+                          : (cfg.k || (same && prev.token) || null) };
 
   if (mine) {
     save();
-    paintMain(); openRing(); openSignal();
+    paintMain(); openStreams();
     toast("Welcome back, " + nameOf(mine));
     return true;
   }
@@ -1924,7 +2190,7 @@ function tryJoin(){
     b.appendChild(dot); b.appendChild(nm);
     b.onclick = function(){
       state.me = mem.id; save();
-      paintMain(); openRing(); openSignal();
+      paintMain(); openStreams();
       toast("Welcome, " + mem.name);
       openSetup();
     };
@@ -2085,17 +2351,17 @@ $("saveToken").onclick = function(){
     return;
   }
   state.token = t || null;
-  state.rev = (state.rev || 0) + 1;
+  bumpRev();
   /* The pause was for the OLD allowance. Signing in gets a new one, so
      holding the page silent for the rest of the countdown makes a fix
      look exactly like the problem it fixed. */
-  coolUntil = 0; paintCool();
+  paintCool();
   save();
   broadcastRoster();
-  if (state.me) { openRing(); openSignal(); }
+  if (state.me) { openStreams(); }
   paintInvites();
   $("mineLink").textContent = personalLink();
-  toast(t ? "Token saved — send everyone their link again" : "Token cleared");
+  toast(t ? "Token saved — and sent to the rest of the family" : "Token cleared");
 };
 
 $("saveServer").onclick = function(){
@@ -2106,11 +2372,11 @@ $("saveServer").onclick = function(){
     return;
   }
   state.server = (v && v !== DEFAULT_SERVER) ? v : null;
-  state.rev = (state.rev || 0) + 1;
-  coolUntil = 0; paintCool();   /* different server, different limit */
+  bumpRev();
+  paintCool();
   save();
   broadcastRoster();
-  if (state.me) { openRing(); openSignal(); }
+  if (state.me) { openStreams(); }
   paintInvites();
   $("mineLink").textContent = personalLink();
   toast("Server saved — send everyone their link again");
@@ -2146,7 +2412,7 @@ $("saveTurn").onclick = function(){
                        pass:$("turnPass").value.trim() } : null;
   if (url && (!state.turn.user || !state.turn.pass))
     toast("Saved, but a relay usually needs a username and credential too");
-  state.rev = (state.rev || 0) + 1;
+  bumpRev();
   save();
   broadcastRoster();
   paintInvites();
@@ -2155,10 +2421,9 @@ $("saveTurn").onclick = function(){
 };
 $("resetAll").onclick = function(){
   if (!confirm("Forget the family and start over on this phone?")) return;
-  try { localStorage.removeItem(STOREKEY); } catch (e) {}
+  wipeStorage();
+  closeStreams();
   state = null;
-  if (ringSrc) { ringSrc.close(); ringSrc = null; }
-  if (sigSrc)  { sigSrc.close();  sigSrc  = null; }
   closeSheet("setupSheet"); paintMain();
 };
 
@@ -2178,38 +2443,49 @@ if (location.protocol === "file:") $("filewarn").style.display = "block";
 
 state = load();
 if (!tryJoin()) paintMain();
-if (state && state.me) { openRing(); openSignal(); }
+if (state && state.me) { openStreams(); }
 
-/* Reconnects anything that has gone quiet, whatever it claims about
-   itself. Called on a timer, when the page comes back to the front,
-   and when the network returns - a phone coming off the lift hits all
-   three within a second of each other, and reopening a stream that was
-   already fine costs nothing. */
+restoreFromIdb();
+
+/* Reconnects anything that has gone quiet. Called on a timer, when the
+   page comes back to the front, and when the network returns. It only
+   reopens a connection that is actually dead - reopening healthy ones
+   on every screen-on was a steady drain on the request allowance. */
 function reviveStreams(force){
   if (!state || !state.me) return;
-  var now = Date.now(), STALE = 110000;
-  if (cooling()) return;
-  if (force || !ringSrc || ringSrc.readyState === 2 ||
-      now - lastBeat.ring > STALE) openRing();
-  if (force || !sigSrc || sigSrc.readyState === 2 ||
-      now - lastBeat.sig > STALE) { openSignal(); }
+  if (mode === "poll") {
+    if (force || !pollTimer) pollLoop(false);
+    return;
+  }
+  if (retryTimer) return;                     /* a reconnect is already due */
+  var stale = Date.now() - lastBeatAt > 110000;
+  if (stale && stream) {
+    staleCount++;
+    if (staleCount >= 2) mode = "poll";       /* stream keeps going silent */
+  }
+  if (!stream || stream.readyState === 2 || stale) openStreams();
+  else if (force) pollSignal();
 }
 
-setInterval(function(){ reviveStreams(false); }, 60000);
+setInterval(function(){ reviveStreams(false); }, 45000);
 
 document.addEventListener("visibilitychange", function(){
-  if (document.hidden) return;
-  /* Forced, not checked. Coming back to the page is the one moment the
-     user is definitely waiting on it, and a stream that died while the
-     screen was off will not have noticed yet. */
-  reviveStreams(true);
-  /* openSignal already catches up on reconnect, so a second poll here
-     was a duplicate request every time the screen came on. */
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  /* After more than a few seconds asleep a phone has usually cut the
+     connection without saying so, so reopen; after a glance away, just
+     catch up on anything missed. */
+  if (hiddenAt && Date.now() - hiddenAt > 30000 && mode === "sse") {
+    retryDelay = 1000; openStreams();
+  } else reviveStreams(true);
 });
 
-window.addEventListener("online",  function(){ reviveStreams(true); });
-window.addEventListener("pageshow", function(){ reviveStreams(true); });
-window.addEventListener("focus",   function(){ reviveStreams(false); });
+window.addEventListener("online", function(){
+  retryDelay = 1000; sseFails = 0;
+  if (state && state.me) openStreams();
+});
+window.addEventListener("pageshow", function(ev){
+  if (ev && ev.persisted) reviveStreams(true);
+});
 
 window.addEventListener("beforeunload", function(){
   if (call) { try { hangUp("ended"); } catch (e) {} }
