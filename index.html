@@ -59,6 +59,20 @@
     font-size:14px;line-height:1.5;color:#CFE6F7}
   .notice b{color:var(--paper)}
   .locked{opacity:.55}
+  .invrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--seam)}
+  .invrow:last-child{border-bottom:0}
+  .invrow .dot{width:36px;height:36px;border-radius:50%;flex:0 0 auto;display:flex;
+    align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0F1B2A}
+  .invrow .nm{flex:1;min-width:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini{display:flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--seam);
+    color:var(--paper);border-radius:12px;padding:9px 12px;font-size:14px;cursor:pointer;flex:0 0 auto}
+  .mini svg{width:17px;height:17px}
+  .mini:active{background:var(--hearth)}
+  @media (max-width:360px){ .mini span{display:none} .mini{padding:9px 11px} }
+  .dayhead{font-size:13px;font-weight:500;color:var(--mist);margin:18px 2px 2px}
+  .dayhead:first-child{margin-top:4px}
+  .more{background:transparent;border:0;color:var(--brass);font-size:14px;padding:14px 2px;
+    cursor:pointer;font-weight:500}
   .locked input,.locked button{pointer-events:none}
   select{width:100%;padding:13px 14px;border-radius:14px;border:1px solid var(--seam);
     background:var(--night);color:var(--paper);font-size:16px;font-family:inherit}
@@ -349,9 +363,8 @@
       <div id="inviteBlock">
       <div class="sectiontitle">Invite the others</div>
       <p class="sub">
-        Each person gets their <b>own</b> link. Opening it signs them in as
-        that person — nobody chooses, so nobody can pick the wrong name.
-        Send each one to the right person and don't forward them.
+        Each person has their own link, which signs them in as that person.
+        Send each one only to the person it's for.
       </p>
       <div id="inviteList"></div>
       </div>
@@ -499,7 +512,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22d";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22e";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1658,6 +1671,8 @@ var ICON = {
   spk:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
   cross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   inArr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7 7 17M7 9v8h8"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
+  copy:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>',
   outArr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>'
 };
 
@@ -3105,7 +3120,11 @@ function remember(who, what, out, when){
   state.recent = state.recent || [];
   state.recent.unshift({ who: who, what: what, out: !!out,
                          at: when ? when*1000 : Date.now() });
-  state.recent = state.recent.slice(0, 12);
+  /* Thirty days of history, not the last twelve lines - twelve was a
+     busy afternoon, and then yesterday was gone. Capped as well, so a
+     very busy month cannot grow without end. */
+  var cutoff = Date.now() - 30 * 86400000;
+  state.recent = state.recent.filter(function(r){ return r.at >= cutoff; }).slice(0, 200);
   save(); paintRecent();
 }
 function timeOf(ms){
@@ -3170,6 +3189,7 @@ function lastWith(name){
   var text = missed ? "Missed call" :
              /^voice call/.test(what) ? (r.out ? "You called" : "Called you") :
              /tap to answer|^called you$/i.test(what) ? "Called you" :
+             /^declined$/i.test(what) ? (r.out ? "Declined your call" : "You declined a call") :
              r.out ? "You buzzed: " + what : "Buzzed you: " + what;
   var len = what.match(/voice call · ([^·]+)/);
   var dur = len ? len[1].trim() : "";
@@ -3263,6 +3283,19 @@ function paintCardNotes(){
   });
 }
 
+var showEarlier = false;
+
+function dayLabel(ms){
+  var d = new Date(ms), today = new Date();
+  var start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  if (ms >= start) return "Today";
+  if (ms >= start - 86400000) return "Yesterday";
+  var days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return (ms >= start - 6 * 86400000 ? days[d.getDay()] + ", " : "") +
+         d.getDate() + " " + months[d.getMonth()];
+}
+
 function paintRecent(){
   paintCardNotes();
   var box = $("recentBox");
@@ -3274,26 +3307,61 @@ function paintRecent(){
     p.className = "hint"; p.textContent = "Calls and buzzes show up here.";
     box.appendChild(p); return;
   }
+
+  /* Today and yesterday up front, each under its own heading; anything
+     older waits behind "Show earlier", so a busy week does not bury
+     what happened this morning. */
+  var recent = [], earlier = [];
   list.forEach(function(r){
-    var what = String(r.what || "");
-    var missed = /missed/i.test(what) && !r.out;
-    var d = document.createElement("div");
-    d.className = "log" + (missed ? " missed" : "");
-    var ic = document.createElement("span");
-    ic.className = "ic"; ic.innerHTML = r.out ? ICON.outArr : ICON.inArr;
-    var tx = document.createElement("span"); tx.className = "tx";
-    var b = document.createElement("b"); b.textContent = r.who;
-    tx.appendChild(b);
-    tx.appendChild(document.createTextNode(what ? "  " + what : ""));
-    var tm = document.createElement("span"); tm.className = "tm";
-    tm.textContent = timeOf(r.at);
-    d.appendChild(ic); d.appendChild(tx); d.appendChild(tm);
-    /* Tapping someone's line is the quickest way back to them. */
-    var m = ((state && state.members) || []).filter(function(x){
-      return x.name === r.who && x.id !== state.me; })[0];
-    if (m) { d.className += " tap"; d.onclick = function(){ openAct(m.id); }; }
-    box.appendChild(d);
+    var label = dayLabel(r.at);
+    (label === "Today" || label === "Yesterday" ? recent : earlier).push(r);
   });
+  if (!recent.length) {
+    var none = document.createElement("p");
+    none.className = "hint"; none.textContent = "Nothing today or yesterday.";
+    box.appendChild(none);
+  }
+  var shown = showEarlier ? recent.concat(earlier) : recent;
+  var lastLabel = "";
+  shown.forEach(function(r){
+    var label = dayLabel(r.at);
+    if (label !== lastLabel) {
+      var h = document.createElement("div");
+      h.className = "dayhead"; h.textContent = label;
+      box.appendChild(h);
+      lastLabel = label;
+    }
+    box.appendChild(recentRow(r));
+  });
+  if (earlier.length) {
+    var more = document.createElement("button");
+    more.className = "more";
+    more.textContent = showEarlier ? "Show less"
+                                   : "Show earlier (" + earlier.length + ")";
+    more.onclick = function(){ showEarlier = !showEarlier; paintRecent(); };
+    box.appendChild(more);
+  }
+}
+
+function recentRow(r){
+  var what = String(r.what || "");
+  var missed = /missed/i.test(what) && !r.out;
+  var d = document.createElement("div");
+  d.className = "log" + (missed ? " missed" : "");
+  var ic = document.createElement("span");
+  ic.className = "ic"; ic.innerHTML = r.out ? ICON.outArr : ICON.inArr;
+  var tx = document.createElement("span"); tx.className = "tx";
+  var b = document.createElement("b"); b.textContent = r.who;
+  tx.appendChild(b);
+  tx.appendChild(document.createTextNode(what ? "  " + what : ""));
+  var tm = document.createElement("span"); tm.className = "tm";
+  tm.textContent = timeOf(r.at);
+  d.appendChild(ic); d.appendChild(tx); d.appendChild(tm);
+  /* Tapping someone's line is the quickest way back to them. */
+  var m = ((state && state.members) || []).filter(function(x){
+    return x.name === r.who && x.id !== state.me; })[0];
+  if (m) { d.className += " tap"; d.onclick = function(){ openAct(m.id); }; }
+  return d;
 }
 
 function paintWelcome(main){
@@ -3414,29 +3482,20 @@ function paintInvites(){
     return;
   }
 
+  /* One short row per person - their colour, their name, Send and Copy.
+     The link itself is never shown (it is a key), so a box holding a
+     hidden link was only taking up room: with ten people it was a page. */
   others.forEach(function(m){
     var row = document.createElement("div");
-    row.style.marginBottom = "14px";
-
-    var who = document.createElement("div");
-    who.style.cssText = "display:flex;align-items:center;margin-bottom:6px";
+    row.className = "invrow";
     var dot = document.createElement("span");
-    dot.style.cssText = "width:12px;height:12px;border-radius:50%;margin-right:10px;"
-                      + "flex:0 0 auto;background:" + m.colour;
+    dot.className = "dot"; dot.style.background = m.colour;
+    dot.textContent = initials(m.name);
     var nm = document.createElement("span");
-    nm.style.cssText = "font-weight:700;font-size:15px";
-    nm.textContent = "Link for " + m.name;
-    who.appendChild(dot); who.appendChild(nm);
-
-    var code = document.createElement("div");
-    code.className = "codebox";
-    code.textContent = maskLink(linkFor(m.id));
-
-    var btns = document.createElement("div");
-    btns.className = "row";
+    nm.className = "nm"; nm.textContent = m.name;
     var send = document.createElement("button");
-    send.className = "btn ghost";
-    send.textContent = "Send to " + m.name;
+    send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
+    send.setAttribute("aria-label", "Send " + m.name + " their link");
     send.onclick = function(){
       var url = linkFor(m.id);
       if (navigator.share)
@@ -3445,12 +3504,10 @@ function paintInvites(){
       else copy(url, "Link for " + m.name + " copied");
     };
     var cp = document.createElement("button");
-    cp.className = "btn ghost";
-    cp.textContent = "Copy";
+    cp.className = "mini"; cp.innerHTML = ICON.copy + "<span>Copy</span>";
+    cp.setAttribute("aria-label", "Copy " + m.name + "'s link");
     cp.onclick = function(){ copy(linkFor(m.id), "Link for " + m.name + " copied"); };
-    btns.appendChild(send); btns.appendChild(cp);
-
-    row.appendChild(who); row.appendChild(code); row.appendChild(btns);
+    row.appendChild(dot); row.appendChild(nm); row.appendChild(send); row.appendChild(cp);
     box.appendChild(row);
   });
 }
@@ -4213,6 +4270,12 @@ if (state && state.me) { openStreams(); }
 
 restoreFromIdb();
 ensureRelay();
+/* The admin's phone re-sends the family's current settings each time
+   the app opens. A phone that was switched off when something changed
+   only catches up on the last couple of minutes of messages, so without
+   this it would wait for the admin's next change to hear about the last
+   one. Phones already up to date ignore it (same version). */
+setTimeout(function(){ if (canSign()) broadcastRoster(); }, 4000);
 
 /* Reconnects anything that has gone quiet. Called on a timer, when the
    page comes back to the front, and when the network returns. It only
