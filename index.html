@@ -348,6 +348,7 @@
     <p class="sub" id="setupSub">Do this once on one phone, then share the invite link.</p>
     <p class="notice" id="lockNote" style="display:none"></p>
 
+    <div id="familyBlock">
     <label for="myName">Who are you?</label>
     <input type="text" id="myName" placeholder="Your name" autocomplete="off">
 
@@ -358,6 +359,7 @@
     <div id="members"></div>
     <button class="btn ghost" id="addMember">+ Add a person</button>
     <button class="btn" id="saveSetup">Save</button>
+    </div>
 
     <div id="shareArea" style="display:none">
       <div id="inviteBlock">
@@ -412,6 +414,7 @@
       allows the notification server.</p>
     <button class="btn ghost" id="checkConn">Check connection</button>
 
+    <div id="serverBlock">
     <label for="serverUrl">Notification server</label>
     <p class="sub" style="margin:0 0 6px">
       Leave this alone unless the check above fails on every network you use.
@@ -432,6 +435,7 @@
     </p>
     <input type="text" id="tokenVal" data-secret="1" placeholder="tk_..." autocomplete="off">
     <button class="btn ghost" id="saveToken">Save token</button>
+    </div>
 
     <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
 
@@ -441,6 +445,7 @@
       what anyone else hears.</p>
     <div id="toneList"></div>
 
+    <div id="relayBlock">
     <div class="sectiontitle">Relay server</div>
     <p class="sub">
       Call audio goes phone to phone. On some mobile networks the two
@@ -477,6 +482,9 @@
     <button class="msgopt routeopt" data-route="auto"><b>Automatically</b>
       <span class="sub2">Phone to phone when possible, a relay only when needed.
       Uses the least relay data.</span></button>
+    </div>
+
+    <div class="sectiontitle">Calls on this network</div>
 
     <button class="btn ghost" id="testTurn">Test relays on this network</button>
     <p class="sub" id="relayUsage" style="margin-top:10px"></p>
@@ -512,7 +520,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22f";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22g";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1673,7 +1681,24 @@ function applyLock(){
     if ("disabled" in el) el.disabled = locked;
     if (el.tagName === "INPUT") el.readOnly = locked;
   });
-  $("inviteBlock").style.display = locked ? "none" : "";
+  /* On a member's phone the shared settings are not shown at all. Read-
+     only and masked, they told a member nothing and pushed the things
+     they CAN do off the bottom of the screen. */
+  ["familyBlock", "serverBlock", "relayBlock", "inviteBlock"].forEach(function(id){
+    var el = $(id);
+    if (el) el.style.display = locked ? "none" : "";
+  });
+  /* For the admin, Family admin sits near the top - it is their section.
+     For a member it is an emergency tool (hand-over, recovery, lost key),
+     so it goes to the bottom, below what they actually come here for. */
+  var area = $("adminArea");
+  var closeBtn = document.querySelector('#setupSheet [data-close="setupSheet"]');
+  if (area && closeBtn) {
+    if (!applyLock.home) applyLock.home = area.nextSibling;
+    if (locked) closeBtn.parentNode.insertBefore(area, closeBtn);
+    else if (applyLock.home && applyLock.home.parentNode)
+      applyLock.home.parentNode.insertBefore(area, applyLock.home);
+  }
   Array.prototype.forEach.call(document.querySelectorAll(".routeopt"), function(b){
     b.disabled = locked; b.classList.toggle("locked", locked);
   });
@@ -1692,10 +1717,10 @@ function applyLock(){
     ? "<b>You've been made the admin, but this device doesn't have the admin " +
       "key yet.</b> Open the hand-over link you were sent on this device, or " +
       "paste it under Family admin below. Until then, settings stay read-only."
-    : "<b>" + escapeHtml(nameOf(state.admin.id)) +
-      " manages this family.</b> Shared settings are shown read-only. You can " +
-      "set up ringing on this phone, copy your topic, choose your ringtone and " +
-      "test the relays.";
+    : "<b>" + escapeHtml(nameOf(state.admin.id)) + " manages this family</b> · " +
+      state.members.length + " people. The family's settings are kept on " +
+      escapeHtml(nameOf(state.admin.id)) + "'s phone. Here you can set up ringing " +
+      "on this phone, choose your ringtone and test calls on this network.";
   $("setupSub").style.display = state ? "none" : "";
 }
 function escapeHtml(t){
