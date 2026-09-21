@@ -382,7 +382,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-21b";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-21d";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -727,13 +727,18 @@ function ringPush(memberId, title, message, answerable){
    normally around 2 KB, but a phone with several network interfaces can
    push it past the limit, and a truncated offer is a call that fails
    with nothing on screen to explain why. */
-function sendSig(memberId, obj){
+function sendSig(memberId, obj, extra){
   var body = JSON.stringify(obj);
   var url  = srv() + "/" + encodeURIComponent(sigTopic(memberId))
            + "?priority=1" + authParam();
 
-  if (body.length <= MAXBODY)
-    return netFetch(url, { method:"POST", body: body }, 5);
+  if (body.length <= MAXBODY) {
+    /* keepalive lets a goodbye finish sending even when it was the page
+       closing that triggered it - swiping the app away mid-call. */
+    var opts = { method:"POST", body: body };
+    if (extra && extra.keepalive) opts.keepalive = true;
+    return netFetch(url, opts, 5);
+  }
 
   var key = rand(6), parts = [], i;
   for (i = 0; i < body.length; i += MAXBODY) parts.push(body.slice(i, i + MAXBODY));
@@ -945,7 +950,7 @@ function pollLoop(first){
     .then(function(){
       if (mode !== "poll") return;
       pollTimer = setTimeout(function(){ pollLoop(false); },
-                             document.hidden ? 30000 : 7000);
+                             call ? 1500 : (document.hidden ? 30000 : 7000));
     });
 }
 
@@ -1112,6 +1117,7 @@ function paintCallButtons(incoming){
     call.stream.getAudioTracks().forEach(function(t){
       t.enabled = !t.enabled; off = !t.enabled;
     });
+    call.muted = off;
     mute.classList.toggle("on", off);
     $("callNote").textContent = off ? "Microphone off" : "";
   };
@@ -1138,6 +1144,10 @@ function newPeer(peerId){
 
   pc.onicecandidate = function(ev){
     if (!call) return;
+    /* During a reconnect the new description is sent whole, candidates
+       included, once gathering finishes - trickled ones could arrive
+       before it and be thrown away as belonging to nothing. */
+    if (call.restarting) return;
     if (!ev.candidate) { flushIce(peerId); return; }   /* gathering done */
 
     /* Gathered into one message rather than sent one at a time.
@@ -1165,7 +1175,7 @@ function newPeer(peerId){
        refused, and an unhandled rejection here would surface as an
        error with no bearing on the call. */
     var p = el.play();
-    if (p && p.catch) p.catch(function(){});
+    if (p && p.catch) p.catch(function(){ needTapForSound(); });
   };
 
   /* Listened for on BOTH events, on purpose.
@@ -1178,19 +1188,25 @@ function newPeer(peerId){
      arrives first wins and markConnected guards against running
      twice. */
   pc.onconnectionstatechange = function(){
-    if (!call || !call.pc) return;
-    var s = call.pc.connectionState;
-    if (s === "connected") markConnected();
-    else if (s === "failed") markFailed();
+    if (!call || !call.pc || call.pc !== pc) return;
+    var s = pc.connectionState;
+    if (s === "connected") { markConnected(); recovered(); }
+    else if (s === "failed") {
+      if (call.state === "connected") beginRecovery(0); else markFailed();
+    }
     else if (s === "disconnected" && call.state === "connected")
-      setCallState("Reconnecting…");
+      beginRecovery(2500);
   };
 
   pc.oniceconnectionstatechange = function(){
-    if (!call || !call.pc) return;
-    var s = call.pc.iceConnectionState;
-    if (s === "connected" || s === "completed") markConnected();
-    else if (s === "failed") markFailed();
+    if (!call || !call.pc || call.pc !== pc) return;
+    var s = pc.iceConnectionState;
+    if (s === "connected" || s === "completed") { markConnected(); recovered(); }
+    else if (s === "failed") {
+      if (call.state === "connected") beginRecovery(0); else markFailed();
+    }
+    else if (s === "disconnected" && call.state === "connected")
+      beginRecovery(2500);
   };
 
   return pc;
@@ -1232,6 +1248,8 @@ function markConnected(){
   if (call.giveUp) { clearTimeout(call.giveUp); call.giveUp = null; }
   call.state = "connected";
   call.t0 = Date.now();
+  keepAwake();
+  prioritiseAudio();
   $("call").classList.remove("incoming");
   $("callNote").textContent = "";
   startTimer();
@@ -1274,7 +1292,20 @@ function watchConnect(){
    on "Asking for the microphone..." for ever with no way out but
    reloading the page. Race it against a clock. */
 function micStream(){
-  var media = navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  /* Echo cancellation, noise suppression and automatic level, asked for
+     by name. Most browsers default to them, some do not on every
+     device, and a speakerphone call without echo cancellation is the
+     "I can hear myself" call. A browser that refuses the constraints
+     gets the plain request instead of no call. */
+  var media = navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true,
+             autoGainControl: true, channelCount: 1 },
+    video: false
+  }).catch(function(err){
+    if (err && (err.name === "OverconstrainedError" || err.name === "TypeError"))
+      return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    throw err;
+  });
   var timeout = new Promise(function(_res, rej){
     setTimeout(function(){
       var e = new Error("No answer to the microphone prompt");
@@ -1342,6 +1373,7 @@ function startCall(peerId){
     .then(function(stream){
       if (!call) { stopStream(stream); return null; }
       call.stream = stream;
+      watchMic(stream);
       call.pc = newPeer(peerId);
       stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
       return call.pc.createOffer();
@@ -1350,7 +1382,9 @@ function startCall(peerId){
       if (!offer || !call) return null;
       return call.pc.setLocalDescription(offer).then(function(){
         return sendSig(peerId, { t:"offer", call: call.id, from: state.me,
-                                 sdp: call.pc.localDescription.sdp });
+                                 sentAt: Date.now(),
+                                 sdp: call.pc.localDescription.sdp })
+          .then(function(r){ if (call) call.offerSent = true; return r; });
       });
     })
     .then(function(){
@@ -1405,6 +1439,22 @@ function onSignal(msg){
   if (!msg || !msg.t) return;
 
   if (msg.t === "offer") {
+    /* Both of you pressed call at the same moment. Each phone was
+       "calling", so each told the other it was busy and nobody got
+       through. Now the phones agree on one call - the one placed by the
+       person whose ID sorts higher - and the other side picks it up by
+       itself, because both people plainly want to talk. */
+    if (call && call.out && call.state === "calling" && call.peer === msg.from) {
+      if (state.me < msg.from) {
+        var wanted = msg;
+        hangUp(null);                               /* quietly, no "bye" */
+        call = { id: wanted.call, peer: wanted.from, out: false, pc: null,
+                 stream: null, state: "incoming", offer: wanted.sdp, pending: [] };
+        showCallScreen(wanted.from, false);
+        answer();
+      }
+      return;                                       /* they will pick up ours */
+    }
     if (call) {
       sendSig(msg.from, { t:"busy", call: msg.call, from: state.me });
       return;
@@ -1414,6 +1464,19 @@ function onSignal(msg){
     showCallScreen(msg.from, true);
     setCallState("Incoming call");
     tone();
+    /* A backstop in case the goodbye never arrives - the caller's phone
+       lost signal, say. The caller gives up at 45 seconds, so ringing
+       past 50 is always ringing for nobody. The offer's age counts, so
+       a phone opened late from the notification stops sooner. */
+    var age = msg.sentAt ? Math.max(0, Date.now() - msg.sentAt) : 0;
+    call.ringTimer = setTimeout(function(){
+      if (call && call.state === "incoming") {
+        stopTone();
+        setCallState("Missed call");
+        remember(nameOf(call.peer), "missed call", false);
+        setTimeout(function(){ hangUp(null); }, 1200);
+      }
+    }, Math.max(3000, 50000 - age));
     if (document.hidden)
       systemNotify(nameOf(msg.from) + " is calling", "Tap to answer");
     return;
@@ -1451,14 +1514,31 @@ function onSignal(msg){
     return;
   }
 
+  if (msg.t === "reoffer" && call.pc) { takeReoffer(msg); return; }
+  if (msg.t === "reanswer" && call.pc) {
+    if (call.pc.signalingState !== "have-local-offer") return;
+    call.pc.setRemoteDescription({ type:"answer", sdp: msg.sdp })
+      .then(checkSoon).catch(function(){});
+    return;
+  }
+  if (msg.t === "restart") { if (call.out) restartIce(); return; }
+
   if (msg.t === "busy") {
     stopTone(); setCallState("They are on another call");
     setTimeout(function(){ hangUp("busy"); }, 2000); return;
   }
 
   if (msg.t === "bye") {
-    stopTone(); setCallState("Call ended");
-    setTimeout(function(){ hangUp(null); }, 900); return;
+    stopTone();
+    /* Said the way it happened: hung up before you answered is a
+       missed call, not an ended one. */
+    var missed = call.state === "incoming";
+    setCallState(missed ? "Missed call" : "Call ended");
+    if (missed) remember(nameOf(call.peer), "missed call", false);
+    if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
+    /* The line goes dead now; the words stay up just long enough to read. */
+    if (call.pc) { try { call.pc.close(); } catch (e) {} }
+    setTimeout(function(){ hangUp(null); }, 700); return;
   }
 }
 
@@ -1470,6 +1550,7 @@ function drainPending(){
 
 function answer(){
   if (!call || call.state !== "incoming") return;
+  if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
   stopTone();
   setCallState("Asking for the microphone…");
   $("callNote").textContent = "Your browser should be asking to allow it";
@@ -1479,6 +1560,7 @@ function answer(){
     .then(function(stream){
       if (!call) { stopStream(stream); return null; }
       call.stream = stream;
+      watchMic(stream);
       call.pc = newPeer(call.peer);
       stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
       return call.pc.setRemoteDescription({ type:"offer", sdp: call.offer });
@@ -1507,19 +1589,27 @@ function answer(){
 
 function hangUp(why){
   stopTone();
+  releaseAwake();
   if (!call) { hideCallScreen(); return; }
+  if (call.recoverTimer) clearTimeout(call.recoverTimer);
+  if (call.recoverDeadline) clearTimeout(call.recoverDeadline);
+  if (call.ringTimer) clearTimeout(call.ringTimer);
   if (call.giveUp)   clearTimeout(call.giveUp);
   if (call.watchdog) clearTimeout(call.watchdog);
   if (call.iceTimer) clearTimeout(call.iceTimer);
   if (call.timer)    clearInterval(call.timer);
-  /* "bye" is only worth sending when there is somebody at the other end
-     expecting one. A call that never connected has nothing to tell. */
-  /* Only when there is somebody at the other end expecting it. A call
-     that never connected has nothing to say goodbye to, and every
-     message spent is one less left in the hour's allowance. */
-  if (why && why !== "failed" && why !== "noanswer" && why !== "busy" &&
-      call.state !== "calling")
-    sendSig(call.peer, { t:"bye", call: call.id, from: state.me })
+  /* Goodbye goes out whenever the other phone knows about this call -
+     and that includes while it is still RINGING. It used to be skipped
+     for a call nobody had answered yet, on the idea that there was
+     nobody to tell. There was: the other phone, still ringing, with no
+     way to learn the caller had hung up. Now it stops within a second
+     or two of the caller giving up.
+     Not sent when they told us first (busy, or their own goodbye -
+     which arrives here as no reason), or when the offer never left. */
+  var theyKnow = call.state !== "calling" || call.offerSent;
+  if (why && why !== "busy" && theyKnow)
+    sendSig(call.peer, { t:"bye", call: call.id, from: state.me },
+            { keepalive: true })
       .catch(function(){});
   if (call.pc) { try { call.pc.close(); } catch (e) {} }
   stopStream(call.stream);
@@ -1534,11 +1624,272 @@ function stopStream(s){
   s.getTracks().forEach(function(t){ try { t.stop(); } catch (e) {} });
 }
 
+/* ================================================================ *
+ * Keeping a call going
+ * ================================================================ */
+
+/* Reconnecting after the network changes.
+ *
+ * Walking out of wifi range, or the phone switching to mobile data,
+ * changes its address, and the old path between the phones dies. The
+ * call used to sit on "Reconnecting..." until somebody hung up. Now the
+ * phones find a new path over the network they are on now (an "ICE
+ * restart") without ending the call: audio pauses for a second or two
+ * and carries on.
+ *
+ * Only the caller starts a restart, so the two phones never both try
+ * at once; the other side asks it to. It keeps trying for 40 seconds,
+ * which covers a lift or a tunnel, before it says the call dropped. */
+function beginRecovery(delay){
+  if (!call || !call.pc || call.state !== "connected") return;
+  if (!call.recovering) {
+    call.recovering = true;
+    setCallState("Reconnecting…");
+    $("callNote").textContent = "The connection dropped — reconnecting";
+  }
+  if (!call.recoverDeadline) {
+    call.recoverDeadline = setTimeout(function(){
+      if (call && call.recovering) {
+        setCallState("Call dropped");
+        $("callNote").textContent = "Could not reconnect";
+        setTimeout(function(){ hangUp("ended"); }, 1500);
+      }
+    }, 40000);
+  }
+  if (call.recoverTimer) return;
+  call.recoverTimer = setTimeout(function(){
+    if (!call) return;
+    call.recoverTimer = null;
+    if (!call.recovering) return;
+    /* Already healed - by the restart, or by itself - without the
+       browser announcing a change, which it only does when the state
+       actually moved. Checked rather than waited for. */
+    if (isUp()) { recovered(); return; }
+    restartIce();
+    /* Not answered yet - try again. Each attempt is a fresh look at
+       whatever network the phone is on by now. */
+    beginRecovery(8000);
+  }, delay);
+}
+
+function isUp(){
+  if (!call || !call.pc) return false;
+  var s = call.pc.iceConnectionState;
+  /* Judged by whether sound can flow, not by whether a reconnect is
+     still being negotiated: a phone on an older build never answers a
+     restart, and its call was working the whole time. */
+  return (s === "connected" || s === "completed") && !call.restarting;
+}
+
+/* After a restart settles, look once more - see isUp. */
+function checkSoon(){
+  setTimeout(function(){ if (call && call.recovering && isUp()) recovered(); }, 1500);
+}
+
+function recovered(){
+  if (!call || !call.recovering) return;
+  call.recovering = false;
+  if (call.recoverTimer)    { clearTimeout(call.recoverTimer);    call.recoverTimer = null; }
+  if (call.recoverDeadline) { clearTimeout(call.recoverDeadline); call.recoverDeadline = null; }
+  $("callNote").textContent = "";
+  setTimeout(showRoute, 600);
+}
+
+/* Resolves once the phone has found every address it can offer, or
+   after a few seconds - a restart description should carry them all. */
+function gathered(pc, ms){
+  return new Promise(function(res){
+    if (pc.iceGatheringState === "complete") return res();
+    var done = false;
+    function finish(){ if (done) return; done = true; res(); }
+    pc.addEventListener("icegatheringstatechange", function(){
+      if (pc.iceGatheringState === "complete") finish();
+    });
+    setTimeout(finish, ms || 3000);
+  });
+}
+
+function restartIce(){
+  if (!call || !call.pc) return;
+  if (!call.out) {
+    sendSig(call.peer, { t:"restart", call: call.id, from: state.me })
+      .catch(function(){});
+    return;
+  }
+  var pc = call.pc, id = call.id;
+  if (pc.signalingState !== "stable") return;       /* one already running */
+  call.restarting = true;
+  pc.createOffer({ iceRestart: true })
+    .then(function(offer){ return pc.setLocalDescription(offer); })
+    .then(function(){ return gathered(pc, 3000); })
+    .then(function(){
+      if (!call || call.id !== id) return;
+      call.restarting = false;
+      return sendSig(call.peer, { t:"reoffer", call: id, from: state.me,
+                                  sdp: pc.localDescription.sdp });
+    })
+    .then(function(){
+      if (call && call.id === id) {
+        /* Nobody answering the restart - an older build on the other
+           phone, say - must not leave this side stuck mid-offer. */
+        setTimeout(function(){
+          if (call && call.id === id && pc.signalingState === "have-local-offer")
+            pc.setLocalDescription({ type:"rollback" }).catch(function(){});
+        }, 10000);
+      }
+    })
+    .catch(function(){ if (call) call.restarting = false; });
+}
+
+function takeReoffer(msg){
+  var pc = call.pc, id = call.id;
+  call.restarting = true;
+  pc.setRemoteDescription({ type:"offer", sdp: msg.sdp })
+    .then(function(){ return pc.createAnswer(); })
+    .then(function(ans){ return pc.setLocalDescription(ans); })
+    .then(function(){ return gathered(pc, 3000); })
+    .then(function(){
+      if (!call || call.id !== id) return;
+      call.restarting = false;
+      return sendSig(call.peer, { t:"reanswer", call: id, from: state.me,
+                                  sdp: pc.localDescription.sdp });
+    })
+    .then(function(){ checkSoon(); })
+    .catch(function(){ if (call) call.restarting = false; });
+}
+
+/* Don't wait to be told. When the phone itself reports a different
+   network, repair the path straight away rather than after the old one
+   has been noticed dead - that is the difference between a blip and a
+   gap. */
+function networkChanged(){
+  if (call && call.pc && call.state === "connected") {
+    call.recovering = true;
+    setCallState("Reconnecting…");
+    setTimeout(function(){ if (call && call.recovering) { restartIce(); beginRecovery(8000); } }, 800);
+  }
+}
+window.addEventListener("online", networkChanged);
+try {
+  var nc = navigator.connection;
+  if (nc && nc.addEventListener) nc.addEventListener("change", networkChanged);
+} catch (e) {}
+
+/* The microphone going away mid-call.
+ *
+ * Plugging in headphones, a Bluetooth headset connecting or dropping,
+ * or another app taking the microphone all end the track the call is
+ * sending - and the other person hears silence while this screen still
+ * says connected. Now a replacement is fetched and swapped in without
+ * touching the connection; mute is kept as it was. */
+function watchMic(stream){
+  stream.getAudioTracks().forEach(function(t){
+    t.onended = function(){ if (call && call.stream === stream) swapMic(); };
+  });
+}
+
+function swapMic(){
+  if (!call || !call.pc || call.swapping) return;
+  call.swapping = true;
+  micStream().then(function(stream){
+    if (!call || !call.pc) { stopStream(stream); return; }
+    var track = stream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !call.muted;
+    var old = call.stream;
+    var sender = call.pc.getSenders().filter(function(s){
+      return s.track === null || (s.track && s.track.kind === "audio");
+    })[0];
+    return (sender ? sender.replaceTrack(track) : Promise.resolve())
+      .then(function(){
+        call.stream = stream;
+        watchMic(stream);
+        stopStream(old);
+      });
+  }).catch(function(){
+    $("callNote").textContent = "Microphone lost — check it is connected";
+  }).then(function(){ if (call) call.swapping = false; });
+}
+
+try {
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+    navigator.mediaDevices.addEventListener("devicechange", function(){
+      /* A new headset should be the one you talk into, which is what
+         asking again for the default microphone gives. */
+      if (call && call.pc && call.state === "connected")
+        setTimeout(swapMic, 600);
+    });
+} catch (e) {}
+
+/* Keeping the screen on for the length of a call. A phone that locks
+   mid-conversation can suspend the page and the audio with it. */
+var wakeLock = null;
+function keepAwake(){
+  try {
+    if (!navigator.wakeLock || wakeLock) return;
+    navigator.wakeLock.request("screen").then(function(lock){
+      wakeLock = lock;
+      lock.addEventListener("release", function(){ wakeLock = null; });
+    }).catch(function(){});
+  } catch (e) {}
+}
+function releaseAwake(){
+  try { if (wakeLock) wakeLock.release(); } catch (e) {}
+  wakeLock = null;
+}
+document.addEventListener("visibilitychange", function(){
+  if (document.hidden || !call) return;
+  /* The browser drops the lock whenever the page is hidden; take it
+     back, and make sure sound is still playing after being away. */
+  if (call.state === "connected") keepAwake();
+  var el = $("remoteAudio");
+  if (el && el.srcObject && el.paused) {
+    var p = el.play(); if (p && p.catch) p.catch(function(){ needTapForSound(); });
+  }
+  try { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume(); } catch (e) {}
+});
+
+/* Voice first. Tells the phone's network stack this is the traffic
+   that matters, which helps on a busy connection - ignored harmlessly
+   where unsupported. */
+function prioritiseAudio(){
+  try {
+    call.pc.getSenders().forEach(function(sender){
+      if (!sender.track || sender.track.kind !== "audio" || !sender.getParameters) return;
+      var p = sender.getParameters();
+      if (!p.encodings || !p.encodings.length) return;
+      p.encodings[0].priority = "high";
+      p.encodings[0].networkPriority = "high";
+      sender.setParameters(p).catch(function(){});
+    });
+  } catch (e) {}
+}
+
+/* If the browser refuses to start the sound by itself, say so and let
+   one tap anywhere fix it, instead of a connected call in silence. */
+function needTapForSound(){
+  if (!call) return;
+  $("callNote").textContent = "Tap anywhere to hear them";
+  function go(){
+    var el = $("remoteAudio");
+    var p = el && el.play();
+    if (p && p.then) p.then(function(){
+      if (call && $("callNote").textContent === "Tap anywhere to hear them")
+        $("callNote").textContent = "";
+    }).catch(function(){});
+    document.removeEventListener("click", go, true);
+    document.removeEventListener("touchend", go, true);
+  }
+  document.addEventListener("click", go, true);
+  document.addEventListener("touchend", go, true);
+}
+
 function startTimer(){
   if (call.timer) clearInterval(call.timer);
   setCallState("00:00");
   call.timer = setInterval(function(){
     if (!call || !call.t0) return;
+    if (call.recovering) { setCallState("Reconnecting…"); return; }
     var s = Math.floor((Date.now() - call.t0)/1000);
     setCallState(("0"+Math.floor(s/60)).slice(-2)+":"+("0"+(s%60)).slice(-2));
   }, 500);
