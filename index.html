@@ -640,7 +640,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-24b";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-24c";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -2884,8 +2884,8 @@ function startCall(peerId){
             if (call) $("callNote").textContent = r.status === "nosub"
               ? nameOf(peerId) + " hasn't turned on call notifications, so their phone " +
                 "only rings if the app is open"
-              : "Their phone's notification service didn't accept the ring — " +
-                "it only rings if their app is open";
+              : "Their phone's notification service didn't accept the ring (code " +
+                ((r.failed || []).join(", ") || "?") + ") — it only rings if their app is open";
             return;
           }
           var why = (r && r.status === 429)
