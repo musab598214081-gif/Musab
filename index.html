@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22v";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22w";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1388,7 +1388,7 @@ function paintStatus(live){
   paintStatus.live = !!live;
   el.querySelector("span:last-child").textContent =
     !live ? "Not connected to " + srv() + " — check Settings → Connection"
-    : busy ? "Server busy — status and calls may be delayed (Settings → ntfy token)"
+    : busy ? "ntfy.sh daily limit reached on this internet connection — status and calls may fail until it resets"
     : "Ready for calls";
 }
 
@@ -5922,8 +5922,10 @@ function paintPresBlock(){
   if (presErr && !state.presOff)
     $("presNote").textContent += presErr === "busy"
       ? " Right now your status can't be sent: the notification server says it is " +
-        "busy (too many messages from this connection today). Others see you as " +
-        "Offline until it goes through - an ntfy account token fixes this."
+        "busy (the daily limit for this internet connection is used up). Others see you as " +
+        "Offline until it goes through. The free ntfy.sh allowance is 250 messages a day per " +
+        "internet connection, shared by every phone on it; it resets on its own. A paid " +
+        "ntfy.sh plan or your own ntfy server (Notification server, above) removes the limit."
       : " Right now your status can't be sent (" + presErr + "). Trying again " +
         "every minute.";
   $("presBtn").textContent = state.presOff ? "Show my status" : "Hide my status";
