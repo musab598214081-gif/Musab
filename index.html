@@ -116,6 +116,31 @@
   .person .pres{display:block;font-weight:400;font-size:12px;color:var(--mist);margin-top:1px}
   .person .pres.on{color:var(--go)} .person .pres.away{color:var(--amber)}
   /* Who-can-see-whom, in the admin's family list. */
+  /* Calls | Buzzes */
+  .tabs{display:flex;gap:6px;margin:22px 0 4px;background:var(--hearth);border-radius:12px;padding:4px}
+  .tabs button{flex:1;border:0;background:transparent;color:var(--mist);font:inherit;font-size:14px;
+    font-weight:500;padding:9px 6px;border-radius:9px;cursor:pointer;display:flex;
+    align-items:center;justify-content:center;gap:6px}
+  .tabs button.sel{background:#22364D;color:var(--paper)}
+  .badge{min-width:18px;height:18px;border-radius:9px;background:var(--stop);color:#fff;
+    font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+  .person .badge{position:absolute;left:-3px;top:-3px}
+  .log .ic.call{color:var(--go)} .log .ic.buzz{color:var(--brass)}
+  .log.missed .ic, .log.missed b{color:#FF8589}
+  .log .tx .q{color:var(--paper)}
+  .actinfo{margin:-8px 0 14px;color:var(--mist);font-size:14px}
+  .acthist{margin-top:14px}
+  .acthist .log{padding:8px 2px}
+  /* The admin's family overview */
+  .ov{background:var(--hearth);border-radius:14px;padding:12px;margin-bottom:8px}
+  .ov .top{display:flex;align-items:center;gap:10px}
+  .ov .dot{width:34px;height:34px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-weight:700;font-size:13px;color:#0F1B2A;position:relative}
+  .ov .nm{flex:1;min-width:0;font-weight:500}
+  .ov .nm small{display:block;font-weight:400;font-size:12px;color:var(--mist)}
+  .ov .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .chip{font-size:12px;padding:3px 8px;border-radius:20px;background:#22364D;color:var(--mist)}
+  .chip.ok{color:var(--go)} .chip.warn{color:var(--amber)} .chip.bad{color:#FF8589}
   .utable{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
   .utable th,.utable td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--seam);white-space:nowrap}
   .utable th{color:var(--mist);font-weight:500}
@@ -355,10 +380,11 @@
 <div class="sheet" id="actSheet">
   <div class="sheetbody">
     <h2 id="actTitle">—</h2>
-    <p class="sub">Talk to them, or just get their attention.</p>
+    <p class="actinfo" id="actInfo"></p>
     <button class="btn green" id="doCall">Call</button>
     <button class="btn ghost" id="doBuzz">Buzz them instead</button>
-    <button class="btn ghost" data-close="actSheet">Cancel</button>
+    <div class="acthist" id="actHist"></div>
+    <button class="btn ghost" data-close="actSheet">Close</button>
   </div>
 </div>
 
@@ -563,6 +589,12 @@
     <button class="btn ghost" id="testTurn">Test relays on this network</button>
     <p class="sub" id="relayUsage" style="margin-top:10px"></p>
 
+    <div id="overviewBlock" style="display:none">
+      <div class="sectiontitle">Family overview</div>
+      <p class="sub">What each phone last told you. Only you see this.</p>
+      <div id="overviewList"></div>
+    </div>
+
     <div id="famUsageBlock" style="display:none">
       <div class="sectiontitle">Family usage</div>
       <p class="sub">Every phone reports its calls to you after each one.
@@ -604,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22l";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22n";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1280,7 +1312,8 @@ function onRingMsg(m){
      "... is calling you · Tap to answer" line for every call. */
   if (!isCallTitle(title)) {
     var who = memberByTitle(title);
-    remember(who ? who.name : title, m.message || "", false, m.time);
+    logBuzz(who ? who.id : null, "in", m.message || "", m.time,
+            who ? who.name : String(title).replace(/\s+is buzzing you.*$/i, ""));
   }
   /* A ring push belonging to a voice call is only there to wake the
      phone. The call screen is raised by the offer on the signal
@@ -2519,6 +2552,13 @@ function startCall(peerId){
          network that blocks the server looked exactly like a person not
          picking up, which is the single most misleading thing this app
          could do. */
+      /* Said on screen, so the caller can see whether the iPhone ring
+         went too - without it, "no Bark ring" and "Bark not set up on
+         their phone yet" look the same. */
+      var pm = memberById(peerId);
+      $("callNote").textContent = !showTech() ? ""
+        : (pm && pm.bk) ? "Also ringing their iPhone through Bark"
+        : "Ringing through ntfy (Bark isn't set up for them on this phone)";
       ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true)
         .then(function(r){
           if (r && r.ok) return;
@@ -2534,8 +2574,7 @@ function startCall(peerId){
             "Their phone will not ring — cannot reach " + srv()
             + " from this network";
         });
-      remember(nameOf(peerId), "voice call", true);
-      call.logAt = state.recent[0].at;
+      call.logAt = logCall(peerId, "out", "calling", { cid: call.id }).at;
       call.giveUp = setTimeout(function(){
         if (call && call.state === "calling") {
           stopTone();
@@ -2589,7 +2628,7 @@ function noteMissed(peer, callId, quiet){
   if (callId && state.missedIds.indexOf(callId) !== -1) return;
   if (callId) { state.missedIds.push(callId); state.missedIds = state.missedIds.slice(-40); }
   lastMissedAt = Date.now();
-  remember(nameOf(peer), "missed call", false);
+  logCall(peer, "in", "missed", { cid: callId || undefined });
   if (!quiet) toast("Missed call from " + nameOf(peer) + " — tap their name to call back");
 }
 
@@ -2730,6 +2769,7 @@ function onSignal(msg){
 
   if (msg.t === "bye") {
     stopTone();
+    if (call.out && call.state === "calling") call.theyDeclined = true;
     /* Said the way it happened: hung up before you answered is a
        missed call, not an ended one. */
     var missed = call.state === "incoming" || call.state === "checking";
@@ -2844,7 +2884,17 @@ function hangUp(why){
   if (call.pc) { try { call.pc.close(); } catch (e) {} }
   stopStream(call.stream);
   try { $("remoteAudio").srcObject = null; } catch (e) {}
-  if (why === "declined") remember(nameOf(call.peer), "declined", false);
+  if (why === "declined" && !call.out) logCall(call.peer, "in", "declined", { cid: call.id });
+  /* An outgoing call that never connected: say how it ended. */
+  if (call.out && !call.t0 && call.logAt) {
+    (state.recent || []).forEach(function(r){
+      if (r.at === call.logAt && r.k === "call" && r.st === "calling") {
+        r.st = why === "busy" ? "busy" : why === "failed" ? "failed" :
+               (why === null || why === "declined") && call.theyDeclined ? "declined" : "noanswer";
+      }
+    });
+    save(); paintRecent();
+  }
   call = null;
   hideCallScreen();
 }
@@ -3214,12 +3264,16 @@ function finishUsage(){
 
   /* The entry written when the call was placed becomes the full one;
      an answered call gets its own. */
+  var secs0 = Math.round((Date.now() - call.t0) / 1000);
+  var tech = [how, total ? fmtBytes(total) : ""].filter(Boolean).join(" · ");
   var entry = null;
   (state.recent || []).forEach(function(r){
     if (!entry && call.logAt && r.at === call.logAt) entry = r;
   });
-  if (entry) { entry.what = what; save(); paintRecent(); }
-  else remember(nameOf(call.peer), what, !!call.out);
+  if (entry) {
+    entry.k = "call"; entry.st = "done"; entry.dur = secs0; entry.det = tech;
+    delete entry.what; save(); paintRecent();
+  } else logCall(call.peer, call.out ? "out" : "in", "done", { dur: secs0, det: tech, cid: call.id });
 
   /* Into this phone's permanent record, which the admin receives. */
   var secs = Math.round((Date.now() - call.t0) / 1000), out = !!call.out;
@@ -3246,6 +3300,13 @@ function paintUsage(){
   }
   var parts = Object.keys(u.relay).filter(function(k){ return u.relay[k] > 0; })
     .map(function(k){ return k + " " + fmtBytes(u.relay[k]); });
+  if (!showTech()) {
+    el.textContent = "This month: " + u.calls + " call" + (u.calls === 1 ? "" : "s") +
+      (u.secs ? ", " + fmtLength(u.secs * 1000) + " talking" : "") +
+      (u.buzz ? ", " + u.buzz + " buzz" + (u.buzz === 1 ? "" : "es") : "") + ".";
+    paintFamUsage();
+    return;
+  }
   el.textContent = "This month on this phone: " + u.calls + " call" +
     (u.calls === 1 ? "" : "s") + (u.secs ? " (" + fmtLength(u.secs * 1000) + ")" : "") +
     " · through relays: " + (parts.length ? parts.join(" · ") : "none") +
@@ -3504,7 +3565,7 @@ function buzz(memberId, message){
     .then(function(r){
       if (!r.ok) throw new Error("http");
       toast("Buzzed " + nameOf(memberId) + " 🔔");
-      remember(nameOf(memberId), message, true);
+      logBuzz(memberId, "out", message);
       ledgerAdd(function(m){ m.buzz++; });
     })
     .catch(function(){
@@ -3600,49 +3661,126 @@ function ago(ms){
 /* Recent entries written by older copies kept the notification's whole
    title as the name ("Jood is calling you on Notifyer"). Read them as
    what they were: a call from Jood, a buzz from Jood. */
-function tidyEntry(r){
-  var who = String(r.who || ""), what = String(r.what || "");
-  if (isCallTitle(who)) {
-    var m = memberByTitle(who);
-    return { who: m ? m.name : who.replace(/\s+is calling you.*$/i, ""),
-             what: "called you", out: r.out, at: r.at, wasPush: true };
-  }
-  var bz = who.match(/^(.*?)\s+is buzzing you$/i);
-  if (bz) return { who: bz[1], what: what, out: r.out, at: r.at };
-  return r;
+/* ------------------------------------------------------------ history
+ *
+ * Every line is now a call or a buzz, said outright - not worked out
+ * later from its wording. Reading the words is what let a buzz whose
+ * message happened to fit the pattern show up as a call.
+ *
+ *   k    "call" | "buzz"
+ *   dir  "in" | "out"
+ *   st   calls: "missed" "done" "declined" "noanswer" "busy" "failed" "calling"
+ *   pid  the other person's ID, when known (names can change)
+ *   dur  seconds talked; det  route and data (shown to the admin only)
+ *   msg  the buzz text; new  an unseen missed call */
+function logEntry(e){
+  state.recent = state.recent || [];
+  e.at = e.at || Date.now();
+  if (e.pid && !e.who) e.who = nameOf(e.pid);
+  state.recent.unshift(e);
+  var cutoff = Date.now() - 30 * 86400000;
+  state.recent = state.recent.filter(function(r){ return r.at >= cutoff; }).slice(0, 200);
+  save(); paintRecent();
+  return e;
+}
+function logCall(pid, dir, st, extra){
+  var e = { k: "call", dir: dir, st: st, pid: pid };
+  if (extra) for (var x in extra) e[x] = extra[x];
+  if (st === "missed") e["new"] = 1;
+  return logEntry(e);
+}
+function logBuzz(pid, dir, msg, whenSec, name){
+  return logEntry({ k: "buzz", dir: dir, pid: pid, who: name, msg: msg || "",
+                    at: whenSec ? whenSec * 1000 : Date.now() });
 }
 
-function recentList(){
+/* Older lines, written before calls and buzzes were told apart. */
+function tidyEntry(r){
+  if (r.k) return r;
+  var who = String(r.who || ""), what = String(r.what || "");
+  var dir = r.out ? "out" : "in";
+  if (isCallTitle(who)) {
+    var m = memberByTitle(who);
+    return { k: "call", dir: "in", st: "done", who: m ? m.name : who.replace(/\s+is calling you.*$/i, ""),
+             at: r.at, wasPush: true };
+  }
+  var bz = who.match(/^(.*?)\s+is buzzing you$/i);
+  if (bz) return { k: "buzz", dir: dir, who: bz[1], msg: what, at: r.at };
+  if (/^missed call$/i.test(what)) return { k: "call", dir: "in", st: "missed", who: who, at: r.at };
+  if (/^declined$/i.test(what)) return { k: "call", dir: dir, st: "declined", who: who, at: r.at };
+  var vc = what.match(/^voice call(?: · ([^·]+))?(?: · (.*))?$/);
+  if (vc) {
+    var d = vc[1] ? vc[1].trim() : "";
+    var secs = /^\d+ s$/.test(d) ? parseInt(d, 10) : /^\d+ min$/.test(d) ? parseInt(d, 10) * 60 : 0;
+    return { k: "call", dir: dir, st: d ? "done" : (r.out ? "noanswer" : "done"),
+             who: who, dur: secs, det: vc[2] || "", at: r.at };
+  }
+  return { k: "buzz", dir: dir, who: who, msg: what, at: r.at };
+}
+
+function recentList(kind){
   var seen = {};
   return ((state && state.recent) || []).map(tidyEntry).filter(function(r){
-    /* An old call notification is only worth a line if nothing else
-       says the call happened; drop it when a real call entry is near. */
+    if (kind && r.k !== kind) return false;
     if (!r.wasPush) return true;
     var key = r.who + Math.round(r.at / 120000);
     if (seen[key]) return false;
     seen[key] = 1;
     return !((state && state.recent) || []).some(function(o){
-      return o.who === r.who && Math.abs(o.at - r.at) < 120000 &&
-             !isCallTitle(o.who);
+      return o.who === r.who && Math.abs(o.at - r.at) < 120000 && !isCallTitle(o.who);
     });
   });
 }
 
+function entryFor(r, m){
+  return r.pid ? r.pid === m.id : r.who === m.name;
+}
+/* Technical detail - route, data - is the admin's business. */
+function showTech(){ return !!(state && (!state.admin || isAdmin())); }
+
+function callLabel(r){
+  var dur = r.dur ? " · " + fmtLength(r.dur * 1000) : "";
+  switch (r.st) {
+    case "missed":   return "Missed call";
+    case "declined": return r.dir === "in" ? "You declined" : "Declined";
+    case "noanswer": return "No answer";
+    case "busy":     return "They were on another call";
+    case "failed":   return "Didn't connect";
+    case "calling":  return "Calling…";
+    default:         return (r.dir === "in" ? "Incoming call" : "Outgoing call") + dur;
+  }
+}
+function buzzLabel(r){
+  return (r.dir === "in" ? "Buzzed you" : "You buzzed") + (r.msg ? ": “" + r.msg + "”" : "");
+}
+function missedCount(m){
+  return ((state && state.recent) || []).filter(function(r){
+    return r.k === "call" && r.st === "missed" && r["new"] && (!m || entryFor(r, m));
+  }).length;
+}
+function clearMissed(m){
+  var changed = false;
+  ((state && state.recent) || []).forEach(function(r){
+    if (r["new"] && (!m || entryFor(r, m))) { delete r["new"]; changed = true; }
+  });
+  if (changed) { save(); paintRecent(); }
+}
+
 /* The latest thing between you and one person, in a few words. */
 function lastWith(name){
-  var r = recentList().filter(function(x){ return x.who === name; })[0];
-  if (!r) return null;
-  var what = String(r.what || "");
-  var missed = /missed/i.test(what) && !r.out;
-  var text = missed ? "Missed call" :
-             /^voice call/.test(what) ? (r.out ? "You called" : "Called you") :
-             /tap to answer|^called you$/i.test(what) ? "Called you" :
-             /^declined$/i.test(what) ? (r.out ? "Declined your call" : "You declined a call") :
-             r.out ? "You buzzed: " + what : "Buzzed you: " + what;
-  var len = what.match(/voice call · ([^·]+)/);
-  var dur = len ? len[1].trim() : "";
-  if (/^\d+ (s|min)$|^\d+ h \d+ min$/.test(dur)) text += " · " + dur;
-  return { text: text + " · " + ago(r.at), missed: missed };
+  var m = null;
+  (state.members || []).forEach(function(x){ if (x.name === name) m = x; });
+  var list = recentList().filter(function(x){ return m ? entryFor(x, m) : x.who === name; });
+  if (!list.length) return null;
+  var unseen = m ? missedCount(m) : 0;
+  if (unseen) {
+    var lastMiss = list.filter(function(x){ return x.k === "call" && x.st === "missed"; })[0];
+    return { text: (unseen > 1 ? unseen + " missed calls" : "Missed call") + " · " +
+                   ago(lastMiss ? lastMiss.at : list[0].at), missed: true, count: unseen };
+  }
+  var r = list[0];
+  return { text: (r.k === "call" ? callLabel(r) : buzzLabel(r)) + " · " + ago(r.at),
+           missed: false, count: 0 };
 }
 
 function paintMain(){
@@ -3715,9 +3853,9 @@ function paintMain(){
   st.innerHTML = '<span class="led"></span><span>Connecting…</span>';
   main.appendChild(st);
 
-  var rt = document.createElement("div");
-  rt.className = "sectiontitle"; rt.textContent = "Recent";
-  main.appendChild(rt);
+  var tabs = document.createElement("div");
+  tabs.className = "tabs"; tabs.id = "histTabs";
+  main.appendChild(tabs);
   var box = document.createElement("div"); box.id = "recentBox";
   main.appendChild(box);
 
@@ -3734,6 +3872,12 @@ function paintCardNotes(){
     var last = lastWith(card.getAttribute("data-who"));
     sub.className = "sub" + (last && last.missed ? " missed" : "");
     sub.textContent = last ? last.text : "Tap to call or buzz";
+    var dot = card.querySelector(".dot"), bd = dot && dot.querySelector(".badge");
+    if (bd) bd.remove();
+    if (dot && last && last.count) {
+      bd = document.createElement("span"); bd.className = "badge"; bd.textContent = last.count;
+      dot.appendChild(bd);
+    }
   });
 }
 
@@ -3750,15 +3894,40 @@ function dayLabel(ms){
          d.getDate() + " " + months[d.getMonth()];
 }
 
+var histTab = "call";
+
+function paintTabs(){
+  var t = $("histTabs");
+  if (!t) return;
+  t.innerHTML = "";
+  var miss = missedCount(null);
+  [["call", "Calls"], ["buzz", "Buzzes"]].forEach(function(d){
+    var b = document.createElement("button");
+    b.className = histTab === d[0] ? "sel" : "";
+    b.innerHTML = (d[0] === "call" ? ICON.phone : ICON.bell).replace("<svg", '<svg width="16" height="16"') +
+                  "<span>" + d[1] + "</span>" +
+                  (d[0] === "call" && miss ? '<span class="badge">' + miss + "</span>" : "");
+    b.onclick = function(){
+      histTab = d[0];
+      /* Looking at the calls is seeing the missed ones. */
+      if (d[0] === "call") clearMissed(null);
+      paintRecent();
+    };
+    t.appendChild(b);
+  });
+}
+
 function paintRecent(){
   paintCardNotes();
+  paintTabs();
   var box = $("recentBox");
   if (!box) return;
   box.innerHTML = "";
-  var list = recentList();
+  var list = recentList(histTab);
   if (!list.length) {
     var p = document.createElement("p");
-    p.className = "hint"; p.textContent = "Calls and buzzes show up here.";
+    p.className = "hint";
+    p.textContent = histTab === "call" ? "Your calls show up here." : "Buzzes you send and get show up here.";
     box.appendChild(p); return;
   }
 
@@ -3775,9 +3944,9 @@ function paintRecent(){
     none.className = "hint"; none.textContent = "Nothing today or yesterday.";
     box.appendChild(none);
   }
-  var shown = showEarlier ? recent.concat(earlier) : recent;
+  var shownList = showEarlier ? recent.concat(earlier) : recent;
   var lastLabel = "";
-  shown.forEach(function(r){
+  shownList.forEach(function(r){
     var label = dayLabel(r.at);
     if (label !== lastLabel) {
       var h = document.createElement("div");
@@ -3797,28 +3966,36 @@ function paintRecent(){
   }
 }
 
-function recentRow(r){
-  var what = String(r.what || "");
-  var missed = /missed/i.test(what) && !r.out;
+function recentRow(r, withDate){
+  var missed = r.k === "call" && r.st === "missed";
   var d = document.createElement("div");
   d.className = "log" + (missed ? " missed" : "");
   var ic = document.createElement("span");
-  ic.className = "ic"; ic.innerHTML = r.out ? ICON.outArr : ICON.inArr;
+  ic.className = "ic " + r.k;
+  ic.innerHTML = r.k === "buzz" ? ICON.bell : (r.dir === "out" ? ICON.outArr : ICON.inArr);
   var tx = document.createElement("span"); tx.className = "tx";
-  var b = document.createElement("b"); b.textContent = r.who;
+  var b = document.createElement("b"); b.textContent = r.pid ? nameOf(r.pid) : r.who;
   tx.appendChild(b);
-  if (what) {
-    var det = document.createElement("span");
-    det.className = "det"; det.textContent = what;
-    tx.appendChild(det);
+  var det = document.createElement("span");
+  det.className = "det";
+  if (r.k === "buzz") {
+    det.appendChild(document.createTextNode(r.dir === "in" ? "Buzzed you" : "You buzzed"));
+    if (r.msg) {
+      var q = document.createElement("span"); q.className = "q";
+      q.textContent = ": “" + r.msg + "”";
+      det.appendChild(q);
+    }
+  } else {
+    det.textContent = callLabel(r) + (showTech() && r.det ? " · " + r.det : "");
   }
+  tx.appendChild(det);
   var tm = document.createElement("span"); tm.className = "tm";
-  tm.textContent = timeOf(r.at);
+  tm.textContent = withDate && dayLabel(r.at) !== "Today" ? dayLabel(r.at) : timeOf(r.at);
   d.appendChild(ic); d.appendChild(tx); d.appendChild(tm);
   /* Tapping someone's line is the quickest way back to them. */
   var m = ((state && state.members) || []).filter(function(x){
-    return x.name === r.who && x.id !== state.me; })[0];
-  if (m) { d.className += " tap"; d.onclick = function(){ openAct(m.id); }; }
+    return entryFor(r, x) && x.id !== state.me && shown(x); })[0];
+  if (m && !withDate) { d.className += " tap"; d.onclick = function(){ openAct(m.id); }; }
   return d;
 }
 
@@ -3842,6 +4019,18 @@ var pendingId = null;
 function openAct(id){
   pendingId = id;
   $("actTitle").textContent = nameOf(id);
+  var st = presenceOf(id);
+  $("actInfo").textContent = st.k === "on" ? "Online now"
+    : st.k === "away" ? st.text : st.text + " — a call still reaches their phone";
+  var m = memberById(id), box = $("actHist");
+  box.innerHTML = "";
+  var mine = m ? recentList().filter(function(r){ return entryFor(r, m); }).slice(0, 6) : [];
+  if (mine.length) {
+    var h = document.createElement("div"); h.className = "dayhead"; h.textContent = "Recent with " + m.name;
+    box.appendChild(h);
+    mine.forEach(function(r){ box.appendChild(recentRow(r, true)); });
+  }
+  if (m) clearMissed(m);
   unlockAudio();                /* this tap is our chance to unlock audio */
   askNotify();
   openSheet("actSheet");
@@ -5005,16 +5194,28 @@ function recentMonths(months){
 function reportUsage(force){
   var e = myLedger();
   if (!e || !state.admin) return;
-  if (isAdmin()) { famRecord(state.me, nameOf(state.me), ledger.dev, e.months); e.changed = false;
+  var infoNow = JSON.stringify(deviceInfo());
+  if (infoNow !== e.infoSent) { e.changed = true; e.infoSent = infoNow; }
+  if (isAdmin()) { famRecord(state.me, nameOf(state.me), ledger.dev, e.months, deviceInfo()); e.changed = false;
                    writeJSON(USAGEKEY, ledger); return; }
   if (!force && !e.changed && Date.now() - (e.sentAt || 0) < 6 * 3600000) return;
   sendSig(state.admin.id, { t:"usage", from: state.me, dev: ledger.dev,
-                            months: recentMonths(e.months) })
+                            months: recentMonths(e.months), info: deviceInfo() })
     .then(function(r){
       if (r && r.ok) { e.changed = false; e.sentAt = Date.now(); writeJSON(USAGEKEY, ledger); }
     }).catch(function(){});
 }
-function famRecord(id, name, dev, months){
+/* What the admin's overview shows about a phone - its setup, nothing
+   about what anyone said or who they called. */
+function deviceInfo(){
+  var perm = null;
+  try { perm = ("Notification" in window) ? Notification.permission : null; } catch (e) {}
+  return { v: VERSION, bark: !!myBark(), ntfy: !!(state && state.ntfy), notif: perm,
+           ios: isIOS(), home: !!(window.navigator.standalone ||
+             (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) };
+}
+
+function famRecord(id, name, dev, months, info){
   var h = famLedger[state.house] || (famLedger[state.house] = { people: {} });
   var p = h.people[id] || (h.people[id] = { name: name, devices: {} });
   p.name = name || p.name;
@@ -5027,6 +5228,7 @@ function famRecord(id, name, dev, months){
     if (!a || (b.calls || 0) + (b.buzz || 0) >= (a.calls || 0) + (a.buzz || 0)) d.months[mk] = b;
   });
   d.at = Date.now();
+  if (info) { p.info = info; p.infoAt = Date.now(); }
   writeJSON(FAMUSEKEY, famLedger);
   paintFamUsage();
 }
@@ -5047,7 +5249,13 @@ function takeUsage(msg){
     });
     clean[k] = r;
   });
-  famRecord(m.id, m.name, msg.dev, clean);
+  var info = null;
+  if (msg.info && typeof msg.info === "object") {
+    info = { v: String(msg.info.v || "").slice(0, 20), bark: !!msg.info.bark,
+             ntfy: !!msg.info.ntfy, ios: !!msg.info.ios, home: !!msg.info.home,
+             notif: ["granted", "denied", "default"].indexOf(msg.info.notif) !== -1 ? msg.info.notif : null };
+  }
+  famRecord(m.id, m.name, msg.dev, clean, info);
 }
 function sumMonth(into, m){
   ["calls", "out", "secs", "buzz", "direct"].forEach(function(f){ into[f] += m[f] || 0; });
@@ -5089,8 +5297,49 @@ function monthName(mk){
   var d = new Date(Number(mk.slice(0, 4)), Number(mk.slice(5, 7)) - 1, 1);
   return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
+function paintOverview(){
+  var block = $("overviewBlock");
+  if (!block) return;
+  var on = !!(state && isAdmin());
+  block.style.display = on ? "block" : "none";
+  if (!on) return;
+  var box = $("overviewList"), h = famLedger && famLedger[state.house];
+  box.innerHTML = "";
+  state.members.forEach(function(m){
+    var p = h && h.people[m.id], info = m.id === state.me ? deviceInfo() : (p && p.info);
+    var card = document.createElement("div"); card.className = "ov";
+    var top = document.createElement("div"); top.className = "top";
+    var dot = document.createElement("span"); dot.className = "dot";
+    dot.style.background = m.colour; dot.textContent = initials(m.name);
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = m.name;
+    var sm = document.createElement("small");
+    var pr = m.id === state.me ? { text: "This phone" } : presenceOf(m.id);
+    sm.textContent = pr.text + (m.id !== state.me && p && p.infoAt
+      ? " · reported " + ago(p.infoAt) : m.id !== state.me ? " · hasn't reported yet" : "");
+    nm.appendChild(sm);
+    top.appendChild(dot); top.appendChild(nm); card.appendChild(top);
+    var chips = document.createElement("div"); chips.className = "chips";
+    function chip(text, cls){ var c = document.createElement("span");
+      c.className = "chip " + (cls || ""); c.textContent = text; chips.appendChild(c); }
+    if (info) {
+      chip(info.v === VERSION ? "Up to date" : "Old version " + (info.v || "?"),
+           info.v === VERSION ? "ok" : "warn");
+      if (info.ios) chip(m.bk || info.bark ? "Bark on" : "No Bark", m.bk || info.bark ? "ok" : "warn");
+      chip(info.ntfy ? "ntfy set up" : "ntfy not set up", info.ntfy ? "ok" : "bad");
+      if (info.notif === "denied") chip("Page alerts blocked", "warn");
+      if (info.ios && !info.home) chip("Not on Home Screen", "warn");
+    } else chip("No report yet — opens with the next version", "");
+    var cnt = m.c ? m.c.length : null;
+    chip(m.id === state.me ? "Admin · sees everyone"
+         : cnt === null ? "Sees everyone" : "In touch with " + cnt, "");
+    card.appendChild(chips);
+    box.appendChild(card);
+  });
+}
+
 var famUsageMonth = null;
 function paintFamUsage(){
+  paintOverview();
   var block = $("famUsageBlock");
   if (!block) return;
   var on = !!(state && isAdmin());
