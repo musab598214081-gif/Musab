@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22u";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22v";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -4079,8 +4079,8 @@ function openSetup(){
   var t = (state && state.turn) || {};
   $("turnUrl").value  = t.api || t.url || "";
   $("turn2Url").value = ((state && state.turn2) || {}).api || "";
-  paintRouteChoice();
-  paintUsage();
+  try { paintRouteChoice(); } catch (e) { console.error(e); }
+  try { paintUsage(); } catch (e) { console.error(e); }
   $("turnUser").value = t.user || "";
   $("turnPass").value = t.pass || "";
 
@@ -4088,17 +4088,22 @@ function openSetup(){
     ? memberById(state.me).colour : COLOURS[0];
 
   $("verTag").textContent = VERSION;
-  paintMicState();
+  try { paintMicState(); } catch (e) { console.error(e); }
   $("serverUrl").value = (state && state.server) || "";
   $("tokenVal").value  = (state && state.token) || "";
   $("connState").textContent = "Tap check to see whether this network "
     + "allows the notification server.";
-  paintNotifyState();
-  paintSwatches(); paintMembers(); paintTopic(); paintTones();
+  /* Each part painted on its own: one that fails used to stop the
+     whole sheet from opening, so tapping Settings did nothing at all. */
+  function safe(f){ try { f(); } catch (e) {
+    try { console.error(e); toast("Part of Settings failed: " + e.message); } catch (x) {} } }
+  safe(paintNotifyState);
+  safe(paintSwatches); safe(paintMembers); safe(paintTopic); safe(paintTones);
   $("shareArea").style.display = state ? "block" : "none";
-  if (state) { paintInvites(); $("mineLink").textContent = maskLink(personalLink()); }
-  paintAdmin();
-  applyLock();
+  if (state) { safe(paintInvites);
+               safe(function(){ $("mineLink").textContent = maskLink(personalLink()); }); }
+  safe(paintAdmin);
+  safe(applyLock);
   openSheet("setupSheet");
 }
 
@@ -4248,6 +4253,25 @@ function contactsPanel(m){
   return p;
 }
 
+/* Send opens the phone's share sheet. On a computer that sheet often
+   refuses or never appears, and the button looked dead - so anything but
+   you closing the sheet yourself now falls back to copying the link. */
+function sendLink(m){
+  var url;
+  try { url = linkFor(m.id); }
+  catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
+  var msg = "Link for " + m.name + " copied — paste it into a message to them";
+  var touch = ("ontouchstart" in window) || (navigator.maxTouchPoints || 0) > 0;
+  if (navigator.share && touch) {
+    try {
+      navigator.share({ title: "Family Notifier — " + m.name, url: url })
+        .catch(function(e){ if (!e || e.name !== "AbortError") copy(url, msg); });
+      return;
+    } catch (e) {}
+  }
+  copy(url, msg);
+}
+
 function paintInvites(){
   var box = $("inviteList");
   if (!box || !state) return;
@@ -4276,17 +4300,15 @@ function paintInvites(){
     var send = document.createElement("button");
     send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
     send.setAttribute("aria-label", "Send " + m.name + " their link");
-    send.onclick = function(){
-      var url = linkFor(m.id);
-      if (navigator.share)
-        navigator.share({ title: "Family Notifier — " + m.name, url: url })
-                 .catch(function(){});
-      else copy(url, "Link for " + m.name + " copied");
-    };
+    send.onclick = function(){ sendLink(m); };
     var cp = document.createElement("button");
     cp.className = "mini"; cp.innerHTML = ICON.copy + "<span>Copy</span>";
     cp.setAttribute("aria-label", "Copy " + m.name + "'s link");
-    cp.onclick = function(){ copy(linkFor(m.id), "Link for " + m.name + " copied"); };
+    cp.onclick = function(){
+      var url; try { url = linkFor(m.id); }
+      catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
+      copy(url, "Link for " + m.name + " copied");
+    };
     row.appendChild(dot); row.appendChild(nm); row.appendChild(send); row.appendChild(cp);
     box.appendChild(row);
   });
@@ -4577,12 +4599,7 @@ function paintPending(){
     nm.appendChild(st);
     var send = document.createElement("button");
     send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
-    send.onclick = function(){
-      var url = linkFor(m.id);
-      if (navigator.share) navigator.share({ title: "Family Notifier — " + m.name, url: url })
-                                    .catch(function(){});
-      else copy(url, "Link for " + m.name + " copied");
-    };
+    send.onclick = function(){ sendLink(m); };
     var cp = document.createElement("button");
     cp.className = "mini"; cp.innerHTML = ICON.copy + "<span>Copy</span>";
     cp.onclick = function(){ copy(linkFor(m.id), "Link for " + m.name + " copied"); };
@@ -5220,11 +5237,60 @@ $("resetAll").onclick = function(){
   closeSheet("setupSheet"); paintMain();
 };
 
+/* Copying has three ways in, tried in order, and always ends with the
+   text in your hands: the modern clipboard (refused by some browsers
+   and in-app viewers), the old copy command, and last a box showing the
+   link to copy by hand. It used to be able to fail with no sign at all. */
 function copy(text, ok){
-  if (navigator.clipboard && navigator.clipboard.writeText)
-    navigator.clipboard.writeText(text)
-      .then(function(){ toast(ok); }, function(){ prompt("Copy this:", text); });
-  else prompt("Copy this:", text);
+  function oldWay(){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    var done = false;
+    try { done = document.execCommand("copy"); } catch (e) { done = false; }
+    document.body.removeChild(ta);
+    if (done) toast(ok);
+    else showLinkBox(text);
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function(){ toast(ok); }, oldWay);
+      return;
+    }
+  } catch (e) {}
+  oldWay();
+}
+
+/* The link itself, shown in a box you can select - when nothing else
+   worked, or when you ask to see it. */
+function showLinkBox(text, title){
+  var old = $("linkBoxWrap");
+  if (old) old.parentNode.removeChild(old);
+  var wrap = document.createElement("div");
+  wrap.id = "linkBoxWrap";
+  wrap.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);" +
+    "display:flex;align-items:center;justify-content:center;padding:16px";
+  var card = document.createElement("div");
+  card.style.cssText = "background:#1b2433;color:#fff;border-radius:16px;padding:16px;" +
+    "max-width:520px;width:100%;box-sizing:border-box";
+  var h = document.createElement("div");
+  h.style.cssText = "font-weight:700;margin-bottom:8px";
+  h.textContent = title || "Copy this link";
+  var ta = document.createElement("textarea");
+  ta.value = text; ta.readOnly = true;
+  ta.style.cssText = "width:100%;height:120px;box-sizing:border-box;font-size:14px;" +
+    "border-radius:10px;padding:8px;background:#0e1520;color:#fff;border:1px solid #334";
+  var close = document.createElement("button");
+  close.className = "btn"; close.textContent = "Done";
+  close.style.marginTop = "10px";
+  close.onclick = function(){ wrap.parentNode.removeChild(wrap); };
+  wrap.onclick = function(e){ if (e.target === wrap) close.onclick(); };
+  card.appendChild(h); card.appendChild(ta); card.appendChild(close);
+  wrap.appendChild(card); document.body.appendChild(wrap);
+  setTimeout(function(){ ta.focus(); ta.select(); }, 50);
 }
 
 /* -------------------------------------------------------- usage ledger
