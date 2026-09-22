@@ -456,6 +456,14 @@
 
     <div id="adminArea"></div>
 
+    <div id="fsPushBlock" style="display:none">
+    <div class="sectiontitle">Call notifications on this device</div>
+    <p class="sub" id="fsPushState">—</p>
+    <button class="btn" id="fsPushBtn">Turn on call notifications</button>
+    <button class="btn ghost" id="fsPushTest">Test — this device should get a notification</button>
+    </div>
+
+    <div id="ntfyRingBlock">
     <div class="sectiontitle">Ringing this phone</div>
     <p class="notice" id="ntfyNote" style="display:none">
       <b>This phone won't ring yet.</b> Right now it only rings while this
@@ -483,6 +491,7 @@
     <p class="sub" style="margin-top:8px">Your topic, if you ever need to type it by hand:</p>
     <div class="codebox" id="myTopic">—</div>
     <button class="btn ghost" id="copyTopic">Copy topic</button>
+    </div>
 
     <div class="sectiontitle">Microphone</div>
     <p class="sub" id="micState">—</p>
@@ -495,6 +504,21 @@
     <button class="btn ghost" id="checkConn">Check connection</button>
 
     <div id="serverBlock">
+    <div id="fsAdminBlock">
+    <label for="fsUrl">Family server (Cloudflare) — replaces ntfy.sh</label>
+    <p class="sub" style="margin:0 0 6px">
+      Your own server in your Cloudflare account: no daily limit, instant
+      calls, accurate Online status, and no ntfy app needed on anyone's
+      phone. Paste its address (it ends in <b>.workers.dev</b>) and tap
+      Use. Everyone switches over with you. Leave empty to keep using
+      ntfy.sh.
+    </p>
+    <input type="text" id="fsUrl" placeholder="https://family-server.yourname.workers.dev" autocomplete="off">
+    <button class="btn" id="fsSave">Use this family server</button>
+    <button class="btn ghost" id="fsStop" style="display:none">Go back to ntfy.sh</button>
+    <p class="sub" style="margin-top:6px" id="fsState">—</p>
+    </div>
+
     <label for="serverUrl">Notification server</label>
     <p class="sub" style="margin:0 0 6px">
       Leave this alone unless the check above fails on every network you use.
@@ -616,7 +640,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-23a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-24a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -723,6 +747,7 @@ function snapshot(){
            rev: state.rev || 0, turn: state.turn || null,
            turn2: state.turn2 || null, route: state.route || null,
            server: state.server || null, token: state.token || null,
+           fs: state.fs || null,
            tone: state.tone || "classic", ntfy: !!state.ntfy,
            pending: state.pending || [], presOff: !!state.presOff,
            missedIds: state.missedIds || [] };
@@ -952,7 +977,8 @@ function encodeConfig(members){
                                  a: state.admin || null,
                                  r: state.rev || 0,
                                  s: state.server || null,
-                                 k: state.token || null });
+                                 k: state.token || null,
+                                 fs: state.fs || null });
   var b64 = btoa(unescape(encodeURIComponent(payload)));
   return b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -994,7 +1020,265 @@ function personalLink(){ return linkFor(state.me); }
 
 /* The ring topic. Loud on purpose: priority 5 is what gets a phone to
    vibrate hard and pop over whatever is on screen. */
-function ringPush(memberId, title, message, answerable){
+/* ==================================================================== *
+ * Family server (Cloudflare) - the alternative to ntfy.sh
+ *
+ * When the admin sets a family server, every phone keeps one live
+ * connection (a WebSocket) to it instead of talking to ntfy.sh:
+ *   - call setup and family updates go over it instantly;
+ *   - the server keeps each message 12 hours, so a phone that was
+ *     closed catches up the moment it connects ("since");
+ *   - Online / Away / Offline come from the server, which simply sees
+ *     who is connected - no "I'm still here" messages;
+ *   - a closed phone is woken with its own notifications (Web Push,
+ *     through sw.js), so the ntfy app is not needed.
+ * Without a family server set, everything works through ntfy.sh as
+ * before.
+ * ==================================================================== */
+function useFS(){ return !!(state && state.fs && state.house && state.me); }
+function fsBase(){ return String(state.fs).replace(/\/+$/, "") + "/f/" + encodeURIComponent(state.house); }
+function netName(){
+  if (useFS()) { try { return new URL(state.fs).host; } catch (e) { return "the family server"; } }
+  return srv();
+}
+var fsWs = null, fsOpen = false, fsRetry = 1000, fsTimer = null, fsPingTimer = null;
+var fsReqs = {}, fsSeq = 0, fsPres = "on", fsVapid = null;
+function fsSinceKey(){ return "familyNotifyer.fsSince." + state.house + "." + state.me; }
+function fsSince(){ try { return Number(localStorage.getItem(fsSinceKey())) || 0; } catch (e) { return 0; } }
+function fsSetSince(t){
+  if (!t || t <= fsSince()) return;
+  try { localStorage.setItem(fsSinceKey(), String(t)); } catch (e) {}
+}
+function fsClose(){
+  if (fsTimer) { clearTimeout(fsTimer); fsTimer = null; }
+  if (fsPingTimer) { clearInterval(fsPingTimer); fsPingTimer = null; }
+  var ws = fsWs; fsWs = null; fsOpen = false;
+  if (ws) { try { ws.close(); } catch (e) {} }
+}
+function fsSchedule(){
+  if (fsTimer || !useFS()) return;
+  var d = fsRetry + Math.random() * 500;
+  fsRetry = Math.min(fsRetry * 2, 30000);
+  fsTimer = setTimeout(function(){ fsTimer = null; fsConnect(); }, d);
+}
+function fsConnect(){
+  if (!useFS()) return;
+  fsClose();
+  var url = fsBase().replace(/^http/, "ws") + "/ws?me=" + encodeURIComponent(state.me)
+          + "&since=" + fsSince();
+  var ws;
+  try { ws = new WebSocket(url); } catch (e) { fsSchedule(); return; }
+  fsWs = ws;
+  ws.onopen = function(){
+    if (ws !== fsWs) return;
+    fsOpen = true; fsRetry = 1000; beat(); paintStatus(true);
+    fsPres = document.hidden ? "away" : "on";
+    fsSendPres();
+    fsSendSub();
+    fsPingTimer = setInterval(function(){
+      try { ws.send("ping"); } catch (e) {}
+      /* No answer for a long while: the connection died without saying. */
+      if (Date.now() - lastBeatAt > 75000 && ws === fsWs) { fsClose(); fsSchedule(); paintStatus(false); }
+    }, 30000);
+  };
+  ws.onmessage = function(ev){
+    if (ws !== fsWs) return;
+    beat();
+    if (ev.data === "pong") return;
+    var f; try { f = JSON.parse(ev.data); } catch (e) { return; }
+    fsFrame(f);
+  };
+  ws.onclose = function(){
+    if (ws !== fsWs) return;
+    fsWs = null; fsOpen = false;
+    if (fsPingTimer) { clearInterval(fsPingTimer); fsPingTimer = null; }
+    paintStatus(false);
+    for (var q in fsReqs) { fsReqs[q]({ ok: false, status: 0 }); }
+    fsReqs = {};
+    fsSchedule();
+  };
+  ws.onerror = function(){};
+}
+/* Kinds worth acting on after the fact. A call offer from an hour ago
+   is not; a family update or an admin request is. */
+var FS_LASTING = ["roster", "addreq", "usage", "hello"];
+function fsFrame(f){
+  if (f.k === "msg") {
+    fsSetSince(f.time);
+    if (Date.now() - f.time > 120000) {
+      var inner; try { inner = JSON.parse(f.body); } catch (e) { return; }
+      if (!inner || FS_LASTING.indexOf(inner.t) === -1) { seen[f.id] = 1; return; }
+    }
+    dispatch({ event: "message", id: f.id, time: Math.floor(f.time / 1000),
+               topic: sigTopic(state.me), message: f.body }, false);
+  } else if (f.k === "ring") {
+    dispatch({ event: "message", id: f.id, time: Math.floor(f.time / 1000),
+               topic: ringTopic(state.me), title: f.title, message: f.body }, false);
+  } else if (f.k === "pres") {
+    fsTakePres(f); paintPresence();
+  } else if (f.k === "presall") {
+    (f.list || []).forEach(fsTakePres); paintPresence();
+  } else if (f.k === "res" && fsReqs[f.q]) {
+    var done = fsReqs[f.q]; delete fsReqs[f.q]; done(f);
+  }
+}
+function fsTakePres(p){
+  if (!p || !p.id || p.id === state.me || !memberById(p.id)) return;
+  PRES[p.id] = { s: p.s, at: p.at || Date.now() };
+}
+/* A request that expects an answer. Over the live connection when it is
+   up (cheapest and fastest), otherwise one plain HTTP request - which is
+   also what a page that is closing uses, since it can still finish. */
+function fsRequest(frame, timeout, keepalive){
+  if (fsOpen && fsWs && !keepalive) {
+    return new Promise(function(resolve){
+      var q = "q" + (++fsSeq);
+      frame.q = q;
+      var t = setTimeout(function(){
+        if (fsReqs[q]) { delete fsReqs[q]; resolve({ ok: false, status: 0 }); }
+      }, timeout || 10000);
+      fsReqs[q] = function(res){ clearTimeout(t); resolve(res); };
+      try { fsWs.send(JSON.stringify(frame)); }
+      catch (e) { delete fsReqs[q]; clearTimeout(t); resolve({ ok: false, status: 0 }); }
+    });
+  }
+  var body = {}; for (var k in frame) body[k] = frame[k];
+  body.me = state.me;
+  var opts = { method: "POST", headers: { "Content-Type": "application/json" },
+               body: JSON.stringify(body) };
+  if (keepalive) opts.keepalive = true;
+  return netFetch(fsBase() + "/send", opts, keepalive ? 1 : 3)
+    .then(function(r){
+      return r.ok ? r.json() : { ok: false, status: r.status };
+    })
+    .catch(function(){ return { ok: false, status: 0 }; });
+}
+function fsSendPres(){
+  if (!fsOpen || !fsWs) return;
+  var s = (state && state.presOff) ? "off" : fsPres;
+  try { fsWs.send(JSON.stringify({ k: "pres", s: s })); } catch (e) {}
+}
+
+/* ---- notifications on this device (Web Push through sw.js) ---- */
+var fsPushState = "unknown";     /* on | off | blocked | nosw | unsupported | needhome */
+function isStandalone(){
+  return !!(window.navigator.standalone ||
+            (window.matchMedia && matchMedia("(display-mode: standalone)").matches));
+}
+function fsSwReg(){
+  if (!("serviceWorker" in navigator)) return Promise.reject(new Error("nosw"));
+  return navigator.serviceWorker.register("sw.js").then(function(){
+    return navigator.serviceWorker.ready;
+  });
+}
+function fsCheckPush(){
+  if (!useFS()) return Promise.resolve();
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    fsPushState = (isIOS() && !isStandalone()) ? "needhome" : "unsupported";
+    paintFsPush(); return Promise.resolve();
+  }
+  return fsSwReg().then(function(reg){
+    return reg.pushManager.getSubscription();
+  }).then(function(sub){
+    var perm = ("Notification" in window) ? Notification.permission : "default";
+    fsPushState = sub ? "on" : (perm === "denied" ? "blocked" : "off");
+    paintFsPush();
+    return sub;
+  }).catch(function(){ fsPushState = "nosw"; paintFsPush(); });
+}
+function fsSendSub(){
+  if (!useFS() || !("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.getRegistration().then(function(reg){
+    return reg ? reg.pushManager.getSubscription() : null;
+  }).then(function(sub){
+    if (sub) fsRequest({ k: "sub", sub: sub.toJSON() }, 8000);
+  }).catch(function(){});
+}
+function fsEnablePush(){
+  if (!useFS()) return;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    fsPushState = (isIOS() && !isStandalone()) ? "needhome" : "unsupported";
+    paintFsPush();
+    toast(fsPushState === "needhome"
+      ? "On iPhone: add this page to your Home Screen, then open it from there"
+      : "This browser can't show notifications from a page");
+    return;
+  }
+  /* Asked first, inside the tap - iPhones only allow the question then. */
+  var ask = ("Notification" in window && Notification.requestPermission)
+    ? Notification.requestPermission() : Promise.resolve("granted");
+  Promise.resolve(ask).then(function(perm){
+    if (perm === "denied") throw new Error("blocked");
+    return Promise.all([fsSwReg(), fsVapidKey()]);
+  }).then(function(got){
+    var reg = got[0], key = got[1];
+    return reg.pushManager.getSubscription().then(function(old){
+      /* A subscription made for a different server's key is useless. */
+      if (old && old.options && old.options.applicationServerKey &&
+          bytesToB64u(old.options.applicationServerKey) !== key)
+        return old.unsubscribe().then(function(){ return null; });
+      return old;
+    }).then(function(old){
+      return old || reg.pushManager.subscribe({ userVisibleOnly: true,
+                                                applicationServerKey: b64uToBytes(key) });
+    });
+  }).then(function(sub){
+    return fsRequest({ k: "sub", sub: sub.toJSON() }, 8000).then(function(r){
+      if (!r || !r.ok) throw new Error("server");
+      fsPushState = "on"; paintFsPush(); paintNtfyWarn();
+      toast("Call notifications are on for this device");
+    });
+  }).catch(function(e){
+    var m = e && e.message;
+    fsPushState = m === "blocked" ? "blocked" : (m === "nosw" ? "nosw" : fsPushState);
+    paintFsPush();
+    toast(m === "blocked" ? "Notifications are blocked for this site — allow them in the browser's settings"
+        : m === "server" ? "The family server didn't accept it — check the connection and try again"
+        : "Couldn't turn on notifications" + (m ? " (" + m + ")" : ""));
+  });
+}
+function fsVapidKey(){
+  if (fsVapid) return Promise.resolve(fsVapid);
+  return netFetch(fsBase() + "/vapid", {}, 2).then(function(r){ return r.json(); })
+    .then(function(v){ if (!v || !v.key) throw new Error("server"); fsVapid = v.key; return v.key; });
+}
+function paintFsPush(){
+  var box = $("fsPushBlock");
+  if (!box) return;
+  box.style.display = useFS() ? "block" : "none";
+  var el = $("fsPushState"), btn = $("fsPushBtn");
+  if (!el) return;
+  var t = {
+    on: "On. Calls and buzzes reach this device even when the app is closed.",
+    off: "Off. Calls only reach this device while the app is open. Tap the button to turn them on.",
+    blocked: "Blocked. Notifications were refused for this site. Allow them in the browser's " +
+             "site settings (on iPhone: Settings → Notifications → this app), then tap the button again.",
+    nosw: "The helper file sw.js wasn't found next to this page, so notifications can't work. " +
+          "Whoever hosts the app needs to upload sw.js beside index.html.",
+    unsupported: "This browser can't receive notifications from a page. Try Chrome, or Safari on iPhone " +
+                 "from the Home Screen.",
+    needhome: "On iPhone, notifications only work from the Home Screen: tap Share → Add to Home Screen, " +
+              "open the app from there, and tap the button.",
+    unknown: "Checking…"
+  };
+  el.textContent = t[fsPushState] || t.unknown;
+  if (btn) btn.style.display = (fsPushState === "on" || fsPushState === "nosw" ||
+                                fsPushState === "unsupported") ? "none" : "block";
+}
+if ("serviceWorker" in navigator) {
+  /* A notification tapped while the app is already open: go where it
+     points (the answer link, usually) without reloading. */
+  navigator.serviceWorker.addEventListener("message", function(e){
+    var d = e.data || {};
+    if (d.t !== "open" || !d.url) return;
+    var i = String(d.url).indexOf("#");
+    if (i === -1) return;
+    history.replaceState(null, "", location.pathname);
+    location.hash = String(d.url).slice(i);
+  });
+}
+
+function ringPush(memberId, title, message, answerable, kind){
   /* Where tapping the notification (or its Answer button) goes.
      It used to be the bare page address - and the browser that opens
      it is often not the one this family was set up in (the Home Screen
@@ -1016,6 +1300,12 @@ function ringPush(memberId, title, message, answerable){
   var join = home.indexOf("#") === -1 ? "#" : "&";
   var fromNote = home + join + "n=1";
   var answerIt = fromNote + "&ans=1";
+  if (useFS()) {
+    return fsRequest({ k: "ring", to: memberId, title: title, body: message,
+                       url: fromNote, answer: answerable ? answerIt : null,
+                       kind: kind || (answerable ? "call" : "buzz"),
+                       tag: (answerable && call && call.peer === memberId) ? call.id : null }, 15000);
+  }
   var base = srv() + "/" + encodeURIComponent(ringTopic(memberId))
            + "?title="  + encodeURIComponent(title)
            + "&priority=5&tags=telephone_receiver"
@@ -1052,6 +1342,14 @@ function ringPush(memberId, title, message, answerable){
    with nothing on screen to explain why. */
 function sendSig(memberId, obj, extra){
   var body = JSON.stringify(obj);
+  if (extra && extra.viaFs) {
+    return netFetch(String(extra.viaFs).replace(/\/+$/, "") + "/f/" + encodeURIComponent(state.house) + "/send",
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ me: state.me, k: "send", to: memberId, body: body }) }, 3)
+      .then(function(r){ return { ok: r.ok, status: r.status }; });
+  }
+  if (useFS() && !(extra && extra.via === "ntfy"))
+    return fsRequest({ k: "send", to: memberId, body: body }, 10000, !!(extra && extra.keepalive));
   var url  = srv() + "/" + encodeURIComponent(sigTopic(memberId))
            + "?priority=1" + authParam();
 
@@ -1067,7 +1365,10 @@ function sendSig(memberId, obj, extra){
   for (i = 0; i < body.length; i += MAXBODY) parts.push(body.slice(i, i + MAXBODY));
   var chain = Promise.resolve();
   parts.forEach(function(p, idx){
-    chain = chain.then(function(){
+    chain = chain.then(function(prev){
+      /* A refused piece makes the rest useless - and its refusal is
+         what the caller needs to see, not the last piece's result. */
+      if (prev && prev.ok === false) return prev;
       return netFetch(url, { method:"POST", body: JSON.stringify({
         t:"chunk", k:key, i:idx, n:parts.length, d:p }) }, 5);
     });
@@ -1088,6 +1389,7 @@ function sendSig(memberId, obj, extra){
  * Every request also has a time limit. On a weak or filtered network a
  * request can hang for minutes without failing, which is what made
  * the page look suspended. */
+var quotaHitAt = 0;
 function netFetch(url, opts, tries){
   tries = tries || 1;
   var delay = 800;
@@ -1103,7 +1405,17 @@ function netFetch(url, opts, tries){
   function attempt(left){
     return once().then(function(r){
       if (r.ok || left <= 1) return r;
-      if (r.status === 429 || r.status >= 500) {
+      if (r.status === 429) {
+        /* ntfy says which 429 it is. "Daily quota reached" (42908) does
+           not clear in seconds, so retrying only made the caller wait
+           ~12 seconds for the same answer. "Too many requests" (42901)
+           does clear quickly, so that one is still retried. */
+        return r.clone().text().then(function(t){
+          if (/42908|daily/i.test(t)) { quotaHitAt = Date.now(); return r; }
+          return wait().then(function(){ return attempt(left - 1); });
+        }, function(){ return wait().then(function(){ return attempt(left - 1); }); });
+      }
+      if (r.status >= 500) {
         return wait().then(function(){ return attempt(left - 1); });
       }
       return r;
@@ -1158,12 +1470,14 @@ function topicsPath(){
 }
 
 function streamLive(){
+  if (useFS()) return fsOpen && Date.now() - lastBeatAt < 75000;
   if (mode === "poll") return Date.now() - lastPollAt < 60000;
   return !!(stream && stream.readyState === 1 &&
             Date.now() - lastBeatAt < 110000);
 }
 
 function closeStreams(){
+  fsClose();
   if (stream) { try { stream.close(); } catch (e) {} stream = null; }
   if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
@@ -1180,6 +1494,7 @@ function dispatch(m, catchingUp){
 function openStreams(){
   if (!state || !state.me) return;
   closeStreams();
+  if (useFS()) { fsConnect(); return; }
   if (upgradeTimer) { clearTimeout(upgradeTimer); upgradeTimer = null; }
 
   if (mode === "poll" || !window.EventSource) {
@@ -1316,7 +1631,7 @@ function onRingMsg(m){
    sent - by which time a live stream alone has already missed it.
    ntfy keeps recent messages, so ask for the last two minutes. */
 function pollSignal(){
-  if (!state || !state.me) return;
+  if (!state || !state.me || useFS()) return;
   netFetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
         + "/json?poll=1&since=2m" + authParam(), {}, 2)
     .then(function(r){ return r.ok ? r.text() : ""; })
@@ -1363,9 +1678,10 @@ function paintStatus(live){
              (typeof presRecvErr !== "undefined" && presRecvErr === "busy");
   paintStatus.live = !!live;
   el.querySelector("span:last-child").textContent =
-    !live ? "Not connected to " + srv() + " — check Settings → Connection"
-    : busy ? "ntfy.sh daily limit reached on this internet connection — status and calls may fail until it resets"
+    !live ? "Not connected to " + netName() + " — check Settings → Connection"
+    : (busy && !useFS()) ? "ntfy.sh daily limit reached on this internet connection — status and calls may fail until it resets"
     : "Ready for calls";
+  if ($("setupSheet") && $("setupSheet").classList.contains("on")) paintFsAdmin();
 }
 
 /* ==================================================================== *
@@ -1568,7 +1884,7 @@ function b64uToBytes(str){
 function familyString(f){
   return JSON.stringify([f.house, f.members, f.turn || null, f.turn2 || null,
                          f.route || null, f.server || null, f.token || null,
-                         f.rev || 0, f.admin || null]);
+                         f.rev || 0, f.admin || null, f.fs || null]);
 }
 
 /* Signing needs the key, not the title: a phone handing the family over
@@ -1828,6 +2144,7 @@ function takeSignedFamily(fam){
   state.route = fam.route || null;
   state.server = fam.server || null;
   state.token = fam.token || null;
+  state.fs = fam.fs || null;
   state.admin = fam.admin;
   /* Handed over: the key belongs to the new admin now. */
   /* A signed update that names someone else as admin, arriving from
@@ -1852,6 +2169,7 @@ function takeSignedFamily(fam){
   if (state.me) {
     openStreams();
     pollPresence();
+    if (useFS()) fsCheckPush().then(paintNtfyWarn);
     if (!wasAdmin && isAdmin()) toast("You manage this family now");
     else toast("Family settings updated by " + nameOf(state.admin.id));
   } else toast("You were removed from the family");
@@ -1861,7 +2179,8 @@ function takeSignedFamily(fam){
    their secrets stay hidden - no Show button. */
 var ADMIN_ONLY = ["myName", "swatches", "members", "addMember", "saveSetup",
                   "inviteBlock", "serverUrl", "saveServer", "tokenVal", "saveToken",
-                  "turnUrl", "turnUser", "turnPass", "saveTurn", "turn2Url", "saveTurn2"];
+                  "turnUrl", "turnUser", "turnPass", "saveTurn", "turn2Url", "saveTurn2",
+                  "fsUrl", "fsSave", "fsStop"];
 
 function applyLock(){
   var locked = managedByOther();
@@ -2498,6 +2817,10 @@ function startCall(peerId){
      page takes seconds; the offer is ready well inside that time, so
      the ring and the call setup now overlap instead of queueing. */
   var micP = micStream().then(function(stream){
+    if (call && call.state === "calling") {
+      setCallState("Connecting…");
+      $("callNote").textContent = "";
+    }
     if (call && call.out && !call.ringP) {
       call.rang = true;
       call.ringP = ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true);
@@ -2525,7 +2848,17 @@ function startCall(peerId){
                                  sentAt: Date.now(), relay: !!call.forcedRelay,
                                  cf: !!call.viaCloudflare,
                                  sdp: call.pc.localDescription.sdp })
-          .then(function(r){ if (call) call.offerSent = true; return r; });
+          .then(function(r){
+            /* Refused: the call never left this phone. It used to go on
+               to show "Ringing..." for 45 seconds regardless. */
+            if (!r || !r.ok) {
+              var e = new Error("offer refused");
+              e.refused = r ? r.status : 0;
+              throw e;
+            }
+            if (call) call.offerSent = true;
+            return r;
+          });
       });
     })
     .then(function(){
@@ -2547,16 +2880,23 @@ function startCall(peerId){
       (call.ringP || ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true))
         .then(function(r){
           if (r && r.ok) return;
+          if (r && (r.status === "nosub" || r.status === "pushfail")) {
+            if (call) $("callNote").textContent = r.status === "nosub"
+              ? nameOf(peerId) + " hasn't turned on call notifications, so their phone " +
+                "only rings if the app is open"
+              : "Their phone's notification service didn't accept the ring — " +
+                "it only rings if their app is open";
+            return;
+          }
           var why = (r && r.status === 429)
-            ? (state.token ? "the notification server is overloaded"
-                           : "add your ntfy token in Settings to fix this")
+            ? "the ntfy.sh daily limit for this internet connection is used up"
             : "the server answered " + (r ? r.status : "?");
           if (call) $("callNote").textContent =
             "Their phone will not ring — " + why;
         })
         .catch(function(){
           if (call) $("callNote").textContent =
-            "Their phone will not ring — cannot reach " + srv()
+            "Their phone will not ring — cannot reach " + netName()
             + " from this network";
         });
       call.logAt = logCall(peerId, "out", "calling", { cid: call.id }).at;
@@ -2572,6 +2912,18 @@ function startCall(peerId){
       }, 45000);
     })
     .catch(function(err){
+      if (err && err.refused !== undefined && call) {
+        stopTone();
+        setCallState("Call not sent");
+        $("callNote").textContent = (err.refused === 429 && !useFS())
+          ? "The notification server refused it: the ntfy.sh daily limit for this " +
+            "internet connection is used up. Try again later, or from mobile data."
+          : err.refused
+            ? "The notification server refused it (" + err.refused + "). Try again in a moment."
+            : "Couldn't reach " + netName() + " from this network.";
+        setTimeout(function(){ if (call) hangUp("failed"); }, 5000);
+        return;
+      }
       toast(callError(err, "start"));
       hangUp("failed");
     });
@@ -2651,6 +3003,7 @@ function onSignal(msg){
     }
     if (call && call.id === msg.call) return;       /* same call, seen again */
     if ((state.missedIds || []).indexOf(msg.call) !== -1) return;   /* dealt with */
+    if (call && call.ending) hangUp(null);          /* the last one is over */
     if (call) {
       sendSig(msg.from, { t:"busy", call: msg.call, from: state.me });
       return;
@@ -2762,7 +3115,13 @@ function onSignal(msg){
     if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
     /* The line goes dead now; the words stay up just long enough to read. */
     if (call.pc) { try { call.pc.close(); } catch (e) {} }
-    setTimeout(function(){ hangUp(null); }, 700); return;
+    /* Marked as over at once. Caught-up messages arrive together, and
+       the NEXT call's offer used to land inside these 700 ms and be
+       answered "busy" - so opening the app to answer a second call
+       after a missed first one refused it. */
+    call.ending = true;
+    var endingId = call.id;
+    setTimeout(function(){ if (call && call.id === endingId) hangUp(null); }, 700); return;
   }
 }
 
@@ -2828,6 +3187,15 @@ function answer(){
 }
 
 function hangUp(why){
+  if (call && call.out && call.rang && call.state !== "connected" && why !== "busy" &&
+      useFS()) {
+    /* Their "is calling" notification becomes "missed call" instead of
+       ringing on for nobody. Same tag, so it replaces rather than adds. */
+    fsRequest({ k: "ring", to: call.peer, kind: "missed", tag: call.id,
+                title: "Missed call", body: nameOf(state.me) + " tried to call you",
+                url: location.origin + location.pathname + "#n=1" }, 8000,
+              why === "ended" && document.visibilityState === "hidden");
+  }
   stopTone();
   releaseAwake();
   if (speakerOn || boost) { speakerOn = false; setBoost(false); }
@@ -3546,13 +3914,17 @@ function stopTone(){ if (toneStop) { toneStop(); toneStop = null; } }
 function buzz(memberId, message){
   ringPush(memberId, nameOf(state.me) + " is buzzing you", message)
     .then(function(r){
+      if (r && r.status === "nosub") {
+        toast(nameOf(memberId) + " hasn't turned on notifications — they'll only see it with the app open");
+        return;
+      }
       if (!r.ok) throw new Error("http");
       toast("Buzzed " + nameOf(memberId) + " 🔔");
       logBuzz(memberId, "out", message);
       ledgerAdd(function(m){ m.buzz++; });
     })
     .catch(function(){
-      toast("Could not reach " + srv() + " — this network is blocking it");
+      toast("Could not reach " + netName() + " — this network is blocking it");
     });
 }
 
@@ -4069,6 +4441,8 @@ function openSetup(){
   if (state) { safe(paintInvites);
                safe(function(){ $("mineLink").textContent = maskLink(personalLink()); }); }
   safe(paintAdmin);
+  safe(paintFsAdmin);
+  if (useFS()) fsCheckPush();
   safe(applyLock);
   openSheet("setupSheet");
 }
@@ -4345,7 +4719,8 @@ function paintNotifyState(){
 function paintNtfyWarn(){
   var el = $("ntfywarn");
   if (el) el.style.display = "none";
-  var needed = !!(state && state.me && !state.ntfy);
+  var needed = !!(state && state.me &&
+    (useFS() ? (fsPushState !== "on" && fsPushState !== "unknown") : !state.ntfy));
   var dot = $("setDot");
   if (dot) dot.style.display = needed ? "block" : "none";
   var note = $("ntfyNote");
@@ -4488,7 +4863,7 @@ function saveSetup(){
  * Instead the change is pushed to each person's signal topic. It rides
  * a revision number so the newest edit wins and an older phone coming
  * back online cannot undo it. */
-function broadcastRoster(onlyId){
+function broadcastRoster(onlyId, route){
   if (!state || !state.me) return;
   /* Only the admin speaks for a managed family. */
   if (managedByOther() && !canSign()) return;
@@ -4502,13 +4877,14 @@ function broadcastRoster(onlyId){
     var plain = { t:"roster", from: state.me, rev: state.rev || 0,
                   members: view, turn: state.turn || null,
                   turn2: state.turn2 || null, route: state.route || null,
-                  server: srv(), token: state.token || null };
-    if (!canSign()) { sendSig(m.id, plain).catch(function(){}); return; }
+                  server: srv(), token: state.token || null,
+                  fs: state.fs || null };
+    if (!canSign()) { sendSig(m.id, plain, route).catch(function(){}); return; }
     signFamily(view).then(function(signed){
       /* The plain fields ride along for phones not updated yet; updated
          phones in a managed family read only the signed copy. */
       if (signed) { plain.fam = signed.fam; plain.sig = signed.sig; }
-      sendSig(m.id, plain).catch(function(){});
+      sendSig(m.id, plain, route).catch(function(){});
     });
   });
 }
@@ -4619,7 +4995,7 @@ function takeAddRequest(msg){
 /* The admin's phone may have been off when a request came in. ntfy
    keeps messages for hours, so look back when the app opens. */
 function adminCatchUp(){
-  if (!isAdmin()) return;
+  if (!isAdmin() || useFS()) return;
   netFetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
         + "/json?poll=1&since=12h" + authParam(), {}, 2)
     .then(function(r){ return r.ok ? r.text() : ""; })
@@ -4639,7 +5015,7 @@ function adminCatchUp(){
    newly added people especially, whose phone didn't exist yet. Look
    back for the newest one; older ones are ignored by their version. */
 function rosterCatchUp(){
-  if (!state || !state.me || !managedByOther()) return;
+  if (!state || !state.me || !managedByOther() || useFS()) return;
   netFetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
         + "/json?poll=1&since=12h" + authParam(), {}, 2)
     .then(function(r){ return r.ok ? r.text() : ""; })
@@ -4680,7 +5056,7 @@ function takeRoster(msg){
     var f;
     try { f = JSON.parse(msg.fam); } catch (e) { return; }
     var fam = { house: f[0], members: f[1], turn: f[2], turn2: f[3], route: f[4],
-                server: f[5], token: f[6], rev: f[7], admin: f[8] };
+                server: f[5], token: f[6], rev: f[7], admin: f[8], fs: f[9] || null };
     if (fam.house !== state.house || !fam.admin) return;
     /* Trusted key: the one we already know, or - for a family that has
        no admin yet - the one this first signed update introduces. */
@@ -4708,6 +5084,7 @@ function takeRoster(msg){
   if (msg.route === "auto" || msg.route === "cloudflare") state.route = msg.route;
   if (msg.server) state.server = (msg.server === DEFAULT_SERVER) ? null : msg.server;
   if (msg.token) state.token = msg.token;
+  if (msg.fs !== undefined) state.fs = msg.fs || null;
 
   /* If this phone's person is no longer on the list, they have been
      removed. Better to say so than to sit on a topic nobody calls. */
@@ -4806,7 +5183,8 @@ function tryJoin(){
             usage: same ? prev.usage : undefined,
             server: older ? (prev.server || null) : (cfg.s || null),
             token:  older ? (prev.token || cfg.k || null)
-                          : (cfg.k || (same && prev.token) || null) };
+                          : (cfg.k || (same && prev.token) || null),
+            fs:     older ? (prev.fs || null) : (cfg.fs || null) };
   if (state.adminKey === undefined) delete state.adminKey;
   if (akey && (!named || named[1] === state.me)) takeAdminKey(akey[1]);
 
@@ -4921,6 +5299,18 @@ $("ntfyfix").onclick = function(){ openSetup(); };
    with which half is not working. */
 $("checkConn").onclick = function(){
   var el = $("connState");
+  if (useFS()) {
+    el.textContent = "Checking…";
+    var t0 = Date.now();
+    netFetch(fsBase() + "/ping", {}, 1).then(function(r){ return r.json(); }).then(function(j){
+      if (!j || !j.ok) throw new Error("x");
+      el.textContent = "Working — the family server answered in " + (Date.now() - t0) +
+        " ms" + (fsOpen ? ", and this device is connected live." : ". Live connection: reconnecting…");
+    }).catch(function(){
+      el.textContent = "Cannot reach the family server (" + netName() + ") from this network.";
+    });
+    return;
+  }
   el.textContent = "Checking…";
   var started = Date.now();
   var timer = setTimeout(function(){
@@ -5043,8 +5433,11 @@ $("notifyBtn").onclick = function(){
 
 $("testMe").onclick = function(){
   if (!state || !state.me) { toast("Save first"); return; }
-  ringPush(state.me, "Test", "If your phone buzzed, you are set up")
-    .then(function(){ toast("Test sent"); })
+  ringPush(state.me, "Test", "If your phone buzzed, you are set up", false, "test")
+    .then(function(r){
+      if (useFS() && r && r.status === "nosub") toast("Turn on call notifications first (button above)");
+      else toast("Test sent");
+    })
     .catch(function(){ toast("Could not send"); });
 };
 $("saveTurn").onclick = function(){
@@ -5350,6 +5743,7 @@ function deviceInfo(){
   var perm = null;
   try { perm = ("Notification" in window) ? Notification.permission : null; } catch (e) {}
   return { v: VERSION, ntfy: !!(state && state.ntfy), notif: perm,
+           push: fsPushState === "on",
            ios: isIOS(), home: !!(window.navigator.standalone ||
              (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) };
 }
@@ -5390,7 +5784,7 @@ function takeUsage(msg){
   });
   var info = null;
   if (msg.info && typeof msg.info === "object") {
-    info = { v: String(msg.info.v || "").slice(0, 20),
+    info = { v: String(msg.info.v || "").slice(0, 20), push: !!msg.info.push,
              ntfy: !!msg.info.ntfy, ios: !!msg.info.ios, home: !!msg.info.home,
              notif: ["granted", "denied", "default"].indexOf(msg.info.notif) !== -1 ? msg.info.notif : null };
   }
@@ -5463,7 +5857,8 @@ function paintOverview(){
     if (info) {
       chip(info.v === VERSION ? "Up to date" : "Old version " + (info.v || "?"),
            info.v === VERSION ? "ok" : "warn");
-      chip(info.ntfy ? "ntfy set up" : "ntfy not set up", info.ntfy ? "ok" : "bad");
+      if (useFS()) chip(info.push ? "Notifications on" : "Notifications off", info.push ? "ok" : "bad");
+      else chip(info.ntfy ? "ntfy set up" : "ntfy not set up", info.ntfy ? "ok" : "bad");
       if (info.notif === "denied") chip("Page alerts blocked", "warn");
       if (info.ios && !info.home) chip("Not on Home Screen", "warn");
     } else chip("No report yet — opens with the next version", "");
@@ -5542,6 +5937,63 @@ $("famUsageCsv").onclick = function(){
   a.download = "family-usage.csv";
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+};
+
+/* ------------------------------------------------ family server setup */
+function paintFsAdmin(){
+  if (!$("fsUrl")) return;
+  var on = !!(state && state.fs);
+  if (document.activeElement !== $("fsUrl")) $("fsUrl").value = (state && state.fs) || "";
+  $("fsStop").style.display = on ? "block" : "none";
+  $("fsSave").textContent = on ? "Save family server" : "Use this family server";
+  $("fsState").textContent = !on ? "Not in use — calls go through ntfy.sh."
+    : fsOpen ? "In use and connected." : "In use — connecting…";
+  var nb = $("ntfyRingBlock");
+  if (nb) nb.style.display = useFS() ? "none" : "";
+  paintFsPush();
+}
+$("fsSave").onclick = function(){
+  if (!state || !state.me) { toast("Save your family first"); return; }
+  if (managedByOther()) { toast("Only " + nameOf(state.admin.id) + " can change this"); return; }
+  var u = $("fsUrl").value.trim().replace(/\/+$/, "");
+  if (!/^https:\/\/[A-Za-z0-9.\-]+(:\d+)?$/.test(u) && !/^http:\/\/127\.0\.0\.1:\d+$/.test(u)) {
+    toast("It should look like https://family-server.yourname.workers.dev"); return;
+  }
+  if (u === state.fs) { toast("Already using it"); return; }
+  $("fsState").textContent = "Checking the server…";
+  netFetch(u + "/", {}, 2).then(function(r){ return r.json(); }).then(function(j){
+    if (!j || j.app !== "family-notifier") throw new Error("not");
+    var old = state.fs || null;
+    state.fs = u; fsVapid = null; fsPushState = "unknown";
+    bumpRev(); save();
+    /* Everyone hears about the move over the route they are on NOW -
+       ntfy.sh, or the old family server - and follows it. */
+    broadcastRoster(null, old ? { viaFs: old } : { via: "ntfy" });
+    openStreams(); fsCheckPush(); paintFsAdmin(); paintNtfyWarn(); paintInvites();
+    toast("Switched to the family server — the others follow as their app opens");
+  }).catch(function(){
+    $("fsState").textContent = "That address didn't answer as a family server. Check that it " +
+      "was deployed and that the address is exactly right.";
+  });
+};
+$("fsStop").onclick = function(){
+  if (!state || !state.fs) return;
+  if (managedByOther()) { toast("Only " + nameOf(state.admin.id) + " can change this"); return; }
+  var old = state.fs;
+  state.fs = null; bumpRev(); save();
+  broadcastRoster(null, { viaFs: old });
+  openStreams(); paintFsAdmin(); paintNtfyWarn(); paintInvites();
+  toast("Back on ntfy.sh — the others follow as their app opens");
+};
+$("fsPushBtn").onclick = function(){ fsEnablePush(); };
+$("fsPushTest").onclick = function(){
+  if (!useFS()) return;
+  ringPush(state.me, "Test", "If this appeared, notifications work on this device", false, "test")
+    .then(function(r){
+      toast(r && r.pushed ? "Sent — the notification should appear in a moment"
+          : r && r.status === "nosub" ? "Turn on call notifications first"
+          : "The notification service didn't accept it — turn notifications off and on again");
+    });
 };
 
 /* ------------------------------------------------ settings autosave
@@ -5628,6 +6080,7 @@ function isPresTopic(t){
 }
 function sendPresence(s, force){
   if (!state || !state.me) return;
+  if (useFS()) { if (s !== "off" || force) fsPres = s; fsSendPres(); return; }
   if (state.presOff) s = "off";
   var now = Date.now();
   if (s === presSent.s && (s !== "on" || now - presSent.at < PRES_BEAT_MS) && !force) return;
@@ -5672,6 +6125,7 @@ function takePresence(m){
 /* What is already known - a stream only brings what happens next. */
 var presPolled = false, presPolledAt = 0, presPolledKey = "";
 function pollPresence(force){
+  if (useFS()) return;                 /* the server sends it on connecting */
   var topics = presTopics();
   if (!topics.length) return;
   /* Flicking between apps used to cost a request every time. The live
@@ -5712,6 +6166,14 @@ var presRecvErr = null;
 function PRES_ANY(){ for (var k in PRES) return true; return false; }
 function presenceOf(id){
   var p = PRES[id];
+  /* From the family server, status is a fact rather than a guess: it
+     sees the connection, so there is nothing to time out. */
+  if (useFS()) {
+    if (!p) return { k: "off", text: "Offline" };
+    if (p.s === "on") return { k: "on", text: "Online" };
+    if (p.s === "away") return { k: "away", text: "Away · " + ago(p.at) };
+    return { k: "off", text: "Offline · last seen " + ago(p.at) };
+  }
   /* Nothing heard, and the server is refusing us: saying "Offline"
      would be a guess dressed up as a fact. */
   if (!p && (presRecvErr || presErr === "busy"))
@@ -5809,7 +6271,7 @@ if (state) {
 })();
 readIntent();
 if (!tryJoin()) paintMain();
-if (state && state.me) { openStreams(); }
+if (state && state.me) { openStreams(); if (useFS()) fsCheckPush().then(paintNtfyWarn); }
 
 restoreFromIdb();
 ensureRelay();
@@ -5844,6 +6306,12 @@ setTimeout(function(){
    on every screen-on was a steady drain on the request allowance. */
 function reviveStreams(force){
   if (!state || !state.me) return;
+  if (useFS()) {
+    if (!fsWs || fsWs.readyState > 1 || Date.now() - lastBeatAt > 75000) {
+      fsRetry = 1000; fsConnect();
+    }
+    return;
+  }
   if (mode === "poll") {
     if (force || !pollTimer) pollLoop(false);
     return;
