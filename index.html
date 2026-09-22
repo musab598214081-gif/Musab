@@ -108,6 +108,25 @@
   .qa.ring{background:var(--go);color:#062414}
   .qa:active{transform:scale(.94)}
   .person.me{opacity:.55}
+  /* Online / away / offline, on the avatar and under the name. */
+  .person .dot{position:relative}
+  .pdot{position:absolute;right:-1px;bottom:-1px;width:15px;height:15px;border-radius:50%;
+    border:3px solid var(--hearth);background:#5E6E80}
+  .pdot.on{background:var(--go)} .pdot.away{background:var(--amber)}
+  .person .pres{display:block;font-weight:400;font-size:12px;color:var(--mist);margin-top:1px}
+  .person .pres.on{color:var(--go)} .person .pres.away{color:var(--amber)}
+  /* Who-can-see-whom, in the admin's family list. */
+  .memberrow .cbtn{width:auto;min-width:64px;padding:0 10px;color:var(--mist);
+    font-size:13px;margin-right:8px}
+  .contacts{background:var(--hearth);border-radius:12px;padding:10px 12px;margin:-2px 0 12px}
+  .contacts .seg{display:flex;gap:6px;margin-bottom:8px}
+  .contacts .seg button{flex:1;padding:8px;border-radius:9px;border:1px solid var(--seam);
+    background:transparent;color:var(--paper);font:inherit;font-size:13px;cursor:pointer}
+  .contacts .seg button.sel{background:var(--brass);color:var(--brass-ink);border-color:var(--brass)}
+  .contacts label.ck{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:15px;
+    color:var(--paper);text-transform:none;letter-spacing:0}
+  .contacts label.ck input{width:20px;height:20px;margin:0;flex:0 0 auto}
+  .contacts .hint2{font-size:12px;color:var(--mist);margin-top:6px;line-height:1.4}
 
   .sectiontitle{font-size:15px;color:var(--paper);margin:26px 2px 8px;font-weight:700}
   .sheetbody .sectiontitle{margin-top:28px}
@@ -369,6 +388,23 @@
     <button class="btn" id="saveSetup">Save</button>
     </div>
 
+    <div id="memberAddBlock" style="display:none">
+      <div class="sectiontitle">Add someone</div>
+      <p class="sub">Add a person you want to be in touch with. They are
+        added straight away for you, and join the family as soon as the
+        admin's phone confirms it. They will see only you and the admin
+        until the admin decides otherwise.</p>
+      <input type="text" id="newPersonName" placeholder="Their name" autocomplete="off">
+      <button class="btn" id="newPersonAdd">Add and get their link</button>
+      <div id="pendingList"></div>
+    </div>
+
+    <div id="presBlock" style="display:none">
+      <div class="sectiontitle">Your status</div>
+      <p class="sub" id="presNote"></p>
+      <button class="btn ghost" id="presBtn">—</button>
+    </div>
+
     <div id="shareArea" style="display:none">
       <div id="inviteBlock">
       <div class="sectiontitle">Invite the others</div>
@@ -416,6 +452,26 @@
     <p class="sub" style="margin-top:8px">Your topic, if you ever need to type it by hand:</p>
     <div class="codebox" id="myTopic">—</div>
     <button class="btn ghost" id="copyTopic">Copy topic</button>
+
+    <div id="barkBlock">
+    <div class="sectiontitle">Ring like a call on iPhone (Bark)</div>
+    <p class="sub">
+      ntfy can't keep an iPhone ringing, or ring it on silent. The free app
+      <b>Bark</b> can: calls ring for 30 seconds, even on silent and Do Not
+      Disturb. ntfy keeps working alongside it.
+      <br><br>
+      1 · Install <b>Bark</b> from the App&nbsp;Store and open it.<br>
+      2 · Allow notifications, and allow <b>Critical Alerts</b> when asked
+      (or later: Settings → Apps → Bark → Notifications → Critical Alerts).<br>
+      3 · In Bark, copy the address shown on its first screen — it looks like
+      <b>https://api.day.app/AbCd…</b> — and paste it here.
+    </p>
+    <input type="text" id="barkUrl" placeholder="https://api.day.app/your-key" autocomplete="off" data-secret>
+    <button class="btn" id="barkSave">Save Bark for this iPhone</button>
+    <button class="btn ghost" id="barkTest">Test — this iPhone should ring</button>
+    <button class="btn ghost" id="barkOff">Stop using Bark</button>
+    <p class="sub" style="margin-top:8px" id="barkState">—</p>
+    </div>
 
     <div class="sectiontitle">Microphone</div>
     <p class="sub" id="micState">—</p>
@@ -533,7 +589,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22h";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22j";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -640,7 +696,9 @@ function snapshot(){
            rev: state.rev || 0, turn: state.turn || null,
            turn2: state.turn2 || null, route: state.route || null,
            server: state.server || null, token: state.token || null,
-           tone: state.tone || "classic", ntfy: !!state.ntfy };
+           tone: state.tone || "classic", ntfy: !!state.ntfy,
+           pending: state.pending || [], presOff: !!state.presOff,
+           barkWant: state.barkWant === undefined ? null : state.barkWant };
 }
 
 function b64u(str){
@@ -791,10 +849,75 @@ function memberById(id){
 }
 function nameOf(id){ var m = memberById(id); return m ? m.name : "Someone"; }
 
+/* ------------------------------------------------------ who sees whom
+ *
+ * Each person may carry `c`: the IDs of the people they are in touch
+ * with. No `c` means "everyone" - which is how every family started, so
+ * nothing changes until the admin chooses.
+ *
+ * The admin sees everybody. Everybody else is sent only the people they
+ * are in touch with - the rest are not hidden on their phone, they are
+ * never sent to it at all. The admin's own entry always travels (so the
+ * phone knows who manages it) but is marked `h` when they are not in
+ * touch, and is then not shown or callable. */
+function adminId(){ return (state && state.admin) ? state.admin.id : null; }
+function shown(m){ return !!m && !m.h; }
+function others(){
+  return state.members.filter(function(m){ return m.id !== state.me && shown(m); });
+}
+function cloneMember(m, keepContacts){
+  var o = { id: m.id, name: m.name, colour: m.colour };
+  if (m.bk) o.bk = m.bk;
+  if (keepContacts && m.c) o.c = m.c.slice();
+  if (keepContacts && m.by) o.by = m.by;
+  return o;
+}
+/* The family as `viewer` is allowed to see it. Only meaningful on the
+   admin's phone (or an unmanaged family), which holds the whole list. */
+function viewFor(viewer){
+  var aid = adminId();
+  if (!aid || viewer === aid) {
+    return state.members.map(function(m){ return cloneMember(m, true); });
+  }
+  var v = memberById(viewer);
+  var out = [];
+  state.members.forEach(function(m){
+    var inTouch = !v || !v.c || m.id === viewer || v.c.indexOf(m.id) !== -1;
+    if (m.id === aid) {
+      var a = cloneMember(m, false);
+      if (!inTouch) { a.h = 1; delete a.bk; }
+      out.push(a);
+    } else if (inTouch) {
+      out.push(cloneMember(m, m.id === viewer));
+    }
+  });
+  return out;
+}
+/* What goes inside a link for `id`. The admin knows everyone's view; a
+   member making a link (a call notification, or somebody they added)
+   only puts in the two of them and the admin - the admin's next update
+   fills in the rest. */
+function membersForLink(id, whole){
+  if (whole || !state.admin || isAdmin() || canSign()) return whole
+    ? state.members.map(function(m){ return cloneMember(m, true); })
+    : viewFor(id);
+  if (id === state.me) return state.members;
+  var aid = adminId(), out = [];
+  state.members.forEach(function(m){
+    if (m.id === state.me) out.push(cloneMember(m, false));
+    else if (m.id === id) out.push(cloneMember(m, false));
+    else if (m.id === aid) { var a = cloneMember(m, false); a.h = 1; delete a.bk; out.push(a); }
+  });
+  (state.pending || []).forEach(function(p){
+    if (p.member.id === id && !memberById(id)) out.push(cloneMember(p.member, false));
+  });
+  return out;
+}
+
 /* ------------------------------------------------------- invite link */
 
-function encodeConfig(){
-  var payload = JSON.stringify({ h: state.house, m: state.members,
+function encodeConfig(members){
+  var payload = JSON.stringify({ h: state.house, m: members || state.members,
                                  t: state.turn || null,
                                  t2: state.turn2 || null,
                                  rt: state.route || null,
@@ -820,15 +943,16 @@ function decodeConfig(str){
  * claimed the same person, and calls went to a topic nobody was
  * listening on. A link that arrives already meaning "this is you"
  * removes the choice, and with it the mistake. */
-function linkFor(memberId){
+function linkFor(memberId, whole){
   return location.origin + location.pathname
-       + "#j=" + encodeConfig() + "&m=" + memberId;
+       + "#j=" + encodeConfig(membersForLink(memberId, whole)) + "&m=" + memberId;
 }
 
 /* Still used when a link has to work for whoever opens it - a phone
    being set up by hand, mostly. */
 function inviteLink(){
-  return location.origin + location.pathname + "#j=" + encodeConfig();
+  return location.origin + location.pathname + "#j="
+       + encodeConfig(state.admin ? viewFor(state.me) : null);
 }
 
 /* The same link with your own name baked in. Worth keeping because
@@ -878,6 +1002,8 @@ function ringPush(memberId, title, message, answerable){
     url += "&actions=" + encodeURIComponent(
       "view, Answer, " + answerIt + ", clear=true");
   }
+
+  barkPush(memberId, title, message, fromNote, answerable);
 
   function go(u){
     return netFetch(u, { method:"POST", body: message }, 5).then(function(r){
@@ -1001,7 +1127,8 @@ function beat(){ lastBeatAt = Date.now(); }
 
 function topicsPath(){
   return encodeURIComponent(ringTopic(state.me)) + ","
-       + encodeURIComponent(sigTopic(state.me));
+       + encodeURIComponent(sigTopic(state.me))
+       + presTopics().map(function(t){ return "," + encodeURIComponent(t); }).join("");
 }
 
 function streamLive(){
@@ -1019,6 +1146,7 @@ function closeStreams(){
 function dispatch(m, catchingUp){
   if (!m || m.event !== "message" || !m.id || seen[m.id]) return;
   seen[m.id] = 1;
+  if (isPresTopic(m.topic)) { takePresence(m); return; }
   if (m.topic === sigTopic(state.me)) takeSignal(m.message, m.time);
   else if (!catchingUp) onRingMsg(m);
 }
@@ -1409,9 +1537,14 @@ function familyString(f){
    must still sign the update that announces the new admin. */
 function canSign(){ return !!(state && state.admin && state.adminKey); }
 
-function signFamily(){
+function signFamily(members){
   if (!canSign() || !window.crypto || !crypto.subtle) return Promise.resolve(null);
-  var text = familyString(state);
+  var f = state;
+  if (members) {
+    f = {}; for (var k in state) f[k] = state[k];
+    f.members = members;
+  }
+  var text = familyString(f);
   return crypto.subtle.importKey("jwk", state.adminKey, SIGN_ALG, false, ["sign"])
     .then(function(key){
       return crypto.subtle.sign(SIGN_USE, key, new TextEncoder().encode(text));
@@ -1462,7 +1595,7 @@ function becomeAdmin(quiet){
    what restores admin control on a new phone - and so it is shown only
    as hidden, and copied only on purpose. */
 function adminLink(forId){
-  return linkFor(forId || state.me) + "&ak=" +
+  return linkFor(forId || state.me, true) + "&ak=" +
          b64u(JSON.stringify(state.adminKey));
 }
 
@@ -1668,8 +1801,17 @@ function takeSignedFamily(fam){
   }
   var still = state.members.some(function(m){ return m.id === state.me; });
   if (!still) state.me = null;
+  /* Somebody this phone asked to add is in the family now. */
+  (state.pending || []).forEach(function(p){
+    if (memberById(p.member.id) && !p.done) {
+      p.done = true;
+      toast(p.member.name + " has been added");
+    }
+  });
   save();
   paintMain();
+  paintPending();
+  paintBark();
   if (state.me) {
     openStreams();
     if (!wasAdmin && isAdmin()) toast("You manage this family now");
@@ -1724,6 +1866,12 @@ function applyLock(){
       if (dotsWork) inp.classList.add("masked"); else inp.type = "password";
     });
   }
+  var addBlock = $("memberAddBlock");
+  if (addBlock) addBlock.style.display =
+    (locked && state.admin.id !== state.me) ? "block" : "none";
+  if (locked) paintPending();
+  paintPresBlock();
+  paintBark();
   var note = $("lockNote");
   note.style.display = locked ? "block" : "none";
   if (locked) note.innerHTML = (state.admin.id === state.me && !state.adminKey)
@@ -1731,7 +1879,7 @@ function applyLock(){
       "key yet.</b> Open the hand-over link you were sent on this device, or " +
       "paste it under Family admin below. Until then, settings stay read-only."
     : "<b>" + escapeHtml(nameOf(state.admin.id)) + " manages this family</b> · " +
-      state.members.length + " people. The family's settings are kept on " +
+      others().length + " people you're in touch with. The family's settings are kept on " +
       escapeHtml(nameOf(state.admin.id)) + "'s phone. Here you can set up ringing " +
       "on this phone, choose your ringtone and test calls on this network.";
   $("setupSub").style.display = state ? "none" : "";
@@ -2448,6 +2596,13 @@ function onSignal(msg){
   }
 
   if (msg.t === "roster") { takeRoster(msg); return; }
+  if (msg.t === "addreq") { takeAddRequest(msg); return; }
+  if (msg.t === "setbark") { takeSetBark(msg); return; }
+  /* A phone that has just joined asks the admin for its copy. */
+  if (msg.t === "hello") {
+    if (isAdmin() && memberById(msg.from)) broadcastRoster(msg.from);
+    return;
+  }
 
   if (!call || msg.call !== call.id) return;
 
@@ -2594,6 +2749,7 @@ function hangUp(why){
      Not sent when they told us first (busy, or their own goodbye -
      which arrives here as no reason), or when the offer never left. */
   var theyKnow = call.state !== "calling" || call.offerSent;
+  if (call.out && call.state !== "connected") barkClear(call.peer, call.id);
   if (why && why !== "busy" && theyKnow)
     sendSig(call.peer, { t:"bye", call: call.id, from: state.me },
             { keepalive: true })
@@ -3411,7 +3567,7 @@ function paintMain(){
   hello.textContent = greeting() + ", " + String(nameOf(state.me)).split(/\s+/)[0];
   main.appendChild(hello);
 
-  var others = state.members.filter(function(m){ return m.id !== state.me; });
+  var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
   if (!others.length) {
     var none = document.createElement("p");
     none.className = "hint";
@@ -3423,13 +3579,18 @@ function paintMain(){
     var card = document.createElement("div");
     card.className = "person";
     card.setAttribute("data-who", m.name);
+    card.setAttribute("data-id", m.id);
     card.setAttribute("role", "button");
     card.tabIndex = 0;
     var dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = m.colour;
     dot.textContent = initials(m.name);
+    var pd = document.createElement("span"); pd.className = "pdot";
+    dot.appendChild(pd);
     var nm = document.createElement("span");
     nm.className = "nm"; nm.textContent = m.name;
+    var pr = document.createElement("span"); pr.className = "pres";
+    nm.appendChild(pr);
     var last = lastWith(m.name);
     var sub = document.createElement("span");
     sub.className = "sub" + (last && last.missed ? " missed" : "");
@@ -3473,6 +3634,7 @@ function paintMain(){
   paintRecent();
   paintNtfyWarn();
   paintStatus(streamLive());
+  paintPresence();
 }
 
 function paintCardNotes(){
@@ -3660,26 +3822,87 @@ function paintSwatches(){
   });
 }
 
+var openContacts = null;
+
 function paintMembers(){
   var box = $("members"); box.innerHTML = "";
+  /* Choosing who sees whom needs someone to enforce it - the admin. */
+  var privacy = !!(state && isAdmin());
   draft.members.forEach(function(m, i){
     var row = document.createElement("div"); row.className = "memberrow";
     var inp = document.createElement("input");
     inp.type = "text"; inp.value = m.name;
     inp.placeholder = "Name"; inp.autocomplete = "off";
     inp.oninput = function(){ draft.members[i].name = inp.value; };
+    row.appendChild(inp);
+    if (privacy && m.id !== state.me) {
+      var cb = document.createElement("button");
+      cb.className = "cbtn";
+      cb.textContent = m.c ? "Sees " + m.c.filter(function(id){
+        return draft.members.some(function(d){ return d.id === id && d.id !== m.id; });
+      }).length : "Sees all";
+      cb.setAttribute("aria-label", "Who " + (m.name || "this person") + " can see");
+      cb.onclick = function(){
+        openContacts = openContacts === m.id ? null : m.id; paintMembers();
+      };
+      row.appendChild(cb);
+    }
     var del = document.createElement("button");
     del.textContent = "×";
     del.onclick = function(){ draft.members.splice(i,1); paintMembers(); };
-    row.appendChild(inp); row.appendChild(del); box.appendChild(row);
+    row.appendChild(del); box.appendChild(row);
+    if (privacy && openContacts === m.id) box.appendChild(contactsPanel(m));
   });
+}
+
+/* In touch goes both ways: ticking Grandma for Sam lets Sam see Grandma
+   and Grandma see Sam (unless Grandma is on "Everyone", who sees all
+   anyway). */
+function setInTouch(a, b, on){
+  function put(x, id){
+    if (!x.c) return;
+    var k = x.c.indexOf(id);
+    if (on && k === -1) x.c.push(id);
+    if (!on && k !== -1) x.c.splice(k, 1);
+  }
+  put(a, b.id); put(b, a.id);
+}
+
+function contactsPanel(m){
+  var p = document.createElement("div"); p.className = "contacts";
+  var seg = document.createElement("div"); seg.className = "seg";
+  var all = document.createElement("button");
+  all.textContent = "Everyone"; all.className = m.c ? "" : "sel";
+  all.onclick = function(){ delete m.c; paintMembers(); };
+  var some = document.createElement("button");
+  some.textContent = "Only people I choose"; some.className = m.c ? "sel" : "";
+  some.onclick = function(){ if (!m.c) m.c = [state.me]; paintMembers(); };
+  seg.appendChild(all); seg.appendChild(some); p.appendChild(seg);
+  if (m.c) {
+    draft.members.forEach(function(o){
+      if (o.id === m.id || !o.name.trim()) return;
+      var lb = document.createElement("label"); lb.className = "ck";
+      var ck = document.createElement("input"); ck.type = "checkbox";
+      ck.checked = m.c.indexOf(o.id) !== -1;
+      ck.onchange = function(){ setInTouch(m, o, ck.checked); paintMembers(); };
+      lb.appendChild(ck);
+      lb.appendChild(document.createTextNode(o.name + (o.id === state.me ? "  (you)"
+                                                 : o.c ? "" : "  (sees everyone)")));
+      p.appendChild(lb);
+    });
+  }
+  var h = document.createElement("p"); h.className = "hint2";
+  h.textContent = (m.name || "They") + " only gets the people ticked here — the others " +
+    "are never sent to their phone. You always see everyone. Press Save to send it.";
+  p.appendChild(h);
+  return p;
 }
 
 function paintInvites(){
   var box = $("inviteList");
   if (!box || !state) return;
   box.innerHTML = "";
-  var others = state.members.filter(function(m){ return m.id !== state.me; });
+  var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
 
   if (!others.length) {
     var p = document.createElement("p");
@@ -3875,6 +4098,14 @@ function saveSetup(){
   /* Chosen with its own buttons while this form was open - the form's
      copy predates the choice, so it must not put the old one back. */
   draft.route = (state && state.route) || draft.route || null;
+  /* People removed from the list come out of everyone's contacts too. */
+  var ids = draft.members.map(function(m){ return m.id; });
+  draft.members.forEach(function(m){
+    if (m.c) m.c = m.c.filter(function(id){ return ids.indexOf(id) !== -1 && id !== m.id; });
+  });
+  draft.pending = (state && state.pending) || [];
+  draft.presOff = !!(state && state.presOff);
+  if (state && state.barkWant !== undefined) draft.barkWant = state.barkWant;
   state = draft;
   bumpRev();
   save();
@@ -3900,27 +4131,177 @@ function saveSetup(){
  * Instead the change is pushed to each person's signal topic. It rides
  * a revision number so the newest edit wins and an older phone coming
  * back online cannot undo it. */
-function broadcastRoster(){
+function broadcastRoster(onlyId){
   if (!state || !state.me) return;
   /* Only the admin speaks for a managed family. */
   if (managedByOther() && !canSign()) return;
-  var plain = { t:"roster", from: state.me, rev: state.rev || 0,
-                members: state.members, turn: state.turn || null,
-                turn2: state.turn2 || null, route: state.route || null,
-                server: srv(), token: state.token || null };
-  var send = function(msg){
-    state.members.forEach(function(m){
-      if (m.id === state.me) return;
-      sendSig(m.id, msg).catch(function(){});
+  /* Each person gets their own copy, holding only the people they are
+     in touch with - see viewFor. One copy for everybody would put the
+     whole family on every phone, which is what privacy rules out. */
+  state.members.forEach(function(m){
+    if (m.id === state.me || (onlyId && m.id !== onlyId)) return;
+    var view = viewFor(m.id);
+    var plain = { t:"roster", from: state.me, rev: state.rev || 0,
+                  members: view, turn: state.turn || null,
+                  turn2: state.turn2 || null, route: state.route || null,
+                  server: srv(), token: state.token || null };
+    if (!canSign()) { sendSig(m.id, plain).catch(function(){}); return; }
+    signFamily(view).then(function(signed){
+      /* The plain fields ride along for phones not updated yet; updated
+         phones in a managed family read only the signed copy. */
+      if (signed) { plain.fam = signed.fam; plain.sig = signed.sig; }
+      sendSig(m.id, plain).catch(function(){});
     });
-  };
-  if (!canSign()) { send(plain); return; }
-  signFamily().then(function(signed){
-    /* The plain fields ride along for phones not updated yet; updated
-       phones in a managed family read only the signed copy. */
-    if (signed) { plain.fam = signed.fam; plain.sig = signed.sig; }
-    send(plain);
   });
+}
+
+/* ------------------------------------------- a member adds somebody
+ *
+ * A member can't sign the family, so they can't change it - but they
+ * can ask. The new person is made on their phone (so a link can be sent
+ * straight away), and the request goes to the admin's phone, which adds
+ * them in touch with the member who asked, and with the admin. Nothing
+ * else a member sends can touch the admin's settings. */
+function addPersonAsMember(){
+  if (!managedByOther()) return;
+  var inp = $("newPersonName"), name = inp.value.trim().slice(0, 40);
+  if (!name) { toast("Type their name first"); return; }
+  var m = newMember(name);
+  state.pending = state.pending || [];
+  state.pending.push({ member: m, sentAt: 0 });
+  inp.value = "";
+  save();
+  sendAddRequest(state.pending[state.pending.length - 1]);
+  paintPending();
+  var url = linkFor(m.id);
+  if (navigator.share)
+    navigator.share({ title: "Family Notifier — " + m.name, url: url }).catch(function(){});
+  else copy(url, "Link for " + m.name + " copied — send it to them");
+}
+
+function sendAddRequest(p){
+  if (!state.admin) return;
+  p.sentAt = Date.now(); save();
+  sendSig(state.admin.id, { t:"addreq", from: state.me, member: p.member })
+    .catch(function(){});
+}
+
+/* Requests the admin has not answered are sent again, at most hourly,
+   in case the admin's phone was off for longer than the server keeps
+   messages. */
+function resendPending(){
+  if (!state || !state.pending || !managedByOther()) return;
+  state.pending.forEach(function(p){
+    if (!memberById(p.member.id) && Date.now() - (p.sentAt || 0) > 3600000)
+      sendAddRequest(p);
+  });
+}
+
+function paintPending(){
+  var box = $("pendingList");
+  if (!box || !state) return;
+  box.innerHTML = "";
+  (state.pending || []).forEach(function(p, i){
+    var m = p.member, done = !!memberById(m.id);
+    var row = document.createElement("div"); row.className = "invrow";
+    var dot = document.createElement("span");
+    dot.className = "dot"; dot.style.background = m.colour; dot.textContent = initials(m.name);
+    var nm = document.createElement("span"); nm.className = "nm";
+    nm.textContent = m.name;
+    var st = document.createElement("span");
+    st.style.cssText = "display:block;font-size:12px;color:var(--mist)";
+    st.textContent = done ? "Added" : "Waiting for " + nameOf(state.admin.id) + "'s phone";
+    nm.appendChild(st);
+    var send = document.createElement("button");
+    send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
+    send.onclick = function(){
+      var url = linkFor(m.id);
+      if (navigator.share) navigator.share({ title: "Family Notifier — " + m.name, url: url })
+                                    .catch(function(){});
+      else copy(url, "Link for " + m.name + " copied");
+    };
+    var cp = document.createElement("button");
+    cp.className = "mini"; cp.innerHTML = ICON.copy + "<span>Copy</span>";
+    cp.onclick = function(){ copy(linkFor(m.id), "Link for " + m.name + " copied"); };
+    row.appendChild(dot); row.appendChild(nm); row.appendChild(send); row.appendChild(cp);
+    if (done) {
+      var ok = document.createElement("button");
+      ok.className = "mini"; ok.textContent = "×";
+      ok.setAttribute("aria-label", "Clear");
+      ok.onclick = function(){ state.pending.splice(i, 1); save(); paintPending(); };
+      row.appendChild(ok);
+    }
+    box.appendChild(row);
+  });
+}
+
+/* On the admin's phone: a member asking to add somebody. */
+function takeAddRequest(msg){
+  if (!isAdmin() || !msg.member) return;
+  var from = memberById(msg.from);
+  if (!from || from.id === state.me) return;
+  var id = String(msg.member.id || "");
+  var name = String(msg.member.name || "").trim().slice(0, 40);
+  if (!name || !/^[a-z0-9]{4,12}$/.test(id)) return;
+  if (memberById(id)) { broadcastRoster(from.id); broadcastRoster(id); return; }
+  var colour = COLOURS.indexOf(msg.member.colour) !== -1 ? msg.member.colour : COLOURS[0];
+  var added = { id: id, name: name, colour: colour, c: [from.id, state.me], by: from.id };
+  state.members.push(added);
+  if (from.c && from.c.indexOf(id) === -1) from.c.push(id);
+  /* Settings open on this phone right now: its copy must learn of them
+     too, or pressing Save there would remove the person just added. */
+  if (draft && draft !== state && draft.members && $("setupSheet").classList.contains("on")) {
+    draft.members.push(JSON.parse(JSON.stringify(added)));
+    var df = null;
+    draft.members.forEach(function(d){ if (d.id === from.id) df = d; });
+    if (df && df.c && df.c.indexOf(id) === -1) df.c.push(id);
+    paintMembers();
+  }
+  bumpRev(); save();
+  broadcastRoster();
+  paintMain(); openStreams();
+  toast(from.name + " added " + name);
+}
+
+/* The admin's phone may have been off when a request came in. ntfy
+   keeps messages for hours, so look back when the app opens. */
+function adminCatchUp(){
+  if (!isAdmin()) return;
+  netFetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
+        + "/json?poll=1&since=12h" + authParam(), {}, 2)
+    .then(function(r){ return r.ok ? r.text() : ""; })
+    .then(function(text){
+      text.split("\n").forEach(function(line){
+        if (!line.trim()) return;
+        var m; try { m = JSON.parse(line); } catch (e) { return; }
+        if (m.event !== "message") return;
+        var msg; try { msg = JSON.parse(m.message); } catch (e) { return; }
+        if (msg && msg.t === "addreq") { seen[m.id] = 1; takeAddRequest(msg); }
+        if (msg && msg.t === "setbark") { seen[m.id] = 1; takeSetBark(msg); }
+      });
+    }).catch(function(){});
+}
+
+/* A member's phone may have been off when the admin's update came -
+   newly added people especially, whose phone didn't exist yet. Look
+   back for the newest one; older ones are ignored by their version. */
+function rosterCatchUp(){
+  if (!state || !state.me || !managedByOther()) return;
+  netFetch(srv() + "/" + encodeURIComponent(sigTopic(state.me))
+        + "/json?poll=1&since=12h" + authParam(), {}, 2)
+    .then(function(r){ return r.ok ? r.text() : ""; })
+    .then(function(text){
+      var best = null;
+      text.split("\n").forEach(function(line){
+        if (!line.trim()) return;
+        var m; try { m = JSON.parse(line); } catch (e) { return; }
+        if (m.event !== "message") return;
+        var msg; try { msg = JSON.parse(m.message); } catch (e) { return; }
+        if (msg && msg.t === "roster" && msg.fam && (!best || (msg.rev || 0) > (best.rev || 0)))
+          best = msg;
+      });
+      if (best) takeRoster(best);
+    }).catch(function(){});
 }
 
 function takeRoster(msg){
@@ -4061,7 +4442,7 @@ function tryJoin(){
 
   if (mine) {
     save();
-    paintMain(); openStreams();
+    paintMain(); openStreams(); sayHello();
     /* Not when a call brought you here - a greeting on top of a ringing
        screen reads like something went wrong. */
     if (!openedFromNote) toast("Welcome back, " + nameOf(mine));
@@ -4074,7 +4455,7 @@ function tryJoin(){
   p.textContent = "You have been invited. Which one are you?";
   main.appendChild(p);
 
-  state.members.forEach(function(mem){
+  state.members.filter(shown).forEach(function(mem){
     var b = document.createElement("button"); b.className = "person";
     var dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = mem.colour;
@@ -4083,7 +4464,7 @@ function tryJoin(){
     b.appendChild(dot); b.appendChild(nm);
     b.onclick = function(){
       state.me = mem.id; save();
-      paintMain(); openStreams();
+      paintMain(); openStreams(); sayHello();
       toast("Welcome, " + mem.name);
       openSetup();
     };
@@ -4465,6 +4846,286 @@ function copy(text, ok){
   else prompt("Copy this:", text);
 }
 
+/* --------------------------------------------------------------- Bark
+ *
+ * Bark is a free iPhone app that rings with iOS's Critical Alerts: it
+ * sounds on silent and through Do Not Disturb, and with call=1 it keeps
+ * ringing for 30 seconds - which ntfy cannot do on an iPhone.
+ *
+ * Each person's Bark address lives on their own entry in the family
+ * list, so it only ever reaches the people they are in touch with (see
+ * viewFor). Whoever holds it can ring that iPhone, so it is treated as a
+ * key: masked, never shown whole.
+ *
+ * The request is a plain form POST with no-cors: a "simple" request, so
+ * the browser needs nothing from Bark's server to send it. The price is
+ * that the answer can't be read - ntfy's result is still what the call
+ * screen reports. */
+var BARK_DEFAULT = "https://api.day.app";
+
+function tidyBark(raw){
+  raw = String(raw || "").trim();
+  if (!raw) return null;
+  if (/^[A-Za-z0-9]{8,64}$/.test(raw)) return BARK_DEFAULT + "/" + raw;
+  var u; try { u = new URL(raw); } catch (e) { return null; }
+  if (u.protocol !== "https:") return null;
+  var key = u.pathname.split("/").filter(Boolean)[0] || "";
+  if (!/^[A-Za-z0-9]{8,64}$/.test(key)) return null;
+  return u.origin + "/" + key;
+}
+
+function barkSend(base, fields){
+  if (!base || !tidyBark(base)) return;
+  var body = new URLSearchParams();
+  Object.keys(fields).forEach(function(k){
+    if (fields[k] !== undefined && fields[k] !== null) body.append(k, String(fields[k]));
+  });
+  try {
+    fetch(base, { method: "POST", mode: "no-cors", body: body, keepalive: true })
+      .catch(function(){});
+  } catch (e) {}
+}
+
+function barkPush(memberId, title, message, link, isCall){
+  var m = memberById(memberId);
+  if (!m || !m.bk) return;
+  var f = { title: title, body: message, group: "Family Notifier", url: link };
+  if (isCall) {
+    f.level = "critical"; f.call = "1"; f.volume = "8";
+    if (call && call.peer === memberId) { f.id = call.id; call.barkSent = true; }
+  } else {
+    f.level = "timeSensitive";
+  }
+  barkSend(m.bk, f);
+}
+
+/* The caller gave up: take the ringing call off their lock screen. */
+function barkClear(memberId, callId){
+  var m = memberById(memberId);
+  if (!m || !m.bk || !callId || !call || !call.barkSent) return;
+  barkSend(m.bk, { id: callId, "delete": "1" });
+}
+
+function myBark(){ var m = state && memberById(state.me); return (m && m.bk) || null; }
+
+/* Setting your own Bark address. The family list is the admin's, so a
+   member asks - and the admin's phone accepts it for the sender's OWN
+   entry only, with nothing else in the message looked at. */
+function setMyBark(bk){
+  if (!state || !state.me) return;
+  var mine = memberById(state.me);
+  if (!mine) return;
+  if (!managedByOther()) {
+    if (bk) mine.bk = bk; else delete mine.bk;
+    delete state.barkWant;
+    bumpRev(); save(); broadcastRoster();
+    paintBark();
+    toast(bk ? "Bark saved — calls to you will ring through it" : "Bark turned off");
+    return;
+  }
+  state.barkWant = bk || "";
+  state.barkSentAt = Date.now();
+  save();
+  sendSig(state.admin.id, { t:"setbark", from: state.me, bk: bk || "" })
+    .catch(function(){});
+  paintBark();
+  toast("Saved — it switches on once " + nameOf(state.admin.id) + "'s phone confirms");
+}
+
+function takeSetBark(msg){
+  if (!isAdmin()) return;
+  var m = memberById(msg.from);
+  if (!m || m.id === state.me) return;
+  var bk = msg.bk ? tidyBark(msg.bk) : null;
+  if (msg.bk && !bk) return;
+  if ((m.bk || null) === bk) { broadcastRoster(m.id); return; }
+  if (bk) m.bk = bk; else delete m.bk;
+  if (draft && draft !== state && draft.members && $("setupSheet").classList.contains("on"))
+    draft.members.forEach(function(d){
+      if (d.id === m.id) { if (bk) d.bk = bk; else delete d.bk; }
+    });
+  bumpRev(); save(); broadcastRoster();
+}
+
+/* A request the admin hasn't confirmed goes again, at most hourly. */
+function resendBark(){
+  if (!state || !managedByOther() || state.barkWant === undefined || state.barkWant === null) return;
+  if ((state.barkWant || null) === myBark()) { delete state.barkWant; save(); return; }
+  if (Date.now() - (state.barkSentAt || 0) < 3600000) return;
+  state.barkSentAt = Date.now(); save();
+  sendSig(state.admin.id, { t:"setbark", from: state.me, bk: state.barkWant || "" })
+    .catch(function(){});
+}
+
+function paintBark(){
+  var el = $("barkState");
+  if (!el || !state || !state.me) return;
+  var have = myBark();
+  var want = (state.barkWant === undefined || state.barkWant === null) ? undefined : (state.barkWant || null);
+  if (want !== undefined && want === have) { delete state.barkWant; save(); want = undefined; }
+  if (want !== undefined) {
+    el.textContent = (want ? "Saved. " : "Turning off. ") + "Waiting for " +
+      nameOf(state.admin.id) + "'s phone to confirm — usually seconds, or next time they open the app.";
+  } else if (have) {
+    el.textContent = "On. Calls to you ring this iPhone through Bark, as well as ntfy.";
+  } else {
+    el.textContent = "Off. Calls to you use ntfy only.";
+  }
+  var inp = $("barkUrl");
+  if (inp && document.activeElement !== inp) inp.value = (want !== undefined ? want : have) || "";
+  $("barkOff").style.display = (have || want) ? "block" : "none";
+}
+
+$("barkSave").onclick = function(){
+  if (!state || !state.me) { toast("Save first"); return; }
+  var bk = tidyBark($("barkUrl").value);
+  if (!bk) { toast("Paste the address from Bark — https://api.day.app/…"); return; }
+  setMyBark(bk);
+};
+$("barkOff").onclick = function(){
+  if (!state || !state.me) return;
+  $("barkUrl").value = "";
+  setMyBark(null);
+};
+/* Rings this iPhone directly from the box - no need to wait for the
+   admin, and the only way to check Critical Alerts were allowed. */
+$("barkTest").onclick = function(){
+  var bk = tidyBark($("barkUrl").value) || myBark();
+  if (!bk) { toast("Paste your Bark address first"); return; }
+  barkSend(bk, { title: "Test call", body: "If this rang on silent, Bark is set up",
+                 level: "critical", call: "1", volume: "8", group: "Family Notifier" });
+  toast("Sent — it should ring for up to 30 seconds. Tap it to stop.");
+};
+
+/* ----------------------------------------------------------- presence
+ *
+ * Online, away or offline, for the people you are in touch with.
+ *
+ * What it can honestly mean in a web app: Online is "has the app open
+ * and in front", Away is "opened it recently but it's in the
+ * background", Offline is "closed, or not seen for half an hour".
+ * A phone that shows Offline can still be rung - the ntfy notification
+ * reaches it with the app closed.
+ *
+ * Each phone posts its own state to its own topic: on every change,
+ * and every five minutes while in front. That is cheap on purpose,
+ * because ntfy.sh limits how many messages a phone may send a day. */
+var PRES = {};                       /* id -> { s, at } */
+var presSent = { s: null, at: 0 };
+var PRES_ON_MS = 7 * 60000, PRES_AWAY_MS = 30 * 60000;
+
+function presTopic(id){ return ringTopic(id) + "-p"; }
+function presTopics(){
+  if (!state || !state.me) return [];
+  return others().map(function(m){ return presTopic(m.id); });
+}
+function isPresTopic(t){
+  return !!(state && t && t.indexOf("fmn-" + state.house + "-") === 0 && /-p$/.test(t));
+}
+function sendPresence(s, force){
+  if (!state || !state.me) return;
+  if (state.presOff) s = "off";
+  var now = Date.now();
+  if (s === presSent.s && (s !== "on" || now - presSent.at < 300000) && !force) return;
+  if (state.presOff && presSent.s === "off" && !force) return;
+  presSent = { s: s, at: now };
+  try {
+    fetch(srv() + "/" + encodeURIComponent(presTopic(state.me)) + "?priority=1" + authParam(),
+          { method: "POST", body: JSON.stringify({ s: s }), keepalive: true })
+      .catch(function(){});
+  } catch (e) {}
+}
+function takePresence(m){
+  var pre = "fmn-" + state.house + "-";
+  var id = m.topic.slice(pre.length, -2);
+  if (!memberById(id)) return;
+  var body; try { body = JSON.parse(m.message); } catch (e) { return; }
+  if (!body || ["on", "away", "off"].indexOf(body.s) === -1) return;
+  var at = (m.time || 0) * 1000 || Date.now();
+  if (!PRES[id] || at >= PRES[id].at) PRES[id] = { s: body.s, at: at };
+  paintPresence();
+}
+/* What is already known - a stream only brings what happens next. */
+var presPolled = false;
+function pollPresence(){
+  var topics = presTopics();
+  if (!topics.length) return;
+  var since = presPolled ? "35m" : "12h";
+  presPolled = true;
+  netFetch(srv() + "/" + topics.map(encodeURIComponent).join(",")
+           + "/json?poll=1&since=" + since + authParam(), {}, 1)
+    .then(function(r){ return r.ok ? r.text() : ""; })
+    .then(function(text){
+      text.split("\n").forEach(function(line){
+        if (!line.trim()) return;
+        var m; try { m = JSON.parse(line); } catch (e) { return; }
+        if (m.event !== "message") return;
+        seen[m.id] = 1;
+        takePresence(m);
+      });
+    }).catch(function(){});
+}
+function ago(ms){
+  var min = Math.round(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return min + " min ago";
+  var h = Math.round(min / 60);
+  return h < 24 ? h + " h ago" : Math.round(h / 24) + " d ago";
+}
+function presenceOf(id){
+  var p = PRES[id];
+  if (!p) return { k: "off", text: "Offline" };
+  var age = Date.now() - p.at;
+  if (p.s === "on" && age < PRES_ON_MS) return { k: "on", text: "Online" };
+  if (p.s !== "off" && age < PRES_AWAY_MS) return { k: "away", text: "Away · " + ago(age) };
+  return { k: "off", text: "Offline · last seen " + ago(age) };
+}
+function paintPresence(){
+  Array.prototype.forEach.call(document.querySelectorAll(".person[data-id]"), function(card){
+    var st = presenceOf(card.getAttribute("data-id"));
+    var d = card.querySelector(".pdot"), t = card.querySelector(".pres");
+    if (d) d.className = "pdot " + st.k;
+    if (t) { t.className = "pres " + st.k; t.textContent = "● " + st.text; }
+  });
+}
+function paintPresBlock(){
+  var b = $("presBlock");
+  if (!b) return;
+  b.style.display = (state && state.me) ? "block" : "none";
+  if (!state) return;
+  $("presNote").textContent = state.presOff
+    ? "Hidden. Everyone you're in touch with sees you as Offline. You can still be called."
+    : "Shown. The people you're in touch with see Online while this app is open, " +
+      "Away when it's in the background, and Offline when it's closed. " +
+      "Offline doesn't stop calls reaching you.";
+  $("presBtn").textContent = state.presOff ? "Show my status" : "Hide my status";
+}
+$("presBtn").onclick = function(){
+  if (!state) return;
+  state.presOff = !state.presOff; save();
+  sendPresence(state.presOff ? "off" : (document.hidden ? "away" : "on"), true);
+  paintPresBlock();
+};
+
+function sayHello(){
+  if (managedByOther() && state.me)
+    sendSig(state.admin.id, { t:"hello", from: state.me }).catch(function(){});
+}
+
+$("newPersonAdd").onclick = addPersonAsMember;
+
+document.addEventListener("visibilitychange", function(){
+  if (!state || !state.me) return;
+  sendPresence(document.hidden ? "away" : "on");
+  if (!document.hidden) { pollPresence(); paintPresence(); }
+});
+window.addEventListener("pagehide", function(){ sendPresence("off", true); });
+setInterval(function(){
+  if (!state || !state.me) return;
+  if (!document.hidden) sendPresence("on");
+  paintPresence();
+}, 60000);
+
 /* -------------------------------------------------------------- start */
 
 /* file:// gives no shareable link and no microphone, so say it at the
@@ -4485,6 +5146,15 @@ ensureRelay();
    this it would wait for the admin's next change to hear about the last
    one. Phones already up to date ignore it (same version). */
 setTimeout(function(){ if (canSign()) broadcastRoster(); }, 4000);
+setTimeout(function(){
+  if (!state || !state.me) return;
+  sendPresence(document.hidden ? "away" : "on");
+  pollPresence();
+  adminCatchUp();
+  rosterCatchUp();
+  resendPending();
+  resendBark();
+}, 2500);
 
 /* Reconnects anything that has gone quiet. Called on a timer, when the
    page comes back to the front, and when the network returns. It only
