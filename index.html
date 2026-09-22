@@ -604,7 +604,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22k";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22l";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -713,7 +713,8 @@ function snapshot(){
            server: state.server || null, token: state.token || null,
            tone: state.tone || "classic", ntfy: !!state.ntfy,
            pending: state.pending || [], presOff: !!state.presOff,
-           barkWant: state.barkWant === undefined ? null : state.barkWant };
+           barkWant: state.barkWant === undefined ? null : state.barkWant,
+           missedIds: state.missedIds || [] };
 }
 
 function b64u(str){
@@ -1295,8 +1296,10 @@ function onRingMsg(m){
   pollSignal();
   setTimeout(function(){ if (!call) pollSignal(); }, 1500);
   setTimeout(function(){
-    if (!call) showBuzz(title, "Tried to call you — tap to call back");
-  }, 5000);
+    if (call || Date.now() - lastMissedAt < 20000) return;
+    var who = memberByTitle(title);
+    if (who) noteMissed(who.id, null);
+  }, 9000);
 }
 
 /* Catching up, which is the whole point on a phone. The page is
@@ -1314,13 +1317,13 @@ function pollSignal(){
         var m; try { m = JSON.parse(line); } catch (e) { return; }
         if (m.event !== "message" || seen[m.id]) return;
         seen[m.id] = 1;
-        takeSignal(m.message, m.time);
+        takeSignal(m.message, m.time, true);
       });
     })
     .catch(function(){});
 }
 
-function takeSignal(raw, when){
+function takeSignal(raw, when, caught){
   var msg; try { msg = JSON.parse(raw); } catch (e) { return; }
 
   if (msg.t === "chunk") {
@@ -1333,7 +1336,12 @@ function takeSignal(raw, when){
 
   /* An offer older than a minute belongs to somebody who gave up.
      Ringing for it would raise a call screen nobody is waiting on. */
-  if (msg.t === "offer" && when && (Date.now()/1000 - when) > 60) return;
+  if (msg.t === "offer" && when && (Date.now()/1000 - when) > 60) {
+    if (msg.from && memberById(msg.from)) noteMissed(msg.from, msg.call);
+    return;
+  }
+  if (msg.t === "offer")
+    msg.caught = !!caught || !when || (Date.now()/1000 - when) > 3;
 
   onSignal(msg);
 }
@@ -2489,7 +2497,7 @@ function startCall(peerId){
     .then(function(offer){
       if (!offer || !call) return null;
       return call.pc.setLocalDescription(offer).then(function(){
-        return sendSig(peerId, { t:"offer", call: call.id, from: state.me,
+        return sendSig(peerId, { t:"offer", call: call.id, from: state.me, v: 2,
                                  sentAt: Date.now(), relay: !!call.forcedRelay,
                                  cf: !!call.viaCloudflare,
                                  sdp: call.pc.localDescription.sdp })
@@ -2545,6 +2553,46 @@ function startCall(peerId){
     });
 }
 
+function ringIncoming(msg){
+  showCallScreen(msg.from, true);
+  setCallState("Incoming call");
+  tone();
+  /* A backstop in case the goodbye never arrives - the caller's phone
+     lost signal, say. The caller gives up at 45 seconds, so ringing
+     past 50 is always ringing for nobody. The offer's age counts, so
+     a phone opened late from the notification stops sooner. */
+  var age = msg.sentAt ? Math.max(0, Date.now() - msg.sentAt) : 0;
+  call.ringTimer = setTimeout(function(){
+    if (call && call.state === "incoming") {
+      stopTone();
+      setCallState("Missed call");
+      noteMissed(call.peer, call.id, true);
+      setTimeout(function(){ hangUp(null); }, 1200);
+    }
+  }, Math.max(3000, 50000 - age));
+
+  /* Opened by the notification's Answer button: that was the answer. */
+  if (autoAnswerUntil > Date.now()) {
+    autoAnswerUntil = 0;
+    setTimeout(function(){ if (call && call.state === "incoming") answer(); }, 50);
+  }
+  if (document.hidden)
+    systemNotify(nameOf(msg.from) + " is calling", "Tap to answer");
+}
+
+/* A missed call, said once: into Recent, and a quiet note - no ringing,
+   no call screen. The same call can reach here more than one way (the
+   offer, its goodbye, the doorbell push), so it's kept by call ID. */
+var lastMissedAt = 0;
+function noteMissed(peer, callId, quiet){
+  state.missedIds = state.missedIds || [];
+  if (callId && state.missedIds.indexOf(callId) !== -1) return;
+  if (callId) { state.missedIds.push(callId); state.missedIds = state.missedIds.slice(-40); }
+  lastMissedAt = Date.now();
+  remember(nameOf(peer), "missed call", false);
+  if (!quiet) toast("Missed call from " + nameOf(peer) + " — tap their name to call back");
+}
+
 function onSignal(msg){
   if (!msg || !msg.t) return;
 
@@ -2578,37 +2626,49 @@ function onSignal(msg){
       return;                                       /* they will pick up ours */
     }
     if (call && call.id === msg.call) return;       /* same call, seen again */
+    if ((state.missedIds || []).indexOf(msg.call) !== -1) return;   /* dealt with */
     if (call) {
       sendSig(msg.from, { t:"busy", call: msg.call, from: state.me });
       return;
     }
     call = { id: msg.call, peer: msg.from, out: false, pc: null,
              stream: null, state: "incoming", offer: msg.sdp, pending: [],
-             wantRelay: !!msg.relay, wantCf: !!msg.cf };
-    showCallScreen(msg.from, true);
-    setCallState("Incoming call");
-    tone();
-    /* A backstop in case the goodbye never arrives - the caller's phone
-       lost signal, say. The caller gives up at 45 seconds, so ringing
-       past 50 is always ringing for nobody. The offer's age counts, so
-       a phone opened late from the notification stops sooner. */
-    var age = msg.sentAt ? Math.max(0, Date.now() - msg.sentAt) : 0;
-    call.ringTimer = setTimeout(function(){
-      if (call && call.state === "incoming") {
-        stopTone();
-        setCallState("Missed call");
-        remember(nameOf(call.peer), "missed call", false);
-        setTimeout(function(){ hangUp(null); }, 1200);
-      }
-    }, Math.max(3000, 50000 - age));
-
-    /* Opened by the notification's Answer button: that was the answer. */
-    if (autoAnswerUntil > Date.now()) {
-      autoAnswerUntil = 0;
-      setTimeout(function(){ if (call && call.state === "incoming") answer(); }, 50);
+             wantRelay: !!msg.relay, wantCf: !!msg.cf, offerMsg: msg };
+    /* Opening the app after a missed call used to ring as if the call
+       were happening now: the offer was still on the server, and nothing
+       said the caller had given up. So an offer that wasn't heard live -
+       caught up on opening, or already a few seconds old - is checked
+       first, silently: "are you still calling?". Only a yes rings. No
+       answer means the caller is gone, and it goes into Recent as a
+       missed call instead. Callers on an older version can't answer the
+       question, so their offers ring the old way. */
+    if (msg.v >= 2 && msg.caught) {
+      call.state = "checking";
+      sendSig(msg.from, { t:"still", call: msg.call, from: state.me }).catch(function(){});
+      call.checkTimer = setTimeout(function(){
+        if (!call || call.state !== "checking" || call.id !== msg.call) return;
+        var who = call.peer, id = call.id;
+        call = null;
+        noteMissed(who, id);
+      }, 7000);
+      return;
     }
-    if (document.hidden)
-      systemNotify(nameOf(msg.from) + " is calling", "Tap to answer");
+    ringIncoming(msg);
+    return;
+  }
+
+  /* The caller's side of the check above. */
+  if (msg.t === "still") {
+    if (call && call.out && call.id === msg.call && call.state !== "connected")
+      sendSig(msg.from, { t:"yes", call: msg.call, from: state.me }).catch(function(){});
+    return;
+  }
+  if (msg.t === "yes") {
+    if (call && call.id === msg.call && call.state === "checking") {
+      clearTimeout(call.checkTimer); call.checkTimer = null;
+      call.state = "incoming";
+      ringIncoming(call.offerMsg);
+    }
     return;
   }
 
@@ -2672,9 +2732,9 @@ function onSignal(msg){
     stopTone();
     /* Said the way it happened: hung up before you answered is a
        missed call, not an ended one. */
-    var missed = call.state === "incoming";
+    var missed = call.state === "incoming" || call.state === "checking";
     setCallState(missed ? "Missed call" : "Call ended");
-    if (missed) remember(nameOf(call.peer), "missed call", false);
+    if (missed) noteMissed(call.peer, call.id, call.state === "incoming");
     if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
     /* The line goes dead now; the words stay up just long enough to read. */
     if (call.pc) { try { call.pc.close(); } catch (e) {} }
@@ -2752,6 +2812,15 @@ function hangUp(why){
   if (call.recoverTimer) clearTimeout(call.recoverTimer);
   if (call.recoverDeadline) clearTimeout(call.recoverDeadline);
   if (call.ringTimer) clearTimeout(call.ringTimer);
+  if (call.checkTimer) clearTimeout(call.checkTimer);
+  /* Remembered as dealt with, so its offer - still on the server for a
+     couple of minutes - is never taken for a missed call on reopening. */
+  if (!call.out && call.id) {
+    state.missedIds = state.missedIds || [];
+    if (state.missedIds.indexOf(call.id) === -1) {
+      state.missedIds.push(call.id); state.missedIds = state.missedIds.slice(-40); save();
+    }
+  }
   if (call.audioTimer) clearInterval(call.audioTimer);
   finishUsage();
   if (call.giveUp)   clearTimeout(call.giveUp);
