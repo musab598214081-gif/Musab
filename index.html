@@ -640,7 +640,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-24a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-24b";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -5305,7 +5305,9 @@ $("checkConn").onclick = function(){
     netFetch(fsBase() + "/ping", {}, 1).then(function(r){ return r.json(); }).then(function(j){
       if (!j || !j.ok) throw new Error("x");
       el.textContent = "Working — the family server answered in " + (Date.now() - t0) +
-        " ms" + (fsOpen ? ", and this device is connected live." : ". Live connection: reconnecting…");
+        " ms" + (fsOpen ? ", and this device is connected live." : ". Live connection: reconnecting…") +
+        (j.home ? " The family server runs in " + cityOf(j.home) + "." : "") +
+        (j.edge ? " This device reaches Cloudflare through " + cityOf(j.edge) + "." : "");
     }).catch(function(){
       el.textContent = "Cannot reach the family server (" + netName() + ") from this network.";
     });
@@ -5938,6 +5940,17 @@ $("famUsageCsv").onclick = function(){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 };
+
+/* Cloudflare names its data centres by airport code. */
+var CF_CITIES = { DXB:"Dubai", AUH:"Abu Dhabi", FJR:"Fujairah", MCT:"Muscat", DOH:"Doha",
+  BAH:"Bahrain", KWI:"Kuwait", RUH:"Riyadh", JED:"Jeddah", DMM:"Dammam", AMM:"Amman",
+  BGW:"Baghdad", CAI:"Cairo", IST:"Istanbul", TLV:"Tel Aviv", KHI:"Karachi", ISB:"Islamabad",
+  LHE:"Lahore", BOM:"Mumbai", DEL:"Delhi", BLR:"Bangalore", MAA:"Chennai", HYD:"Hyderabad",
+  CMB:"Colombo", SIN:"Singapore", HKG:"Hong Kong", NRT:"Tokyo", FRA:"Frankfurt", AMS:"Amsterdam",
+  LHR:"London", CDG:"Paris", MRS:"Marseille", MXP:"Milan", MAD:"Madrid", VIE:"Vienna",
+  WAW:"Warsaw", ARN:"Stockholm", ZRH:"Zurich", IAD:"Washington", EWR:"New York",
+  ORD:"Chicago", LAX:"Los Angeles", SJC:"San Jose", JNB:"Johannesburg", NBO:"Nairobi" };
+function cityOf(code){ return CF_CITIES[code] ? CF_CITIES[code] + " (" + code + ")" : code; }
 
 /* ------------------------------------------------ family server setup */
 function paintFsAdmin(){
