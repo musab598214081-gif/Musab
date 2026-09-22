@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22n";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22o";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -4255,13 +4255,20 @@ function paintNotifyState(){
       + "something else, it raises a notification — tapping that brings this "
       + "page back, rather than opening a second copy.";
   } else if (p === "denied") {
-    el.textContent = "Blocked. iPhone: Settings \u2192 Apps \u2192 Safari "
-      + "\u2192 Notifications. Android: long-press the browser icon "
-      + "\u2192 Notifications. You have to turn it back on there — a page "
-      + "cannot ask twice once it has been refused.";
+    el.textContent = (!isIOS() && !isAndroid())
+      ? "Blocked. On a computer: click the icon just left of the web address "
+        + "(a padlock or sliders) \u2192 Notifications \u2192 Allow, then reload "
+        + "the page. In the installed app it's under \u22ef \u2192 App info "
+        + "\u2192 Permissions. A page can't ask again once it has been refused."
+      : "Blocked. iPhone: Settings \u2192 Apps \u2192 Safari "
+        + "\u2192 Notifications. Android: long-press the browser icon "
+        + "\u2192 Notifications. You have to turn it back on there — a page "
+        + "cannot ask twice once it has been refused.";
   } else {
-    el.textContent = "Not asked yet. On iPhone this only works once the page "
-      + "has been added to your Home Screen (Share \u2192 Add to Home Screen).";
+    el.textContent = isIOS()
+      ? "Not asked yet. On iPhone this only works once the page "
+        + "has been added to your Home Screen (Share \u2192 Add to Home Screen)."
+      : "Not asked yet. Tap the button above and choose Allow.";
   }
   if (btn) btn.style.display = (p === "granted" || p === null) ? "none" : "block";
 }
