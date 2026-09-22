@@ -116,6 +116,11 @@
   .person .pres{display:block;font-weight:400;font-size:12px;color:var(--mist);margin-top:1px}
   .person .pres.on{color:var(--go)} .person .pres.away{color:var(--amber)}
   /* Who-can-see-whom, in the admin's family list. */
+  .utable{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
+  .utable th,.utable td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--seam);white-space:nowrap}
+  .utable th{color:var(--mist);font-weight:500}
+  .utable td small{display:block;color:var(--mist);font-size:11px}
+  .utable tr.tot td{font-weight:700;border-bottom:0}
   .memberrow .cbtn{width:auto;min-width:64px;padding:0 10px;color:var(--mist);
     font-size:13px;margin-right:8px}
   .contacts{background:var(--hearth);border-radius:12px;padding:10px 12px;margin:-2px 0 12px}
@@ -558,6 +563,16 @@
     <button class="btn ghost" id="testTurn">Test relays on this network</button>
     <p class="sub" id="relayUsage" style="margin-top:10px"></p>
 
+    <div id="famUsageBlock" style="display:none">
+      <div class="sectiontitle">Family usage</div>
+      <p class="sub">Every phone reports its calls to you after each one.
+        Kept on this phone separately from the family settings — Start over
+        doesn't erase it.</p>
+      <select id="famUsageMonth" style="width:100%;margin-bottom:10px"></select>
+      <div id="famUsageTable" style="overflow-x:auto"></div>
+      <button class="btn ghost" id="famUsageCsv">Download as spreadsheet (CSV)</button>
+    </div>
+
     <button class="btn ghost" data-close="setupSheet" style="margin-top:22px">Close</button>
     <button class="btn danger" id="resetAll">Start over</button>
   </div>
@@ -589,7 +604,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22j";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22k";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -743,24 +758,26 @@ function idbOpen(){
     r.onerror = function(){ rej(r.error); };
   });
 }
-function idbPut(val){
+function idbPut(val, key){
+  key = key || STOREKEY;
   return idbOpen().then(function(db){
     return new Promise(function(res){
       try {
         var tx = db.transaction("kv", "readwrite");
-        if (val === null) tx.objectStore("kv").delete(STOREKEY);
-        else tx.objectStore("kv").put(val, STOREKEY);
+        if (val === null) tx.objectStore("kv").delete(key);
+        else tx.objectStore("kv").put(val, key);
         tx.oncomplete = function(){ res(true); };
         tx.onerror = tx.onabort = function(){ res(false); };
       } catch (e) { res(false); }
     });
   }).catch(function(){ return false; });
 }
-function idbGet(){
+function idbGet(key){
+  key = key || STOREKEY;
   return idbOpen().then(function(db){
     return new Promise(function(res){
       try {
-        var q = db.transaction("kv", "readonly").objectStore("kv").get(STOREKEY);
+        var q = db.transaction("kv", "readonly").objectStore("kv").get(key);
         q.onsuccess = function(){ res(q.result || null); };
         q.onerror = function(){ res(null); };
       } catch (e) { res(null); }
@@ -2598,6 +2615,7 @@ function onSignal(msg){
   if (msg.t === "roster") { takeRoster(msg); return; }
   if (msg.t === "addreq") { takeAddRequest(msg); return; }
   if (msg.t === "setbark") { takeSetBark(msg); return; }
+  if (msg.t === "usage") { takeUsage(msg); return; }
   /* A phone that has just joined asks the admin for its copy. */
   if (msg.t === "hello") {
     if (isAdmin() && memberById(msg.from)) broadcastRoster(msg.from);
@@ -3134,35 +3152,37 @@ function finishUsage(){
   if (entry) { entry.what = what; save(); paintRecent(); }
   else remember(nameOf(call.peer), what, !!call.out);
 
-  /* This phone's running total for the month, per relay - kept on this
-     phone only; it is what this phone used, not the whole family. */
-  var month = monthKey();
-  if (!state.usage || state.usage.month !== month)
-    state.usage = { month: month, calls: 0, direct: 0, relay: {} };
-  state.usage.calls++;
-  Object.keys(u.by).forEach(function(route){
-    var n = u.by[route] || 0;
-    if (route === "direct") state.usage.direct += n;
-    else state.usage.relay[route] = (state.usage.relay[route] || 0) + n;
+  /* Into this phone's permanent record, which the admin receives. */
+  var secs = Math.round((Date.now() - call.t0) / 1000), out = !!call.out;
+  ledgerAdd(function(m){
+    m.calls++; if (out) m.out++;
+    m.secs += secs;
+    Object.keys(u.by).forEach(function(route){
+      var n = u.by[route] || 0;
+      if (route === "direct") m.direct += n;
+      else m.relay[route] = (m.relay[route] || 0) + n;
+    });
   });
-  save();
 }
 
 function paintUsage(){
   var el = $("relayUsage");
   if (!el) return;
-  var u = state && state.usage;
-  if (!u || u.month !== monthKey() || !u.calls) {
+  var e = ledger && myLedger();
+  var u = e && e.months[monthKey()];
+  if (!u || (!u.calls && !u.buzz)) {
     el.textContent = "No calls yet this month.";
+    paintFamUsage();
     return;
   }
   var parts = Object.keys(u.relay).filter(function(k){ return u.relay[k] > 0; })
     .map(function(k){ return k + " " + fmtBytes(u.relay[k]); });
   el.textContent = "This month on this phone: " + u.calls + " call" +
-    (u.calls === 1 ? "" : "s") + " · through relays: " +
-    (parts.length ? parts.join(" · ") : "none") +
+    (u.calls === 1 ? "" : "s") + (u.secs ? " (" + fmtLength(u.secs * 1000) + ")" : "") +
+    " · through relays: " + (parts.length ? parts.join(" · ") : "none") +
     (u.direct ? " · direct: " + fmtBytes(u.direct) : "") +
     ". Free: Cloudflare 1,000 GB, Open Relay 20 GB a month.";
+  paintFamUsage();
 }
 
 function noSound(){
@@ -3416,6 +3436,7 @@ function buzz(memberId, message){
       if (!r.ok) throw new Error("http");
       toast("Buzzed " + nameOf(memberId) + " 🔔");
       remember(nameOf(memberId), message, true);
+      ledgerAdd(function(m){ m.buzz++; });
     })
     .catch(function(){
       toast("Could not reach " + srv() + " — this network is blocking it");
@@ -4278,6 +4299,7 @@ function adminCatchUp(){
         var msg; try { msg = JSON.parse(m.message); } catch (e) { return; }
         if (msg && msg.t === "addreq") { seen[m.id] = 1; takeAddRequest(msg); }
         if (msg && msg.t === "setbark") { seen[m.id] = 1; takeSetBark(msg); }
+        if (msg && msg.t === "usage") { seen[m.id] = 1; takeUsage(msg); }
       });
     }).catch(function(){});
 }
@@ -4832,7 +4854,7 @@ $("testTurn").onclick = function(){
 $("micAllow").onclick = micAllowNow;
 
 $("resetAll").onclick = function(){
-  if (!confirm("Forget the family and start over on this phone?")) return;
+  if (!confirm("Forget the family and start over on this phone? Call usage records are kept.")) return;
   wipeStorage();
   closeStreams();
   state = null;
@@ -4845,6 +4867,226 @@ function copy(text, ok){
       .then(function(){ toast(ok); }, function(){ prompt("Copy this:", text); });
   else prompt("Copy this:", text);
 }
+
+/* -------------------------------------------------------- usage ledger
+ *
+ * Kept under its own storage keys, apart from the family settings, so
+ * Start over - which wipes only the settings - never touches it. Every
+ * month is kept; nothing rolls over or resets.
+ *
+ * Each phone counts its own calls, talk time, buzzes and data, and
+ * reports them to the admin after every call. The admin's phone keeps
+ * the whole family's record, per person and per phone: a person on a
+ * new phone starts a new line under their name rather than overwriting
+ * what their old phone counted. */
+var USAGEKEY = "familyNotifyer.usage.v1";
+var FAMUSEKEY = "familyNotifyer.familyUsage.v1";
+var ledger = null, famLedger = null;
+
+function readJSON(k){
+  try { var r = localStorage.getItem(k); return r ? JSON.parse(r) : null; }
+  catch (e) { return null; }
+}
+function writeJSON(k, v){
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
+  idbPut(v, k);
+}
+function loadLedgers(){
+  ledger = readJSON(USAGEKEY) || { dev: rand(8), who: {} };
+  famLedger = readJSON(FAMUSEKEY) || {};
+  /* localStorage is what a phone throws away first; IndexedDB may still
+     have them. Take whichever copy holds more. */
+  idbGet(USAGEKEY).then(function(v){
+    if (v && v.dev && JSON.stringify(v).length > JSON.stringify(ledger).length) {
+      ledger = v; try { localStorage.setItem(USAGEKEY, JSON.stringify(v)); } catch (e) {}
+      paintUsage();
+    }
+  });
+  idbGet(FAMUSEKEY).then(function(v){
+    if (v && JSON.stringify(v).length > JSON.stringify(famLedger).length) {
+      famLedger = v; try { localStorage.setItem(FAMUSEKEY, JSON.stringify(v)); } catch (e) {}
+      paintFamUsage();
+    }
+  });
+}
+function blankMonth(){ return { calls: 0, out: 0, secs: 0, buzz: 0, direct: 0, relay: {} }; }
+function myLedger(){
+  if (!state || !state.me) return null;
+  var k = state.house + "|" + state.me;
+  var e = ledger.who[k] || (ledger.who[k] = { months: {} });
+  return e;
+}
+function ledgerAdd(fn){
+  var e = myLedger();
+  if (!e) return;
+  var mk = monthKey();
+  var m = e.months[mk] || (e.months[mk] = blankMonth());
+  fn(m);
+  e.changed = true;
+  writeJSON(USAGEKEY, ledger);
+  reportUsage();
+}
+/* The last thirteen months travel - enough for a year's comparison,
+   small enough for one message. Older months stay on both phones. */
+function recentMonths(months){
+  var keys = Object.keys(months).sort().slice(-13), out = {};
+  keys.forEach(function(k){ out[k] = months[k]; });
+  return out;
+}
+function reportUsage(force){
+  var e = myLedger();
+  if (!e || !state.admin) return;
+  if (isAdmin()) { famRecord(state.me, nameOf(state.me), ledger.dev, e.months); e.changed = false;
+                   writeJSON(USAGEKEY, ledger); return; }
+  if (!force && !e.changed && Date.now() - (e.sentAt || 0) < 6 * 3600000) return;
+  sendSig(state.admin.id, { t:"usage", from: state.me, dev: ledger.dev,
+                            months: recentMonths(e.months) })
+    .then(function(r){
+      if (r && r.ok) { e.changed = false; e.sentAt = Date.now(); writeJSON(USAGEKEY, ledger); }
+    }).catch(function(){});
+}
+function famRecord(id, name, dev, months){
+  var h = famLedger[state.house] || (famLedger[state.house] = { people: {} });
+  var p = h.people[id] || (h.people[id] = { name: name, devices: {} });
+  p.name = name || p.name;
+  var d = p.devices[dev] || (p.devices[dev] = { months: {} });
+  /* Month by month, never shrinking: a phone only ever counts up, so a
+     smaller figure is an old message arriving late. */
+  Object.keys(months || {}).forEach(function(mk){
+    var a = d.months[mk], b = months[mk];
+    if (!b) return;
+    if (!a || (b.calls || 0) + (b.buzz || 0) >= (a.calls || 0) + (a.buzz || 0)) d.months[mk] = b;
+  });
+  d.at = Date.now();
+  writeJSON(FAMUSEKEY, famLedger);
+  paintFamUsage();
+}
+function takeUsage(msg){
+  if (!isAdmin() || !msg.months || typeof msg.months !== "object") return;
+  var m = memberById(msg.from);
+  if (!m || !/^[a-z0-9]{4,16}$/.test(String(msg.dev || ""))) return;
+  var clean = {};
+  Object.keys(msg.months).forEach(function(k){
+    if (!/^\d{4}-\d{2}$/.test(k)) return;
+    var v = msg.months[k] || {}, r = {};
+    ["calls", "out", "secs", "buzz", "direct"].forEach(function(f){
+      r[f] = Math.max(0, Number(v[f]) || 0);
+    });
+    r.relay = {};
+    Object.keys(v.relay || {}).slice(0, 6).forEach(function(n){
+      r.relay[String(n).slice(0, 24)] = Math.max(0, Number(v.relay[n]) || 0);
+    });
+    clean[k] = r;
+  });
+  famRecord(m.id, m.name, msg.dev, clean);
+}
+function sumMonth(into, m){
+  ["calls", "out", "secs", "buzz", "direct"].forEach(function(f){ into[f] += m[f] || 0; });
+  Object.keys(m.relay || {}).forEach(function(n){ into.relay[n] = (into.relay[n] || 0) + m.relay[n]; });
+}
+function relayTotal(m){
+  return Object.keys(m.relay || {}).reduce(function(t, n){ return t + (m.relay[n] || 0); }, 0);
+}
+/* Rows for one month ("" = all time): one per person, phones added up. */
+function famRows(month){
+  var h = famLedger && state && famLedger[state.house];
+  if (!h) return [];
+  return Object.keys(h.people).map(function(id){
+    var p = h.people[id], tot = blankMonth(), at = 0, phones = 0;
+    Object.keys(p.devices).forEach(function(dv){
+      var d = p.devices[dv]; phones++;
+      at = Math.max(at, d.at || 0);
+      Object.keys(d.months).forEach(function(mk){
+        if (!month || mk === month) sumMonth(tot, d.months[mk]);
+      });
+    });
+    var cur = memberById(id);
+    return { id: id, name: cur ? cur.name : (p.name + " (removed)"), at: at,
+             phones: phones, m: tot };
+  }).sort(function(a, b){ return b.m.calls - a.m.calls || a.name.localeCompare(b.name); });
+}
+function famMonths(){
+  var h = famLedger && state && famLedger[state.house], set = {};
+  set[monthKey()] = 1;
+  if (h) Object.keys(h.people).forEach(function(id){
+    Object.keys(h.people[id].devices).forEach(function(dv){
+      Object.keys(h.people[id].devices[dv].months).forEach(function(mk){ set[mk] = 1; });
+    });
+  });
+  return Object.keys(set).sort().reverse();
+}
+function monthName(mk){
+  if (!mk) return "All time";
+  var d = new Date(Number(mk.slice(0, 4)), Number(mk.slice(5, 7)) - 1, 1);
+  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+var famUsageMonth = null;
+function paintFamUsage(){
+  var block = $("famUsageBlock");
+  if (!block) return;
+  var on = !!(state && isAdmin());
+  block.style.display = on ? "block" : "none";
+  if (!on) return;
+  var sel = $("famUsageMonth"), months = famMonths();
+  if (famUsageMonth === null) famUsageMonth = monthKey();
+  sel.innerHTML = "";
+  months.concat([""]).forEach(function(mk){
+    var o = document.createElement("option");
+    o.value = mk; o.textContent = monthName(mk);
+    if (mk === famUsageMonth) o.selected = true;
+    sel.appendChild(o);
+  });
+  var rows = famRows(famUsageMonth), box = $("famUsageTable");
+  if (!rows.length) {
+    box.innerHTML = '<p class="sub">Nothing reported yet. Each phone reports after its ' +
+                    'next call, or when it next opens the app.</p>';
+    return;
+  }
+  var all = blankMonth();
+  var html = '<table class="utable"><tr><th>Person</th><th>Calls</th><th>Talk</th>' +
+             '<th>Buzzes</th><th>Relay data</th><th>Direct</th></tr>';
+  rows.forEach(function(r){
+    sumMonth(all, r.m);
+    html += "<tr><td>" + escapeHtml(r.name) + "<small>" +
+            (r.at ? "updated " + ago(r.at) : "") +
+            (r.phones > 1 ? " · " + r.phones + " phones" : "") + "</small></td>" +
+            "<td>" + r.m.calls + (r.m.out ? "<small>" + r.m.out + " made</small>" : "") + "</td>" +
+            "<td>" + (r.m.secs ? fmtLength(r.m.secs * 1000) : "—") + "</td>" +
+            "<td>" + r.m.buzz + "</td>" +
+            "<td>" + (relayTotal(r.m) ? fmtBytes(relayTotal(r.m)) : "—") + "</td>" +
+            "<td>" + (r.m.direct ? fmtBytes(r.m.direct) : "—") + "</td></tr>";
+  });
+  html += '<tr class="tot"><td>Everyone</td><td>' + all.calls + "</td><td>" +
+          (all.secs ? fmtLength(all.secs * 1000) : "—") + "</td><td>" + all.buzz + "</td><td>" +
+          (relayTotal(all) ? fmtBytes(relayTotal(all)) : "—") + "</td><td>" +
+          (all.direct ? fmtBytes(all.direct) : "—") + "</td></tr></table>";
+  /* Each call counts on both phones - a call between two people is
+     their call each - so "Everyone" is calls taken part in, not placed. */
+  html += '<p class="hint2" style="font-size:12px;color:var(--mist)">A call counts for ' +
+          'both people on it. Relay data is what the relays carried; the free ' +
+          'allowances are Cloudflare 1,000 GB and Open Relay 20 GB a month.</p>';
+  box.innerHTML = html;
+}
+$("famUsageMonth").onchange = function(){ famUsageMonth = this.value; paintFamUsage(); };
+$("famUsageCsv").onclick = function(){
+  var lines = [["Month", "Person", "Calls", "Calls made", "Talk minutes", "Buzzes",
+                "Relay MB", "Direct MB"].join(",")];
+  famMonths().forEach(function(mk){
+    famRows(mk).forEach(function(r){
+      if (!r.m.calls && !r.m.buzz) return;
+      lines.push([mk, '"' + r.name.replace(/"/g, '""') + '"', r.m.calls, r.m.out,
+                  Math.round(r.m.secs / 60), r.m.buzz,
+                  (relayTotal(r.m) / 1048576).toFixed(1),
+                  (r.m.direct / 1048576).toFixed(1)].join(","));
+    });
+  });
+  var blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "family-usage.csv";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+};
 
 /* --------------------------------------------------------------- Bark
  *
@@ -5065,20 +5307,13 @@ function pollPresence(){
       });
     }).catch(function(){});
 }
-function ago(ms){
-  var min = Math.round(ms / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return min + " min ago";
-  var h = Math.round(min / 60);
-  return h < 24 ? h + " h ago" : Math.round(h / 24) + " d ago";
-}
 function presenceOf(id){
   var p = PRES[id];
   if (!p) return { k: "off", text: "Offline" };
   var age = Date.now() - p.at;
   if (p.s === "on" && age < PRES_ON_MS) return { k: "on", text: "Online" };
-  if (p.s !== "off" && age < PRES_AWAY_MS) return { k: "away", text: "Away · " + ago(age) };
-  return { k: "off", text: "Offline · last seen " + ago(age) };
+  if (p.s !== "off" && age < PRES_AWAY_MS) return { k: "away", text: "Away · " + ago(p.at) };
+  return { k: "off", text: "Offline · last seen " + ago(p.at) };
 }
 function paintPresence(){
   Array.prototype.forEach.call(document.querySelectorAll(".person[data-id]"), function(card){
@@ -5133,7 +5368,17 @@ setInterval(function(){
    the user has to guess at. */
 if (location.protocol === "file:") $("filewarn").style.display = "block";
 
+loadLedgers();
 state = load();
+/* The month's figures from before the ledger existed, carried over once. */
+(function(){
+  var e = myLedger(), old = state && state.usage;
+  if (e && old && old.month && !e.months[old.month]) {
+    var m = blankMonth(); m.calls = old.calls || 0; m.direct = old.direct || 0;
+    m.relay = old.relay || {}; e.months[old.month] = m; e.changed = true;
+    writeJSON(USAGEKEY, ledger);
+  }
+})();
 readIntent();
 if (!tryJoin()) paintMain();
 if (state && state.me) { openStreams(); }
@@ -5154,6 +5399,7 @@ setTimeout(function(){
   rosterCatchUp();
   resendPending();
   resendBark();
+  reportUsage();
 }, 2500);
 
 /* Reconnects anything that has gone quiet. Called on a timer, when the
