@@ -573,7 +573,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-09-25b";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-25c";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -1075,10 +1075,21 @@ function fsCheckPush(){
     fsPushState = (isIOS() && !isStandalone()) ? "needhome" : "unsupported";
     paintFsPush(); return Promise.resolve();
   }
+  var perm = ("Notification" in window) ? Notification.permission : "default";
   return fsSwReg().then(function(reg){
-    return reg.pushManager.getSubscription();
+    return reg.pushManager.getSubscription().then(function(sub){
+      if (sub || perm !== "granted") return sub;
+      /* Allowed before, but the phone dropped this device's registration
+         (an iPhone does after some restarts and updates). Renewed here,
+         quietly, instead of asking the person to turn it on again. */
+      return fsVapidKey().then(function(key){
+        return reg.pushManager.subscribe({ userVisibleOnly: true,
+                                           applicationServerKey: b64uToBytes(key) });
+      }).then(function(fresh){
+        return fsRequest({ k: "sub", sub: fresh.toJSON() }, 8000).then(function(){ return fresh; });
+      }).catch(function(){ return null; });
+    });
   }).then(function(sub){
-    var perm = ("Notification" in window) ? Notification.permission : "default";
     fsPushState = sub ? "on" : (perm === "denied" ? "blocked" : "off");
     paintFsPush();
     return sub;
