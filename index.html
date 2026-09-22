@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22s";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22t";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1383,9 +1383,13 @@ function paintStatus(live){
   var el = $("statusLine");
   if (!el) return;
   el.classList.toggle("live", !!live);
+  var busy = (typeof presErr !== "undefined" && presErr === "busy") ||
+             (typeof presRecvErr !== "undefined" && presRecvErr === "busy");
+  paintStatus.live = !!live;
   el.querySelector("span:last-child").textContent =
-    live ? "Ready for calls"
-         : "Not connected to " + srv() + " — check Settings → Connection";
+    !live ? "Not connected to " + srv() + " — check Settings → Connection"
+    : busy ? "Server busy — status and calls may be delayed (Settings → ntfy token)"
+    : "Ready for calls";
 }
 
 /* ==================================================================== *
@@ -5724,13 +5728,18 @@ function sendPresence(s, force){
      below sends it again, and the reason is shown under Settings. */
   function failed(why){
     if (presSent === sent) presSent = { s: null, at: 0 };
-    presErr = why; paintPresBlock();
+    presErr = why; paintPresBlock(); paintPresence();
+    paintStatus(paintStatus.live !== false);
   }
   try {
     fetch(srv() + "/" + encodeURIComponent(presTopic(state.me)) + "?priority=1" + authParam(),
           { method: "POST", body: JSON.stringify({ s: s }), keepalive: true })
       .then(function(r){
-        if (r.ok) { if (presErr) { presErr = null; paintPresBlock(); } return; }
+        if (r.ok) {
+          if (presErr) { presErr = null; paintPresBlock(); paintPresence();
+                         paintStatus(paintStatus.live !== false); }
+          return;
+        }
         failed(r.status === 429 ? "busy" : "error " + r.status);
       })
       .catch(function(){ failed("network"); });
@@ -5767,7 +5776,15 @@ function pollPresence(force){
   presPolled = true;
   netFetch(srv() + "/" + topics.map(encodeURIComponent).join(",")
            + "/json?poll=1&since=" + since + authParam(), {}, 1)
-    .then(function(r){ return r.ok ? r.text() : ""; })
+    .then(function(r){
+      /* Refused (the server's allowance used up) is not the same as
+         "nobody is online" - remember it, so the cards can say so. */
+      var was = presRecvErr;
+      presRecvErr = r.ok ? null : (r.status === 429 ? "busy" : "error " + r.status);
+      if (!r.ok && !PRES_ANY()) presPolled = false;    /* next try looks back 12h again */
+      if (was !== presRecvErr) { paintPresence(); paintStatus(paintStatus.live !== false); }
+      return r.ok ? r.text() : "";
+    })
     .then(function(text){
       text.split("\n").forEach(function(line){
         if (!line.trim()) return;
@@ -5778,8 +5795,14 @@ function pollPresence(force){
       });
     }).catch(function(){});
 }
+var presRecvErr = null;
+function PRES_ANY(){ for (var k in PRES) return true; return false; }
 function presenceOf(id){
   var p = PRES[id];
+  /* Nothing heard, and the server is refusing us: saying "Offline"
+     would be a guess dressed up as a fact. */
+  if (!p && (presRecvErr || presErr === "busy"))
+    return { k: "off", text: "Status unavailable — server busy" };
   if (!p) return { k: "off", text: "Offline" };
   var age = Date.now() - p.at;
   if (p.s === "on" && age < PRES_ON_MS) return { k: "on", text: "Online" };
@@ -5840,6 +5863,7 @@ window.addEventListener("pagehide", function(){ sendPresence("off", true); });
 setInterval(function(){
   if (!state || !state.me) return;
   if (!document.hidden) sendPresence("on");
+  if (presRecvErr && !document.hidden) pollPresence();   /* refused earlier: try again */
   paintPresence();
 }, 60000);
 
