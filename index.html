@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22w";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22x";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -4261,8 +4261,11 @@ function sendLink(m){
   try { url = linkFor(m.id); }
   catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
   var msg = "Link for " + m.name + " copied — paste it into a message to them";
-  var touch = ("ontouchstart" in window) || (navigator.maxTouchPoints || 0) > 0;
-  if (navigator.share && touch) {
+  /* The share window opens wherever the browser offers one - phone or
+     computer. (For one version it was skipped on computers, which took
+     away the window people use there to send the link.) Only if the
+     browser refuses it does the link get copied instead. */
+  if (navigator.share) {
     try {
       navigator.share({ title: "Family Notifier — " + m.name, url: url })
         .catch(function(e){ if (!e || e.name !== "AbortError") copy(url, msg); });
