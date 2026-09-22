@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22q";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22s";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -1872,6 +1872,7 @@ function takeSignedFamily(fam){
   paintBark();
   if (state.me) {
     openStreams();
+    pollPresence();
     if (!wasAdmin && isAdmin()) toast("You manage this family now");
     else toast("Family settings updated by " + nameOf(state.admin.id));
   } else toast("You were removed from the family");
@@ -4698,7 +4699,7 @@ function takeRoster(msg){
 
   save();
   paintMain();
-  if (state.me) { openStreams(); toast("Family list updated"); }
+  if (state.me) { openStreams(); pollPresence(); toast("Family list updated"); }
   else toast("You were removed from the family");
 }
 
@@ -5694,8 +5695,11 @@ $("barkTest").onclick = function(){
  * because ntfy.sh limits how many messages a phone may send a day. */
 var PRES = {};                       /* id -> { s, at } */
 var presSent = { s: null, at: 0 };
-var PRES_ON_MS = 12 * 60000, PRES_AWAY_MS = 30 * 60000;
-var PRES_BEAT_MS = 10 * 60000;       /* was 5 min: half the steady traffic */
+var PRES_ON_MS = 7 * 60000, PRES_AWAY_MS = 30 * 60000;
+/* Back to every 5 minutes. Stretching it to 10 made phones still on an
+   older copy (which expect a beat within 7) show everyone as Away for
+   part of every ten minutes. */
+var PRES_BEAT_MS = 5 * 60000;
 
 function presTopic(id){ return ringTopic(id) + "-p"; }
 function presTopics(){
@@ -5711,13 +5715,28 @@ function sendPresence(s, force){
   var now = Date.now();
   if (s === presSent.s && (s !== "on" || now - presSent.at < PRES_BEAT_MS) && !force) return;
   if (state.presOff && presSent.s === "off" && !force) return;
-  presSent = { s: s, at: now };
+  var sent = presSent = { s: s, at: now };
+  /* A status that failed to send used to count as sent, so nobody saw
+     this phone until the next beat five minutes later - or ever, for
+     "away". The very first one, fired as the app opens, fails often
+     (network still waking, or the server refusing because the allowance
+     is used up). A failure is now forgotten, so the once-a-minute check
+     below sends it again, and the reason is shown under Settings. */
+  function failed(why){
+    if (presSent === sent) presSent = { s: null, at: 0 };
+    presErr = why; paintPresBlock();
+  }
   try {
     fetch(srv() + "/" + encodeURIComponent(presTopic(state.me)) + "?priority=1" + authParam(),
           { method: "POST", body: JSON.stringify({ s: s }), keepalive: true })
-      .catch(function(){});
-  } catch (e) {}
+      .then(function(r){
+        if (r.ok) { if (presErr) { presErr = null; paintPresBlock(); } return; }
+        failed(r.status === 429 ? "busy" : "error " + r.status);
+      })
+      .catch(function(){ failed("network"); });
+  } catch (e) { failed("network"); }
 }
+var presErr = null;
 function takePresence(m){
   var pre = "fmn-" + state.house + "-";
   var id = m.topic.slice(pre.length, -2);
@@ -5729,15 +5748,21 @@ function takePresence(m){
   paintPresence();
 }
 /* What is already known - a stream only brings what happens next. */
-var presPolled = false, presPolledAt = 0;
-function pollPresence(){
+var presPolled = false, presPolledAt = 0, presPolledKey = "";
+function pollPresence(force){
   var topics = presTopics();
   if (!topics.length) return;
   /* Flicking between apps used to cost a request every time. The live
      stream already carries changes, so this catch-up is only worth
-     doing once a minute at most. */
-  if (presPolled && Date.now() - presPolledAt < 60000) return;
+     doing once a minute - unless the list of people changed, because
+     somebody who just appeared on it has no status yet at all and
+     would sit on "Offline" until their next beat. */
+  var key = topics.join(",");
+  if (!force && presPolled && key === presPolledKey &&
+      Date.now() - presPolledAt < 60000) return;
   presPolledAt = Date.now();
+  if (key !== presPolledKey && presPolled) presPolled = false;  /* look back 12h for them */
+  presPolledKey = key;
   var since = presPolled ? "35m" : "12h";
   presPolled = true;
   netFetch(srv() + "/" + topics.map(encodeURIComponent).join(",")
@@ -5779,6 +5804,13 @@ function paintPresBlock(){
     : "Shown. The people you're in touch with see Online while this app is open, " +
       "Away when it's in the background, and Offline when it's closed. " +
       "Offline doesn't stop calls reaching you.";
+  if (presErr && !state.presOff)
+    $("presNote").textContent += presErr === "busy"
+      ? " Right now your status can't be sent: the notification server says it is " +
+        "busy (too many messages from this connection today). Others see you as " +
+        "Offline until it goes through - an ntfy account token fixes this."
+      : " Right now your status can't be sent (" + presErr + "). Trying again " +
+        "every minute.";
   $("presBtn").textContent = state.presOff ? "Show my status" : "Hide my status";
 }
 $("presBtn").onclick = function(){
@@ -5795,23 +5827,14 @@ function sayHello(){
 
 $("newPersonAdd").onclick = addPersonAsMember;
 
-/* A glance away and back used to post "away" then "on" - two
-   messages for nothing. "Away" now waits 20 seconds and is dropped if
-   the app comes back first. */
-var awayTimer = null;
+/* "Away" goes out the moment the app leaves the screen. It briefly
+   waited 20 seconds to save a message on quick glances - but phones
+   freeze a page's timers as soon as it is in the background, so the
+   message never went and people stayed "Online" after leaving. */
 document.addEventListener("visibilitychange", function(){
   if (!state || !state.me) return;
-  if (document.hidden) {
-    if (awayTimer) clearTimeout(awayTimer);
-    awayTimer = setTimeout(function(){
-      awayTimer = null;
-      if (document.hidden) sendPresence("away");
-    }, 20000);
-    return;
-  }
-  if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
-  sendPresence("on");
-  pollPresence(); paintPresence();
+  sendPresence(document.hidden ? "away" : "on");
+  if (!document.hidden) { pollPresence(); paintPresence(); }
 });
 window.addEventListener("pagehide", function(){ sendPresence("off", true); });
 setInterval(function(){
