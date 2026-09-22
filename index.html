@@ -484,26 +484,6 @@
     <div class="codebox" id="myTopic">—</div>
     <button class="btn ghost" id="copyTopic">Copy topic</button>
 
-    <div id="barkBlock">
-    <div class="sectiontitle">Ring like a call on iPhone (Bark)</div>
-    <p class="sub">
-      ntfy can't keep an iPhone ringing, or ring it on silent. The free app
-      <b>Bark</b> can: calls ring for 30 seconds, even on silent and Do Not
-      Disturb. ntfy keeps working alongside it.
-      <br><br>
-      1 · Install <b>Bark</b> from the App&nbsp;Store and open it.<br>
-      2 · Allow notifications, and allow <b>Critical Alerts</b> when asked
-      (or later: Settings → Apps → Bark → Notifications → Critical Alerts).<br>
-      3 · In Bark, copy the address shown on its first screen — it looks like
-      <b>https://api.day.app/AbCd…</b> — and paste it here.
-    </p>
-    <input type="text" id="barkUrl" placeholder="https://api.day.app/your-key" autocomplete="off" data-secret>
-    <button class="btn" id="barkSave">Save Bark for this iPhone</button>
-    <button class="btn ghost" id="barkTest">Test — this iPhone should ring</button>
-    <button class="btn ghost" id="barkOff">Stop using Bark</button>
-    <p class="sub" style="margin-top:8px" id="barkState">—</p>
-    </div>
-
     <div class="sectiontitle">Microphone</div>
     <p class="sub" id="micState">—</p>
     <p class="notice" id="micHow" style="display:none"></p>
@@ -636,7 +616,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22x";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-23a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -745,7 +725,6 @@ function snapshot(){
            server: state.server || null, token: state.token || null,
            tone: state.tone || "classic", ntfy: !!state.ntfy,
            pending: state.pending || [], presOff: !!state.presOff,
-           barkWant: state.barkWant === undefined ? null : state.barkWant,
            missedIds: state.missedIds || [] };
 }
 
@@ -917,7 +896,6 @@ function others(){
 }
 function cloneMember(m, keepContacts){
   var o = { id: m.id, name: m.name, colour: m.colour };
-  if (m.bk) o.bk = m.bk;
   if (keepContacts && m.c) o.c = m.c.slice();
   if (keepContacts && m.by) o.by = m.by;
   return o;
@@ -935,7 +913,7 @@ function viewFor(viewer){
     var inTouch = !v || !v.c || m.id === viewer || v.c.indexOf(m.id) !== -1;
     if (m.id === aid) {
       var a = cloneMember(m, false);
-      if (!inTouch) { a.h = 1; delete a.bk; }
+      if (!inTouch) a.h = 1;
       out.push(a);
     } else if (inTouch) {
       out.push(cloneMember(m, m.id === viewer));
@@ -956,7 +934,7 @@ function membersForLink(id, whole){
   state.members.forEach(function(m){
     if (m.id === state.me) out.push(cloneMember(m, false));
     else if (m.id === id) out.push(cloneMember(m, false));
-    else if (m.id === aid) { var a = cloneMember(m, false); a.h = 1; delete a.bk; out.push(a); }
+    else if (m.id === aid) { var a = cloneMember(m, false); a.h = 1; out.push(a); }
   });
   (state.pending || []).forEach(function(p){
     if (p.member.id === id && !memberById(id)) out.push(cloneMember(p.member, false));
@@ -1052,8 +1030,6 @@ function ringPush(memberId, title, message, answerable){
     url += "&actions=" + encodeURIComponent(
       "view, Answer, " + answerIt + ", clear=true");
   }
-
-  barkPush(memberId, title, message, fromNote, answerable);
 
   function go(u){
     return netFetch(u, { method:"POST", body: message }, 5).then(function(r){
@@ -1873,7 +1849,6 @@ function takeSignedFamily(fam){
   save();
   paintMain();
   paintPending();
-  paintBark();
   if (state.me) {
     openStreams();
     pollPresence();
@@ -1934,7 +1909,6 @@ function applyLock(){
     (locked && state.admin.id !== state.me) ? "block" : "none";
   if (locked) paintPending();
   paintPresBlock();
-  paintBark();
   var note = $("lockNote");
   note.style.display = locked ? "block" : "none";
   if (locked) note.innerHTML = (state.admin.id === state.me && !state.adminKey)
@@ -2569,13 +2543,7 @@ function startCall(peerId){
          network that blocks the server looked exactly like a person not
          picking up, which is the single most misleading thing this app
          could do. */
-      /* Said on screen, so the caller can see whether the iPhone ring
-         went too - without it, "no Bark ring" and "Bark not set up on
-         their phone yet" look the same. */
-      var pm = memberById(peerId);
-      $("callNote").textContent = !showTech() ? ""
-        : (pm && pm.bk) ? "Also ringing their iPhone through Bark"
-        : "Ringing through ntfy (Bark isn't set up for them on this phone)";
+      $("callNote").textContent = "";
       (call.ringP || ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true))
         .then(function(r){
           if (r && r.ok) return;
@@ -2730,7 +2698,6 @@ function onSignal(msg){
 
   if (msg.t === "roster") { takeRoster(msg); return; }
   if (msg.t === "addreq") { takeAddRequest(msg); return; }
-  if (msg.t === "setbark") { takeSetBark(msg); return; }
   if (msg.t === "usage") { takeUsage(msg); return; }
   /* A phone that has just joined asks the admin for its copy. */
   if (msg.t === "hello") {
@@ -2893,7 +2860,6 @@ function hangUp(why){
      Not sent when they told us first (busy, or their own goodbye -
      which arrives here as no reason), or when the offer never left. */
   var theyKnow = call.state !== "calling" || call.offerSent || call.rang;
-  if (call.out && call.state !== "connected") barkClear(call.peer, call.id);
   if (why && why !== "busy" && theyKnow)
     sendSig(call.peer, { t:"bye", call: call.id, from: state.me },
             { keepalive: true })
@@ -4209,7 +4175,11 @@ function contactsChanged(){
     if (!touched.length && !added.length && !renamed) return;
     bumpRev(); save();
     if (added.length || renamed) broadcastRoster();
-    else touched.forEach(function(id){ if (id !== state.me) broadcastRoster(id); });
+    else {
+      touched.forEach(function(id){ if (id !== state.me) broadcastRoster(id); });
+      /* Nobody else's copy changed, so everyone is up to date. */
+      state.bcRev = state.rev; state.bcAt = Date.now(); save();
+    }
     paintMain(); paintInvites();
     if (added.length) openStreams();
     toast(added.length
@@ -4487,7 +4457,6 @@ function saveSetup(){
   });
   draft.pending = (state && state.pending) || [];
   draft.presOff = !!(state && state.presOff);
-  if (state && state.barkWant !== undefined) draft.barkWant = state.barkWant;
   state = draft;
   bumpRev();
   save();
@@ -4526,6 +4495,7 @@ function broadcastRoster(onlyId){
   /* Each person gets their own copy, holding only the people they are
      in touch with - see viewFor. One copy for everybody would put the
      whole family on every phone, which is what privacy rules out. */
+  if (!onlyId) { state.bcRev = state.rev; state.bcAt = Date.now(); save(); }
   state.members.forEach(function(m){
     if (m.id === state.me || (onlyId && m.id !== onlyId)) return;
     var view = viewFor(m.id);
@@ -4660,7 +4630,6 @@ function adminCatchUp(){
         if (m.event !== "message") return;
         var msg; try { msg = JSON.parse(m.message); } catch (e) { return; }
         if (msg && msg.t === "addreq") { seen[m.id] = 1; takeAddRequest(msg); }
-        if (msg && msg.t === "setbark") { seen[m.id] = 1; takeSetBark(msg); }
         if (msg && msg.t === "usage") { seen[m.id] = 1; takeUsage(msg); }
       });
     }).catch(function(){});
@@ -5380,7 +5349,7 @@ function reportUsage(force){
 function deviceInfo(){
   var perm = null;
   try { perm = ("Notification" in window) ? Notification.permission : null; } catch (e) {}
-  return { v: VERSION, bark: !!myBark(), ntfy: !!(state && state.ntfy), notif: perm,
+  return { v: VERSION, ntfy: !!(state && state.ntfy), notif: perm,
            ios: isIOS(), home: !!(window.navigator.standalone ||
              (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) };
 }
@@ -5421,7 +5390,7 @@ function takeUsage(msg){
   });
   var info = null;
   if (msg.info && typeof msg.info === "object") {
-    info = { v: String(msg.info.v || "").slice(0, 20), bark: !!msg.info.bark,
+    info = { v: String(msg.info.v || "").slice(0, 20),
              ntfy: !!msg.info.ntfy, ios: !!msg.info.ios, home: !!msg.info.home,
              notif: ["granted", "denied", "default"].indexOf(msg.info.notif) !== -1 ? msg.info.notif : null };
   }
@@ -5494,7 +5463,6 @@ function paintOverview(){
     if (info) {
       chip(info.v === VERSION ? "Up to date" : "Old version " + (info.v || "?"),
            info.v === VERSION ? "ok" : "warn");
-      if (info.ios) chip(m.bk || info.bark ? "Bark on" : "No Bark", m.bk || info.bark ? "ok" : "warn");
       chip(info.ntfy ? "ntfy set up" : "ntfy not set up", info.ntfy ? "ok" : "bad");
       if (info.notif === "denied") chip("Page alerts blocked", "warn");
       if (info.ios && !info.home) chip("Not on Home Screen", "warn");
@@ -5576,157 +5544,6 @@ $("famUsageCsv").onclick = function(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 };
 
-/* --------------------------------------------------------------- Bark
- *
- * Bark is a free iPhone app that rings with iOS's Critical Alerts: it
- * sounds on silent and through Do Not Disturb, and with call=1 it keeps
- * ringing for 30 seconds - which ntfy cannot do on an iPhone.
- *
- * Each person's Bark address lives on their own entry in the family
- * list, so it only ever reaches the people they are in touch with (see
- * viewFor). Whoever holds it can ring that iPhone, so it is treated as a
- * key: masked, never shown whole.
- *
- * The request is a plain form POST with no-cors: a "simple" request, so
- * the browser needs nothing from Bark's server to send it. The price is
- * that the answer can't be read - ntfy's result is still what the call
- * screen reports. */
-var BARK_DEFAULT = "https://api.day.app";
-
-function tidyBark(raw){
-  raw = String(raw || "").trim();
-  if (!raw) return null;
-  if (/^[A-Za-z0-9]{8,64}$/.test(raw)) return BARK_DEFAULT + "/" + raw;
-  var u; try { u = new URL(raw); } catch (e) { return null; }
-  if (u.protocol !== "https:") return null;
-  var key = u.pathname.split("/").filter(Boolean)[0] || "";
-  if (!/^[A-Za-z0-9]{8,64}$/.test(key)) return null;
-  return u.origin + "/" + key;
-}
-
-function barkSend(base, fields){
-  if (!base || !tidyBark(base)) return;
-  var body = new URLSearchParams();
-  Object.keys(fields).forEach(function(k){
-    if (fields[k] !== undefined && fields[k] !== null) body.append(k, String(fields[k]));
-  });
-  try {
-    fetch(base, { method: "POST", mode: "no-cors", body: body, keepalive: true })
-      .catch(function(){});
-  } catch (e) {}
-}
-
-function barkPush(memberId, title, message, link, isCall){
-  var m = memberById(memberId);
-  if (!m || !m.bk) return;
-  var f = { title: title, body: message, group: "Family Notifier", url: link };
-  if (isCall) {
-    f.level = "critical"; f.call = "1"; f.volume = "8";
-    if (call && call.peer === memberId) { f.id = call.id; call.barkSent = true; }
-  } else {
-    f.level = "timeSensitive";
-  }
-  barkSend(m.bk, f);
-}
-
-/* The caller gave up: take the ringing call off their lock screen. */
-function barkClear(memberId, callId){
-  var m = memberById(memberId);
-  if (!m || !m.bk || !callId || !call || !call.barkSent) return;
-  barkSend(m.bk, { id: callId, "delete": "1" });
-}
-
-function myBark(){ var m = state && memberById(state.me); return (m && m.bk) || null; }
-
-/* Setting your own Bark address. The family list is the admin's, so a
-   member asks - and the admin's phone accepts it for the sender's OWN
-   entry only, with nothing else in the message looked at. */
-function setMyBark(bk){
-  if (!state || !state.me) return;
-  var mine = memberById(state.me);
-  if (!mine) return;
-  if (!managedByOther()) {
-    if (bk) mine.bk = bk; else delete mine.bk;
-    delete state.barkWant;
-    bumpRev(); save(); broadcastRoster();
-    paintBark();
-    toast(bk ? "Bark saved — calls to you will ring through it" : "Bark turned off");
-    return;
-  }
-  state.barkWant = bk || "";
-  state.barkSentAt = Date.now();
-  save();
-  sendSig(state.admin.id, { t:"setbark", from: state.me, bk: bk || "" })
-    .catch(function(){});
-  paintBark();
-  toast("Saved — it switches on once " + nameOf(state.admin.id) + "'s phone confirms");
-}
-
-function takeSetBark(msg){
-  if (!isAdmin()) return;
-  var m = memberById(msg.from);
-  if (!m || m.id === state.me) return;
-  var bk = msg.bk ? tidyBark(msg.bk) : null;
-  if (msg.bk && !bk) return;
-  if ((m.bk || null) === bk) { broadcastRoster(m.id); return; }
-  if (bk) m.bk = bk; else delete m.bk;
-  if (draft && draft !== state && draft.members && $("setupSheet").classList.contains("on"))
-    draft.members.forEach(function(d){
-      if (d.id === m.id) { if (bk) d.bk = bk; else delete d.bk; }
-    });
-  bumpRev(); save(); broadcastRoster();
-}
-
-/* A request the admin hasn't confirmed goes again, at most hourly. */
-function resendBark(){
-  if (!state || !managedByOther() || state.barkWant === undefined || state.barkWant === null) return;
-  if ((state.barkWant || null) === myBark()) { delete state.barkWant; save(); return; }
-  if (Date.now() - (state.barkSentAt || 0) < 3600000) return;
-  state.barkSentAt = Date.now(); save();
-  sendSig(state.admin.id, { t:"setbark", from: state.me, bk: state.barkWant || "" })
-    .catch(function(){});
-}
-
-function paintBark(){
-  var el = $("barkState");
-  if (!el || !state || !state.me) return;
-  var have = myBark();
-  var want = (state.barkWant === undefined || state.barkWant === null) ? undefined : (state.barkWant || null);
-  if (want !== undefined && want === have) { delete state.barkWant; save(); want = undefined; }
-  if (want !== undefined) {
-    el.textContent = (want ? "Saved. " : "Turning off. ") + "Waiting for " +
-      nameOf(state.admin.id) + "'s phone to confirm — usually seconds, or next time they open the app.";
-  } else if (have) {
-    el.textContent = "On. Calls to you ring this iPhone through Bark, as well as ntfy.";
-  } else {
-    el.textContent = "Off. Calls to you use ntfy only.";
-  }
-  var inp = $("barkUrl");
-  if (inp && document.activeElement !== inp) inp.value = (want !== undefined ? want : have) || "";
-  $("barkOff").style.display = (have || want) ? "block" : "none";
-}
-
-$("barkSave").onclick = function(){
-  if (!state || !state.me) { toast("Save first"); return; }
-  var bk = tidyBark($("barkUrl").value);
-  if (!bk) { toast("Paste the address from Bark — https://api.day.app/…"); return; }
-  setMyBark(bk);
-};
-$("barkOff").onclick = function(){
-  if (!state || !state.me) return;
-  $("barkUrl").value = "";
-  setMyBark(null);
-};
-/* Rings this iPhone directly from the box - no need to wait for the
-   admin, and the only way to check Critical Alerts were allowed. */
-$("barkTest").onclick = function(){
-  var bk = tidyBark($("barkUrl").value) || myBark();
-  if (!bk) { toast("Paste your Bark address first"); return; }
-  barkSend(bk, { title: "Test call", body: "If this rang on silent, Bark is set up",
-                 level: "critical", call: "1", volume: "8", group: "Family Notifier" });
-  toast("Sent — it should ring for up to 30 seconds. Tap it to stop.");
-};
-
 /* ------------------------------------------------ settings autosave
  *
  * Every setting that had its own Save button now also saves itself a
@@ -5736,7 +5553,7 @@ $("barkTest").onclick = function(){
  * an accidental wipe never goes out to everyone. */
 (function(){
   var groups = { serverUrl: "saveServer", tokenVal: "saveToken",
-                 barkUrl: "barkSave", turn2Url: "saveTurn2",
+                 turn2Url: "saveTurn2",
                  turnUrl: "saveTurn", turnUser: "saveTurn", turnPass: "saveTurn" };
   function val(id){ return ($(id) && $(id).value || "").trim(); }
   function stored(key){
@@ -5745,7 +5562,6 @@ $("barkTest").onclick = function(){
     switch (key) {
       case "saveServer": return state.server || DEFAULT_SERVER;
       case "saveToken":  return state.token || "";
-      case "barkSave":   return myBark() || "";
       case "saveTurn2":  return (state.turn2 && state.turn2.api) || "";
       case "saveTurn":   return [t.api || t.url || "", t.user || "", t.pass || ""].join("|");
     }
@@ -5790,15 +5606,17 @@ $("barkTest").onclick = function(){
  * reaches it with the app closed.
  *
  * Each phone posts its own state to its own topic: on every change,
- * and every five minutes while in front. That is cheap on purpose,
+ * and every ten minutes while in front. That is cheap on purpose,
  * because ntfy.sh limits how many messages a phone may send a day. */
 var PRES = {};                       /* id -> { s, at } */
 var presSent = { s: null, at: 0 };
-var PRES_ON_MS = 7 * 60000, PRES_AWAY_MS = 30 * 60000;
-/* Back to every 5 minutes. Stretching it to 10 made phones still on an
-   older copy (which expect a beat within 7) show everyone as Away for
-   part of every ten minutes. */
-var PRES_BEAT_MS = 5 * 60000;
+/* "I'm still here" goes out every 10 minutes while the app is on screen
+   (it was 5: a computer left open all day spent over 100 of the 250
+   free daily messages on this alone). Online stays shown for 16
+   minutes after the last one, so one lost beat doesn't flicker to Away.
+   Leaving and closing the app are still sent the moment they happen. */
+var PRES_ON_MS = 16 * 60000, PRES_AWAY_MS = 30 * 60000;
+var PRES_BEAT_MS = 10 * 60000;
 
 function presTopic(id){ return ringTopic(id) + "-p"; }
 function presTopics(){
@@ -5973,6 +5791,13 @@ if (location.protocol === "file:") $("filewarn").style.display = "block";
 
 loadLedgers();
 state = load();
+/* Bark has been taken out. Anything it left in storage goes with it. */
+if (state) {
+  var hadBark = ("barkWant" in state) || ("barkSentAt" in state);
+  delete state.barkWant; delete state.barkSentAt;
+  (state.members || []).forEach(function(m){ if (m.bk) { delete m.bk; hadBark = true; } });
+  if (hadBark) save();
+}
 /* The month's figures from before the ledger existed, carried over once. */
 (function(){
   var e = myLedger(), old = state && state.usage;
@@ -5993,7 +5818,16 @@ ensureRelay();
    only catches up on the last couple of minutes of messages, so without
    this it would wait for the admin's next change to hear about the last
    one. Phones already up to date ignore it (same version). */
-setTimeout(function(){ if (canSign()) broadcastRoster(); }, 4000);
+/* Only when something changed since the last send, or the last one is
+   old enough to have dropped out of the server's 12-hour memory. It
+   used to go out on EVERY opening - one message per person, often in
+   several pieces - which alone could use up a good part of the free
+   daily allowance while the admin was testing. */
+setTimeout(function(){
+  if (!canSign()) return;
+  if (state.bcRev === state.rev && Date.now() - (state.bcAt || 0) < 10 * 3600000) return;
+  broadcastRoster();
+}, 4000);
 setTimeout(function(){
   if (!state || !state.me) return;
   sendPresence(document.hidden ? "away" : "on");
@@ -6001,7 +5835,6 @@ setTimeout(function(){
   adminCatchUp();
   rosterCatchUp();
   resendPending();
-  resendBark();
   reportUsage();
 }, 2500);
 
