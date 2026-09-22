@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22t";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22u";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -4130,6 +4130,7 @@ function paintMembers(){
     inp.type = "text"; inp.value = m.name;
     inp.placeholder = "Name"; inp.autocomplete = "off";
     inp.oninput = function(){ draft.members[i].name = inp.value; };
+    inp.onchange = function(){ contactsChanged(); };
     row.appendChild(inp);
     if (privacy && m.id !== state.me) {
       var cb = document.createElement("button");
@@ -4164,36 +4165,55 @@ function setInTouch(a, b, on){
   put(a, b.id); put(b, a.id);
 }
 
-/* Who-sees-whom used to change only in the form's copy, and reached
-   anybody's phone only when Save at the bottom was pressed - so
-   switching someone to "Everyone" and closing Settings changed nothing
-   on their phone. Now each change is applied and sent on its own, a
-   moment after the last tap, and only to the phones it affects. People
-   added in the form but not saved yet wait for Save, as before. */
+/* Changes in the family list go out on their own, a moment after the
+ * last tap or once you leave a name box - no Save needed:
+ *   - a new person, once they have a name, joins the family and their
+ *     invite link appears under "Invite the others" straight away
+ *     (it used to appear only after Save, so it looked missing);
+ *   - a renamed person is renamed on everyone's phone;
+ *   - who-sees-whom reaches the phones it affects.
+ * Removing someone (×) still waits for Save, so a slip of the finger
+ * never throws a person out of the family. */
 var contactsTimer = null;
 function contactsChanged(){
   if (!state || !state.me || managedByOther() || !draft || draft === state) return;
   clearTimeout(contactsTimer);
   contactsTimer = setTimeout(function(){
     contactsTimer = null;
-    var touched = [];
+    var touched = [], added = [], renamed = false;
+    draft.members.forEach(function(d){
+      var name = String(d.name || "").trim().slice(0, 40);
+      if (!name || memberById(d.id)) return;
+      var copy = JSON.parse(JSON.stringify(d));
+      copy.name = name;
+      state.members.push(copy);
+      added.push(copy);
+    });
     draft.members.forEach(function(d){
       var m = memberById(d.id);
       if (!m) return;
+      var name = String(d.name || "").trim().slice(0, 40);
+      if (name && name !== m.name && m.id !== state.me) { m.name = name; renamed = true; }
       var want = d.c ? d.c.filter(function(id){ return id !== d.id && !!memberById(id); })
                      : null;
       var have = m.c || null;
       if (JSON.stringify(want) === JSON.stringify(have)) return;
       if (want) m.c = want.slice(); else delete m.c;
-      touched.push(m.id);
+      if (touched.indexOf(m.id) === -1) touched.push(m.id);
     });
-    if (!touched.length) return;
+    if (!touched.length && !added.length && !renamed) return;
     bumpRev(); save();
-    touched.forEach(function(id){ if (id !== state.me) broadcastRoster(id); });
+    if (added.length || renamed) broadcastRoster();
+    else touched.forEach(function(id){ if (id !== state.me) broadcastRoster(id); });
     paintMain(); paintInvites();
-    toast(touched.length === 1 && touched[0] !== state.me
-      ? "Sent to " + nameOf(touched[0]) + "'s phone"
-      : "Sent to the family");
+    if (added.length) openStreams();
+    toast(added.length
+      ? added.map(function(m){ return m.name; }).join(", ") +
+        " added — their invite link is ready under Invite the others"
+      : renamed ? "Name updated on everyone's phone"
+      : touched.length === 1 && touched[0] !== state.me
+        ? "Sent to " + nameOf(touched[0]) + "'s phone"
+        : "Sent to the family");
   }, 800);
 }
 
@@ -4455,6 +4475,12 @@ function saveSetup(){
   $("shareArea").style.display = "block";
   paintInvites();
   $("mineLink").textContent = maskLink(personalLink());
+  /* The form becomes a fresh copy again. It used to BE the saved
+     family after Save, so every later tap in the same visit changed the
+     family directly - never saved, never sent - and the automatic
+     sending below could not tell anything had changed. */
+  draft = JSON.parse(JSON.stringify(state));
+  paintMembers();
   toast("Saved");
 }
 
