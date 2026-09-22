@@ -636,7 +636,7 @@
  *                         notifications as the candidates flow.
  * ==================================================================== */
 
-var VERSION  = "2026-09-22p";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-22q";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 var DEFAULT_SERVER = "https://ntfy.sh";
@@ -4159,15 +4159,48 @@ function setInTouch(a, b, on){
   put(a, b.id); put(b, a.id);
 }
 
+/* Who-sees-whom used to change only in the form's copy, and reached
+   anybody's phone only when Save at the bottom was pressed - so
+   switching someone to "Everyone" and closing Settings changed nothing
+   on their phone. Now each change is applied and sent on its own, a
+   moment after the last tap, and only to the phones it affects. People
+   added in the form but not saved yet wait for Save, as before. */
+var contactsTimer = null;
+function contactsChanged(){
+  if (!state || !state.me || managedByOther() || !draft || draft === state) return;
+  clearTimeout(contactsTimer);
+  contactsTimer = setTimeout(function(){
+    contactsTimer = null;
+    var touched = [];
+    draft.members.forEach(function(d){
+      var m = memberById(d.id);
+      if (!m) return;
+      var want = d.c ? d.c.filter(function(id){ return id !== d.id && !!memberById(id); })
+                     : null;
+      var have = m.c || null;
+      if (JSON.stringify(want) === JSON.stringify(have)) return;
+      if (want) m.c = want.slice(); else delete m.c;
+      touched.push(m.id);
+    });
+    if (!touched.length) return;
+    bumpRev(); save();
+    touched.forEach(function(id){ if (id !== state.me) broadcastRoster(id); });
+    paintMain(); paintInvites();
+    toast(touched.length === 1 && touched[0] !== state.me
+      ? "Sent to " + nameOf(touched[0]) + "'s phone"
+      : "Sent to the family");
+  }, 800);
+}
+
 function contactsPanel(m){
   var p = document.createElement("div"); p.className = "contacts";
   var seg = document.createElement("div"); seg.className = "seg";
   var all = document.createElement("button");
   all.textContent = "Everyone"; all.className = m.c ? "" : "sel";
-  all.onclick = function(){ delete m.c; paintMembers(); };
+  all.onclick = function(){ delete m.c; paintMembers(); contactsChanged(); };
   var some = document.createElement("button");
   some.textContent = "Only people I choose"; some.className = m.c ? "sel" : "";
-  some.onclick = function(){ if (!m.c) m.c = [state.me]; paintMembers(); };
+  some.onclick = function(){ if (!m.c) m.c = [state.me]; paintMembers(); contactsChanged(); };
   seg.appendChild(all); seg.appendChild(some); p.appendChild(seg);
   if (m.c) {
     draft.members.forEach(function(o){
@@ -4175,7 +4208,7 @@ function contactsPanel(m){
       var lb = document.createElement("label"); lb.className = "ck";
       var ck = document.createElement("input"); ck.type = "checkbox";
       ck.checked = m.c.indexOf(o.id) !== -1;
-      ck.onchange = function(){ setInTouch(m, o, ck.checked); paintMembers(); };
+      ck.onchange = function(){ setInTouch(m, o, ck.checked); paintMembers(); contactsChanged(); };
       lb.appendChild(ck);
       lb.appendChild(document.createTextNode(o.name + (o.id === state.me ? "  (you)"
                                                  : o.c ? "" : "  (sees everyone)")));
@@ -4184,7 +4217,8 @@ function contactsPanel(m){
   }
   var h = document.createElement("p"); h.className = "hint2";
   h.textContent = (m.name || "They") + " only gets the people ticked here — the others " +
-    "are never sent to their phone. You always see everyone. Press Save to send it.";
+    "are never sent to their phone. You always see everyone. Changes are sent to " +
+    "their phone straight away.";
   p.appendChild(h);
   return p;
 }
@@ -4590,14 +4624,31 @@ function rosterCatchUp(){
         + "/json?poll=1&since=12h" + authParam(), {}, 2)
     .then(function(r){ return r.ok ? r.text() : ""; })
     .then(function(text){
-      var best = null;
+      /* A signed family is often bigger than one ntfy message and
+         travels in pieces. This used to look only at whole messages, so
+         a phone that was closed when the admin changed something never
+         caught up on it - the update was sitting there, in chunks. */
+      var best = null, parts = {};
+      function consider(msg){
+        if (msg && msg.t === "roster" && msg.fam && (!best || (msg.rev || 0) > (best.rev || 0)))
+          best = msg;
+      }
       text.split("\n").forEach(function(line){
         if (!line.trim()) return;
         var m; try { m = JSON.parse(line); } catch (e) { return; }
         if (m.event !== "message") return;
         var msg; try { msg = JSON.parse(m.message); } catch (e) { return; }
-        if (msg && msg.t === "roster" && msg.fam && (!best || (msg.rev || 0) > (best.rev || 0)))
-          best = msg;
+        if (!msg) return;
+        if (msg.t === "chunk") {
+          var b = parts[msg.k] || (parts[msg.k] = { n: msg.n, got: 0, d: [] });
+          if (b.d[msg.i] === undefined) { b.d[msg.i] = msg.d; b.got++; }
+          if (b.got === b.n) {
+            var whole; try { whole = JSON.parse(b.d.join("")); } catch (e) { whole = null; }
+            consider(whole);
+          }
+          return;
+        }
+        consider(msg);
       });
       if (best) takeRoster(best);
     }).catch(function(){});
