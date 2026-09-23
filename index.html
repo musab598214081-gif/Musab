@@ -305,6 +305,75 @@
   .rnd:active{transform:scale(.95)}
   .rndlbl{text-align:center;font-size:13px;color:var(--mist);margin-top:14px;min-height:18px}
 
+  .rnd.add{background:rgba(255,255,255,.1)}
+
+  /* ---------------------------------------------------------------
+     Group call. Everyone's tile in their own colour; whoever is
+     talking gets a ring of it, so you can tell who is speaking. */
+  #gcall{position:fixed;top:0;right:0;bottom:0;left:0;display:none;flex-direction:column;
+    align-items:center;justify-content:space-between;background:var(--night);overflow:hidden;
+    isolation:isolate;z-index:75;padding:24px 20px;
+    padding-top:calc(48px + env(safe-area-inset-top,0px));
+    padding-bottom:calc(36px + env(safe-area-inset-bottom,0px))}
+  #gcall.on{display:flex}
+  #gcall::before{content:"";position:absolute;inset:-20%;z-index:-2;
+    background:radial-gradient(circle at 50% 30%, var(--who-a) 0%, rgba(15,27,42,0) 60%);opacity:.5}
+  #gcall.incoming::before{opacity:.9;animation:breathe 2.4s ease-in-out infinite}
+  #gcall.incoming .wave{animation:ripple 2.4s cubic-bezier(.2,.6,.3,1) infinite}
+  .gtop{text-align:center;width:100%}
+  .gtitle{font-size:30px;font-weight:700;margin:0 0 8px;letter-spacing:-.3px}
+  #gcall .state{font-size:16px;color:var(--mist);margin:0;font-variant-numeric:tabular-nums;
+    max-width:32ch;margin:0 auto;line-height:1.4}
+  .ggrid{flex:1 1 auto;width:100%;max-width:460px;display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:22px 8px;
+    align-content:center;justify-items:center;padding:20px 0;overflow-y:auto}
+  #gcall.incoming .ggrid{display:flex;flex-direction:column;align-items:center;justify-content:center}
+  #gcall .halo .avatar{width:auto;height:auto}
+  .gmore{color:var(--mist);font-size:14px;text-align:center;margin:10px 0 0}
+  .gt{display:flex;flex-direction:column;align-items:center;min-width:0;width:100%;text-align:center}
+  .gt .av{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-weight:700;font-size:25px;color:#0F1B2A;background:var(--who);
+    box-shadow:0 0 0 0 var(--who-a);transition:box-shadow .18s ease-out}
+  .gt.talk .av{box-shadow:0 0 0 4px var(--night),0 0 0 8px var(--who)}
+  .gt.wait .av{opacity:.5;animation:waitpulse 1.6s ease-in-out infinite}
+  @keyframes waitpulse{0%,100%{opacity:.4} 50%{opacity:.75}}
+  .gt.gone .av{opacity:.3;filter:grayscale(.7)}
+  .gt .nm{margin-top:9px;font-size:15px;font-weight:500;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gt .st{font-size:12px;color:var(--mist);min-height:16px;margin-top:2px}
+  #gcall .controls{width:100%;max-width:420px}
+  @media (prefers-reduced-motion: reduce){
+    #gcall.incoming::before,.gt.wait .av,#gcall.incoming .wave{animation:none}
+    .gt.talk .av{transition:none}
+  }
+
+  /* Choosing who to call. Above the call screens, since Add opens it
+     from the middle of a call; below the toast, which must stay readable. */
+  #grpSheet{z-index:78}
+  /* Choosing who to call */
+  .pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 12px;
+    margin-bottom:8px;background:var(--night);border:1px solid var(--seam);border-radius:16px;
+    color:var(--paper);font:inherit;font-size:16px;cursor:pointer}
+  .pick .dot{width:40px;height:40px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-weight:700;font-size:15px;color:#0F1B2A}
+  .pick .nm{flex:1;min-width:0}
+  .pick .nm small{display:block;font-size:12px;color:var(--mist);margin-top:1px}
+  .pick .nm small.on{color:var(--go)} .pick .nm small.away{color:var(--amber)}
+  .pick .tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--seam);flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center}
+  .pick.sel{border-color:var(--brass)}
+  .pick.sel .tick{background:var(--brass);border-color:var(--brass)}
+  .pick.sel .tick::after{content:"";width:6px;height:11px;border:solid var(--brass-ink);
+    border-width:0 2.5px 2.5px 0;transform:translateY(-1px) rotate(45deg)}
+  .grpbtn{display:flex;align-items:center;width:100%;text-align:left;background:transparent;
+    border:1px dashed var(--seam);border-radius:20px;padding:12px 14px;margin:2px 0 10px;
+    color:var(--paper);font:inherit;font-size:16px;font-weight:500;cursor:pointer}
+  .grpbtn .ic{width:48px;height:48px;border-radius:50%;background:#22364D;color:var(--go);
+    display:flex;align-items:center;justify-content:center;margin-right:14px;flex:0 0 auto}
+  .grpbtn .ic svg{width:24px;height:24px}
+  .grpbtn small{display:block;font-weight:400;font-size:13px;color:var(--mist);margin-top:2px}
+  .grpbtn:active{background:var(--hearth)}
+
   .toast{position:fixed;left:50%;transform:translateX(-50%);
     bottom:calc(26px + env(safe-area-inset-bottom,0px));
     background:#22364D;color:var(--paper);
@@ -369,6 +438,29 @@
   <div class="controls">
     <div class="callbtns" id="callBtns"></div>
     <p class="rndlbl" id="callNote"></p>
+  </div>
+</div>
+
+<div id="gcall" aria-live="polite">
+  <div class="gtop">
+    <p class="gtitle" id="gTitle">Group call</p>
+    <p class="state" id="gState">Joining…</p>
+  </div>
+  <div class="ggrid" id="gGrid"></div>
+  <div class="controls">
+    <div class="callbtns" id="gBtns"></div>
+    <p class="rndlbl" id="gNote"></p>
+  </div>
+  <div id="gAudio" hidden></div>
+</div>
+
+<div class="sheet" id="grpSheet">
+  <div class="sheetbody">
+    <h2 id="grpTitle">Group call</h2>
+    <p class="sub" id="grpSub">Pick who to call.</p>
+    <div id="grpList"></div>
+    <button class="btn green" id="grpGo">Call</button>
+    <button class="btn ghost" data-close="grpSheet">Cancel</button>
   </div>
 </div>
 
@@ -573,7 +665,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-09-25c";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-26a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -655,7 +747,7 @@ function snapshot(){
            fs: state.fs || null,
            tone: state.tone || "classic",
            pending: state.pending || [], presOff: !!state.presOff,
-           missedIds: state.missedIds || [] };
+           missedIds: state.missedIds || [], grpSeen: state.grpSeen || {} };
 }
 
 function b64u(str){
@@ -973,6 +1065,7 @@ function fsConnect(){
     fsPres = document.hidden ? "away" : "on";
     fsSendPres();
     fsSendSub();
+    swConfig();
     fsPingTimer = setInterval(function(){
       try { ws.send("ping"); } catch (e) {}
       /* No answer for a long while: the connection died without saying. */
@@ -1011,7 +1104,10 @@ function fsFrame(f){
                topic: sigTopic(state.me), message: f.body }, false);
   } else if (f.k === "ring") {
     dispatch({ event: "message", id: f.id, time: Math.floor(f.time / 1000),
-               topic: ringTopic(state.me), title: f.title, message: f.body }, false);
+               topic: ringTopic(state.me), title: f.title, message: f.body,
+               kind: f.kind || null, tag: f.tag || null }, false);
+  } else if (f.k === "room") {
+    groupRoomFrame(f);
   } else if (f.k === "pres") {
     fsTakePres(f); paintPresence();
   } else if (f.k === "presall") {
@@ -1178,6 +1274,14 @@ if ("serviceWorker" in navigator) {
      points (the answer link, usually) without reloading. */
   navigator.serviceWorker.addEventListener("message", function(e){
     var d = e.data || {};
+    /* A notification just reached this device while this copy is open.
+       Its connection may have died quietly while it slept - reconnect
+       now, so the call behind the notification arrives at once. */
+    if (d.t === "push") {
+      if (!fsOpen || Date.now() - lastBeatAt > 20000) { fsRetry = 1000; fsConnect(); }
+      else { try { fsWs.send("ping"); } catch (x) {} }
+      return;
+    }
     if (d.t !== "open" || !d.url) return;
     var i = String(d.url).indexOf("#");
     if (i === -1) return;
@@ -1186,7 +1290,8 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-function ringPush(memberId, title, message, answerable, kind){
+function ringPush(memberId, title, message, answerable, kind, opt){
+  opt = opt || {};
   /* Where tapping the notification (or its Answer button) goes.
      It used to be the bare page address - and the browser that opens
      it is often not the one this family was set up in (the Home Screen
@@ -1207,11 +1312,48 @@ function ringPush(memberId, title, message, answerable, kind){
      opening the page to ring all over again. */
   var join = home.indexOf("#") === -1 ? "#" : "&";
   var fromNote = home + join + "n=1";
-  var answerIt = fromNote + "&ans=1";
+  var answerIt = fromNote + (opt.gr ? "&gr=" + opt.gr : "&ans=1");
+  var tag = opt.tag || ((answerable && call && call.peer === memberId) ? call.id : null);
+  /* Decline, straight from the notification: what the app would have
+     sent had it been open - so the caller hears "declined" at once
+     instead of ringing on to "no answer". */
+  var dec = null;
+  if (answerable && tag) {
+    dec = { u: fsBase() + "/send",
+            b: opt.gr ? { me: memberId, k: "room", op: "decline", room: opt.gr }
+                      : { me: memberId, k: "send", to: state.me,
+                          body: JSON.stringify({ t: "bye", call: tag, from: memberId }) } };
+  }
   return fsRequest({ k: "ring", to: memberId, title: title, body: message,
                      url: fromNote, answer: answerable ? answerIt : null,
                      kind: kind || (answerable ? "call" : "buzz"),
-                     tag: (answerable && call && call.peer === memberId) ? call.id : null }, 15000);
+                     tag: tag, dec: dec, ringFor: opt.ringFor || null }, 15000);
+}
+
+/* Tells the notification helper where to send a renewed registration,
+   so a phone whose browser replaced it keeps ringing by itself. */
+function swConfig(){
+  if (!useFS() || !("serviceWorker" in navigator)) return;
+  fsVapidKey().then(function(key){
+    return navigator.serviceWorker.getRegistration().then(function(reg){
+      var w = reg && (reg.active || reg.waiting || reg.installing);
+      if (w) w.postMessage({ t: "cfg", send: fsBase() + "/send", me: state.me, key: key });
+    });
+  }).catch(function(){});
+}
+
+/* Takes this call's notification off this device - it was answered,
+   declined or has ended, and "is calling you" should not stay up. */
+function clearCallNote(tag){
+  if (!tag || !("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.getRegistration().then(function(reg){
+    if (!reg) return;
+    var w = reg.active;
+    if (w) w.postMessage({ t: "silence", tag: tag });
+    if (reg.getNotifications) return reg.getNotifications({ tag: tag }).then(function(ns){
+      ns.forEach(function(n){ n.close(); });
+    });
+  }).catch(function(){});
 }
 
 /* A message to one person's phones, through the family server. */
@@ -1302,6 +1444,8 @@ function openStreams(){
 
 function onRingMsg(m){
   var title = m.title || "Someone";
+  /* A group call's ring: the room itself raises the call screen. */
+  if (m.kind === "group") return;
   var fresh = !m.time || (Date.now()/1000 - m.time) < 120;
   /* Only buzzes go into Recent from here. A call's notification is just
      its doorbell - the call itself is logged when it is answered,
@@ -1324,7 +1468,7 @@ function onRingMsg(m){
      a missed call rather than left unexplained. */
   if (!fresh || call) return;
   setTimeout(function(){
-    if (call || Date.now() - lastMissedAt < 20000) return;
+    if (call || group || Date.now() - lastMissedAt < 20000) return;
     var who = memberByTitle(title);
     if (who) noteMissed(who.id, null);
   }, 15000);
@@ -1967,6 +2111,8 @@ var ICON = {
   inArr: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7 7 17M7 9v8h8"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
   copy:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>',
+  addp:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.6"/><path d="M3 20c.6-3.6 3.3-5.6 6.5-5.6s5.9 2 6.5 5.6M18.5 8v6M15.5 11h6"/></svg>',
+  group: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.5-3.2 3-5 6-5s5.5 1.8 6 5"/><circle cx="17" cy="9.5" r="2.5"/><path d="M16.5 14.6c2.4.2 4 1.8 4.5 4.4"/></svg>',
   outArr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>'
 };
 
@@ -2068,6 +2214,11 @@ function paintCallButtons(incoming){
     spk.button.classList.toggle("on", speakerOn);
   };
   spk.button.classList.toggle("on", speakerOn);
+
+  add("add", ICON.addp, "Add", function(){
+    if (!call || call.state !== "connected") { toast("Add people once the call has connected"); return; }
+    openGroupPicker("add");
+  });
 
   add("hang", ICON.end, "End", function(){ hangUp("ended"); });
 }
@@ -2477,19 +2628,18 @@ function startCall(peerId){
   setCallState("Asking for the microphone…");
   $("callNote").textContent = "Your browser should be asking to allow it";
 
-  /* The other phone is woken the moment the microphone is granted,
-     instead of after the relay lookup, the offer and its upload have
-     all finished one after another. Waking a phone and opening the
-     page takes seconds; the offer is ready well inside that time, so
-     the ring and the call setup now overlap instead of queueing. */
+  /* The other phone is woken at once - before the microphone, the
+     relay lookup and the offer, not after them. Waking a phone and
+     opening the page takes seconds; everything here is ready well
+     inside that time, so the ring and the call setup overlap instead
+     of queueing. (It used to wait for the microphone, and a first-time
+     permission question could hold the ring back for many seconds.) */
+  call.rang = true;
+  call.ringP = ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true);
   var micP = micStream().then(function(stream){
     if (call && call.state === "calling") {
       setCallState("Connecting…");
       $("callNote").textContent = "";
-    }
-    if (call && call.out && !call.ringP) {
-      call.rang = true;
-      call.ringP = ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true);
     }
     return stream;
   });
@@ -2614,7 +2764,7 @@ function ringIncoming(msg){
     setTimeout(function(){ if (call && call.state === "incoming") answer(); }, 50);
   }
   if (document.hidden)
-    systemNotify(nameOf(msg.from) + " is calling", "Tap to answer");
+    systemNotify(nameOf(msg.from) + " is calling", "Tap to answer", msg.call);
 }
 
 /* A missed call, said once: into Recent, and a quiet note - no ringing,
@@ -2665,7 +2815,7 @@ function onSignal(msg){
     if (call && call.id === msg.call) return;       /* same call, seen again */
     if ((state.missedIds || []).indexOf(msg.call) !== -1) return;   /* dealt with */
     if (call && call.ending) hangUp(null);          /* the last one is over */
-    if (call) {
+    if (call || (group && group.state !== "incoming")) {
       sendSig(msg.from, { t:"busy", call: msg.call, from: state.me });
       return;
     }
@@ -2710,6 +2860,7 @@ function onSignal(msg){
     return;
   }
 
+  if (typeof msg.t === "string" && msg.t.indexOf("g-") === 0) { groupSignal(msg); return; }
   if (msg.t === "roster") { takeRoster(msg); return; }
   if (msg.t === "addreq") { takeAddRequest(msg); return; }
   if (msg.t === "usage") { takeUsage(msg); return; }
@@ -2771,7 +2922,8 @@ function onSignal(msg){
     /* Said the way it happened: hung up before you answered is a
        missed call, not an ended one. */
     var missed = call.state === "incoming" || call.state === "checking";
-    setCallState(missed ? "Missed call" : "Call ended");
+    setCallState(missed ? "Missed call" : call.theyDeclined ? "Declined" : "Call ended");
+    clearCallNote(call.id);
     if (missed) noteMissed(call.peer, call.id, call.state === "incoming");
     if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
     /* The line goes dead now; the words stay up just long enough to read. */
@@ -2805,6 +2957,7 @@ function tellMyOtherCopies(what){
 function answer(){
   if (!call || call.state !== "incoming") return;
   tellMyOtherCopies("answered");
+  clearCallNote(call.id);
   if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
   stopTone();
   setCallState("Asking for the microphone…");
@@ -2858,7 +3011,9 @@ function hangUp(why){
               why === "ended" && document.visibilityState === "hidden");
   }
   stopTone();
-  releaseAwake();
+  if (call) clearCallNote(call.id);
+  /* Moved into a group call: the group now owns the screen lock. */
+  if (!group || group.state === "incoming") releaseAwake();
   if (speakerOn || boost) { speakerOn = false; setBoost(false); }
   if (call && call.t0) micTipAfterCall();
   if (!call) { hideCallScreen(); return; }
@@ -3530,31 +3685,84 @@ function playPattern(key){
   return (at - audioCtx.currentTime) + spec.gap;
 }
 
+/* The ringtone, as one seamless loop.
+ *
+ * It used to be scheduled one pass at a time from a timer. A page in the
+ * background has its timers slowed or frozen by the browser - so a call
+ * arriving while the app was behind another tab or app rang once and
+ * stopped, or rang with long gaps. Now the whole pattern, gap included,
+ * is drawn once into a sound buffer that the audio system loops by
+ * itself, with no timer involved at all. */
+var toneBufs = {};
+function toneBuffer(key){
+  var spec = TONES[key] || TONES.classic;
+  var sr = audioCtx.sampleRate;
+  var hit = toneBufs[key];
+  if (hit && hit.sampleRate === sr) return hit;
+  var len = spec.gap;
+  spec.steps.forEach(function(st){ len += st.d + st.r; });
+  var buf = audioCtx.createBuffer(1, Math.ceil(len * sr), sr);
+  var data = buf.getChannelData(0);
+  var at = 0;
+  spec.steps.forEach(function(st){
+    var n0 = Math.floor(at * sr), n = Math.floor(st.d * sr), amp = 0.28 / st.f.length;
+    for (var i = 0; i < n && n0 + i < data.length; i++) {
+      var t = i / sr;
+      /* The same soft start and finish as before - no clicks. */
+      var env = Math.max(0, Math.min(1, t / 0.012, (st.d - t) / 0.03));
+      var v = 0;
+      for (var k = 0; k < st.f.length; k++) v += Math.sin(2 * Math.PI * st.f[k] * t);
+      data[n0 + i] += v * amp * env;
+    }
+    at += st.d + st.r;
+  });
+  toneBufs[key] = buf;
+  return buf;
+}
+
 function tone(){
   unlockAudio();
   if (!audioCtx) return;
   stopTone();
-  var key = toneName(), on = true, iv = null;
+  var key = toneName(), spec = TONES[key] || TONES.classic, src = null, vib = null;
+  try {
+    src = audioCtx.createBufferSource();
+    src.buffer = toneBuffer(key);
+    src.loop = true;
+    src.connect(audioCtx.destination);
+    src.start();
+  } catch (e) { src = null; }
 
-  function round(){
-    if (!on) return;
-    var wait = playPattern(key);
-    /* Vibration follows the pattern's own shape, so the phone in a
-       pocket rings in the same rhythm as the phone on the table. */
-    if (navigator.vibrate) {
-      var pat = [], spec = TONES[key] || TONES.classic;
-      spec.steps.forEach(function(st){
-        pat.push(Math.round(st.d*1000), Math.round(st.r*1000));
-      });
-      try { navigator.vibrate(pat); } catch (e) {}
-    }
-    iv = setTimeout(round, Math.max(400, wait * 1000));
+  /* Vibration follows the pattern's own shape, so the phone in a pocket
+     rings in the same rhythm as the phone on the table - handed over
+     as one long pattern, renewed well before it runs out. */
+  function vibrate(){
+    if (!navigator.vibrate) return;
+    var one = [];
+    spec.steps.forEach(function(st){ one.push(Math.round(st.d * 1000), Math.round(st.r * 1000)); });
+    one[one.length - 1] += Math.round(spec.gap * 1000);
+    var pat = [];
+    while (pat.length + one.length <= 60) pat = pat.concat(one);
+    try { navigator.vibrate(pat); } catch (e) {}
   }
-  round();
+  vibrate();
+  vib = setInterval(vibrate, 15000);
+
+  /* No buffer (a very old browser): the old way, one pass at a time. */
+  var iv = null, on = true;
+  if (!src) {
+    (function round(){
+      if (!on) return;
+      var wait = playPattern(key);
+      iv = setTimeout(round, Math.max(400, wait * 1000));
+    })();
+  }
 
   toneStop = function(){
     on = false;
+    if (src) { try { src.stop(); src.disconnect(); } catch (e) {} }
     if (iv) clearTimeout(iv);
+    if (vib) clearInterval(vib);
     if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
   };
 }
@@ -3596,10 +3804,21 @@ function buzz(memberId, message){
  * THAT focuses this page rather than opening a second copy. It still
  * takes a tap, because nothing on the web may steal the screen, but it
  * is one tap and the page is already alive behind it. */
-function systemNotify(title, body){
+function systemNotify(title, body, tag){
   try {
     if (!("Notification" in window)) return false;
     if (Notification.permission !== "granted") return false;
+    /* Through the notification helper when there is one: with the call's
+       own tag it merges with the one from the server instead of showing
+       twice, and it works on phones, where a page's own notifications
+       are not allowed. */
+    if (tag && "serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if (reg) reg.showNotification(title, { body: body, tag: tag, renotify: true,
+          requireInteraction: true, data: { url: location.href, kind: "call", tag: tag } });
+      }).catch(function(){});
+      return true;
+    }
     var n = new Notification(title, {
       body: body,
       tag: "notifyer-call",       /* replaces itself, never stacks */
@@ -3756,6 +3975,12 @@ function showTech(){ return !!(state && (!state.admin || isAdmin())); }
 
 function callLabel(r){
   var dur = r.dur ? " · " + fmtLength(r.dur * 1000) : "";
+  if (r.grp) switch (r.st) {
+    case "missed":   return "Missed group call";
+    case "declined": return "Group call · declined";
+    case "noanswer": return "Group call · nobody answered";
+    default:         return "Group call" + dur;
+  }
   switch (r.st) {
     case "missed":   return "Missed call";
     case "declined": return r.dir === "in" ? "You declined" : "Declined";
@@ -3862,6 +4087,15 @@ function paintMain(){
     card.onkeydown = function(ev){ if (ev.key === "Enter") openAct(m.id); };
     main.appendChild(card);
   });
+
+  if (others.length >= 2) {
+    var gb = document.createElement("button");
+    gb.className = "grpbtn";
+    gb.innerHTML = '<span class="ic">' + ICON.group + '</span><span>Group call' +
+                   '<small>Call several people at once</small></span>';
+    gb.onclick = function(){ unlockAudio(); askNotify(); openGroupPicker("new"); };
+    main.appendChild(gb);
+  }
 
   var st = document.createElement("div");
   st.className = "status"; st.id = "statusLine";
@@ -4012,6 +4246,11 @@ function recentRow(r, withDate){
   var m = ((state && state.members) || []).filter(function(x){
     return entryFor(r, x) && x.id !== state.me && shown(x); })[0];
   if (m && !withDate) { d.className += " tap"; d.onclick = function(){ openAct(m.id); }; }
+  /* A group call's line: tap to call the same people again. */
+  if (!m && r.grp && r.ids && r.ids.length && !withDate) {
+    d.className += " tap";
+    d.onclick = function(){ openGroupPicker("new", r.ids); };
+  }
   return d;
 }
 
@@ -4704,16 +4943,29 @@ var TAB_ID = rand(8);
 /* What the notification asked for, read from the address. */
 var autoAnswerUntil = 0;
 var openedFromNote  = false;
+var callBackTo = null;
 function readIntent(){
   var h = location.hash || "";
   openedFromNote = /[#&]n=1(&|$)/.test(h);
+  /* "Call back" on a missed call: their card opens, one tap from calling. */
+  var cb = h.match(/[#&]cb=([A-Za-z0-9]{3,16})(&|$)/);
+  if (cb) {
+    callBackTo = cb[1];
+    setTimeout(function(){
+      if (callBackTo && state && state.me && memberById(callBackTo) && !call && !group) openAct(callBackTo);
+      callBackTo = null;
+    }, 400);
+  }
+  /* "Join" on a group call's notification. */
+  var gr = h.match(/[#&]gr=([A-Za-z0-9_-]{4,32})(&|$)/);
+  if (gr) groupAutoJoin(gr[1]);
   if (/[#&]ans=1(&|$)/.test(h)) {
     /* The offer may still be on its way - the page has only just
        opened. Answer it when it lands, if that is within a minute. */
     autoAnswerUntil = Date.now() + 60000;
     if (call && call.state === "incoming") { autoAnswerUntil = 0; answer(); }
   }
-  if ((openedFromNote || autoAnswerUntil) && !/[#&]j=/.test(h))
+  if ((openedFromNote || autoAnswerUntil || cb || gr) && !/[#&]j=/.test(h))
     history.replaceState(null, "", location.pathname);
 }
 
@@ -5553,6 +5805,858 @@ setInterval(function(){
   if (!state || !state.me) return;
   paintPresence();                     /* keeps "Away · 5 min" current */
 }, 60000);
+
+/* ==================================================================== *
+ * Group calls
+ *
+ * Up to eight people, everyone hearing everyone. As with a two-person
+ * call the audio goes phone to phone (or through the relay) - every
+ * phone in the call is connected to every other one. The family server
+ * keeps the call's "room": who is in it, who is being rung, who has
+ * gone. Each phone connects to whoever joined before it, so two phones
+ * never both try to start the same connection.
+ *
+ * A two-person call becomes a group call with Add: both phones move into
+ * a room, and the old connection is only closed once the new one
+ * between them carries sound - no gap, no hanging up.
+ * ==================================================================== */
+var GROUP_MAX = 8;
+var group = null;
+var groupAuto = null;          /* { room, until } - opened from "Join" */
+var groupBusyNoted = {};
+
+function newGroup(id, st){
+  return { id: id, state: st, room: null, stream: null, links: {}, met: {},
+           gone: {}, t0: 0, muted: false, speaker: false };
+}
+function gMember(r, id){
+  var m = memberById(id);
+  var x = r && ((r.live && r.live[id]) || (r.inv && r.inv[id]));
+  return { name: (m && m.name) || (x && x.n) || "Someone",
+           colour: (m && m.colour) || (x && x.c) || "#5B8DEF" };
+}
+function gName(r, id){ return id === state.me ? "You" : gMember(r, id).name; }
+function gOthers(r){
+  return Object.keys((r && r.live) || {}).filter(function(id){ return id !== state.me; });
+}
+function gList(names){
+  if (names.length <= 1) return names.join("");
+  return names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+}
+function gNote(t){ var e = $("gNote"); if (e) e.textContent = t || ""; }
+function gIce(){
+  var list = iceServers();
+  if (routeMode() === "cloudflare") list = list.concat(cloudflareServers());
+  return { iceServers: list };
+}
+
+/* ---------------------------------------------------------- choosing */
+
+var pickMode = "new", picked = {};
+function openGroupPicker(mode, preset){
+  if (!state || !state.me) return;
+  pickMode = mode; picked = {};
+  (preset || []).forEach(function(id){ if (memberById(id)) picked[id] = 1; });
+  var busy = {};
+  if (call) busy[call.peer] = 1;
+  if (group && group.room) {
+    Object.keys(group.room.live).forEach(function(id){ busy[id] = 1; });
+    Object.keys(group.room.inv).forEach(function(id){ busy[id] = 1; });
+  }
+  var room = GROUP_MAX - 1 - Object.keys(busy).length;
+  $("grpTitle").textContent = mode === "new" ? "Group call" : "Add to the call";
+  $("grpSub").textContent = mode === "new"
+    ? "Pick who to call. Everyone hears everyone, up to " + GROUP_MAX + " people."
+    : "Their phones ring now. Everyone already on the call stays on it.";
+  var list = $("grpList"); list.innerHTML = "";
+  var cands = others().filter(function(m){ return !busy[m.id]; });
+  if (!cands.length) {
+    var p = document.createElement("p"); p.className = "hint";
+    p.textContent = mode === "new" ? "Add more people to the family in Settings first."
+                                   : "Everyone you can call is already on it.";
+    list.appendChild(p);
+  }
+  cands.forEach(function(m){
+    var b = document.createElement("button");
+    b.className = "pick" + (picked[m.id] ? " sel" : "");
+    b.setAttribute("aria-pressed", picked[m.id] ? "true" : "false");
+    var dot = document.createElement("span"); dot.className = "dot";
+    dot.style.background = m.colour; dot.textContent = initials(m.name);
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = m.name;
+    var st = document.createElement("small"); st.textContent = presenceOf(m.id).text;
+    st.className = "pres " + presenceOf(m.id).k;
+    nm.appendChild(st);
+    var tick = document.createElement("span"); tick.className = "tick";
+    b.appendChild(dot); b.appendChild(nm); b.appendChild(tick);
+    b.onclick = function(){
+      if (!picked[m.id] && Object.keys(picked).length >= room) {
+        toast("A call can have " + GROUP_MAX + " people at most"); return;
+      }
+      if (picked[m.id]) delete picked[m.id]; else picked[m.id] = 1;
+      b.classList.toggle("sel", !!picked[m.id]);
+      b.setAttribute("aria-pressed", picked[m.id] ? "true" : "false");
+      paintPickGo();
+    };
+    list.appendChild(b);
+  });
+  paintPickGo();
+  unlockAudio();
+  openSheet("grpSheet");
+}
+function paintPickGo(){
+  var n = Object.keys(picked).length, b = $("grpGo");
+  b.disabled = !n;
+  b.style.opacity = n ? "1" : ".5";
+  b.textContent = pickMode === "new"
+    ? (n ? "Call " + n + (n === 1 ? " person" : " people") : "Pick at least one person")
+    : (n ? "Add " + n + (n === 1 ? " person" : " people") : "Pick who to add");
+}
+$("grpGo").onclick = function(){
+  var ids = Object.keys(picked);
+  if (!ids.length) return;
+  closeSheet("grpSheet");
+  askNotify();
+  if (pickMode === "new") {
+    if (ids.length === 1) startCall(ids[0]);      /* one person is simply a call */
+    else groupStart(ids);
+  } else if (group && group.state === "live") groupInvite(ids);
+  else if (call && call.state === "connected") groupFromCall(ids);
+  else toast("The call has ended");
+};
+
+/* ------------------------------------------------------- starting */
+
+function groupCanCall(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast("This browser cannot make calls — open the page in Safari or Chrome"); return false;
+  }
+  if (!window.isSecureContext) { toast("Calls need the https:// address, not a local file"); return false; }
+  return true;
+}
+
+function groupStart(ids){
+  if (call || group) { toast("Already on a call"); return; }
+  if (!groupCanCall()) return;
+  unlockAudio();
+  group = newGroup(rand(10), "joining");
+  group.out = true;
+  group.want = ids.slice();
+  showGroupScreen();
+  gNote("Your browser should be asking to allow the microphone");
+  Promise.all([micStream(), ensureRelay()]).then(function(got){
+    if (!group) { stopStream(got[0]); return false; }
+    group.stream = got[0];
+    gNote("");
+    return groupEnter("open");
+  }).then(function(ok){
+    if (ok && group) return groupInvite(ids);
+  }).catch(function(err){
+    toast(callError(err, "start"));
+    groupEnd(null, true);
+  });
+}
+
+/* Joins (or opens) the room on the family server. */
+function groupEnter(op){
+  var g = group;
+  var me = memberById(state.me) || {};
+  return fsRequest({ k: "room", op: op, room: g.id, name: me.name || "", colour: me.colour || "" }, 10000)
+    .then(function(r){
+      if (group !== g) return false;
+      if (!r || !r.ok || !r.room) {
+        var why = r && r.status === "full" ? "That call is full"
+                : r && r.status === "gone" ? "That call has already ended"
+                : "Couldn't reach " + netName() + " — try again";
+        toast(why);
+        groupEnd(null, true);
+        return false;
+      }
+      g.state = "live";
+      keepAwake();
+      groupApply(r.room);
+      return true;
+    });
+}
+
+function groupInvite(ids){
+  var g = group;
+  if (!g) return Promise.resolve();
+  var names = {};
+  ids.forEach(function(id){
+    var m = memberById(id);
+    if (m) names[id] = { n: m.name, c: m.colour };
+  });
+  return fsRequest({ k: "room", op: "invite", room: g.id, ids: ids, names: names }, 10000)
+    .then(function(r){
+      if (group !== g) return;
+      if (!r || !r.ok) { toast("Couldn't ring them — " + netName() + " didn't answer"); return; }
+      g.invited = true;
+      if (r.room) groupApply(r.room);
+      (r.added || []).forEach(function(id){
+        var with_ = gOthers(g.room).concat([state.me]).filter(function(x){ return x !== id; })
+          .map(function(x){ return x === state.me ? nameOf(state.me) : gName(g.room, x); });
+        ringPush(id, nameOf(state.me) + CALLTAG,
+                 "Group call" + (with_.length > 1 ? " with " + gList(with_) : ""), true, "group",
+                 { tag: g.id, gr: g.id, ringFor: 45000 })
+          .then(function(res){
+            if (group !== g || !res) return;
+            if (res.status === "nosub")
+              toast(nameOf(id) + " hasn't turned on call notifications — they'll only ring with the app open");
+          }).catch(function(){});
+      });
+    });
+}
+
+/* Add, during a two-person call. */
+function groupFromCall(ids){
+  if (!call || call.state !== "connected" || group) return;
+  var peer = call.peer, cid = call.id;
+  group = newGroup(rand(10), "joining");
+  group.out = true;
+  group.moveFrom = peer; group.moveCall = cid;
+  group.want = ids.slice();
+  /* The same microphone, shared: asking for it a second time makes some
+     phones silence the first. */
+  group.stream = call.stream ? call.stream.clone() : null;
+  $("callNote").textContent = "Adding " + gList(ids.map(nameOf)) + "…";
+  var g = group;
+  (group.stream ? Promise.resolve(group.stream) : micStream()).then(function(s){
+    if (group !== g) { stopStream(s); return false; }
+    g.stream = s;
+    return groupEnter("open");
+  }).then(function(ok){
+    if (!ok || group !== g) return;
+    sendSig(peer, { t: "g-move", call: cid, room: g.id, from: state.me }).catch(function(){});
+    /* Their phone is on an older version if it never follows. */
+    g.moveTimer = setTimeout(function(){
+      if (group !== g || (g.room && g.room.live[peer])) return;
+      toast(nameOf(peer) + "'s app needs updating before group calls work — the call carries on as it was");
+      groupAbandon(g);
+    }, 12000);
+    return groupInvite(ids);
+  }).catch(function(err){
+    toast(callError(err, "start"));
+    if (group === g) groupAbandon(g);
+  });
+}
+
+/* Gives up on a group that never got going, keeping the two-person
+   call it came from. */
+function groupAbandon(g){
+  if (group !== g) return;
+  fsRequest({ k: "room", op: "leave", room: g.id }, 8000);
+  closeAllLinks(g);
+  stopStream(g.stream);
+  if (g.moveTimer) clearTimeout(g.moveTimer);
+  group = null;
+  hideGroupScreen();
+  if (call) $("callNote").textContent = "";
+}
+
+/* The other side of Add. */
+function groupMoveIn(msg){
+  if (!call || call.id !== msg.call || call.state !== "connected" || group) return;
+  group = newGroup(msg.room, "joining");
+  group.moveFrom = msg.from; group.moveCall = call.id;
+  group.stream = call.stream ? call.stream.clone() : null;
+  var g = group;
+  (g.stream ? Promise.resolve(g.stream) : micStream()).then(function(s){
+    if (group !== g) { stopStream(s); return; }
+    g.stream = s;
+    return groupEnter("join");
+  }).then(function(ok){
+    if (ok && group === g) showGroupScreen();
+  }).catch(function(){ if (group === g) groupAbandon(g); });
+}
+
+/* The new connection to the person we were talking to carries sound:
+   the old one goes, quietly. */
+function finishMove(){
+  if (!group || !group.moveFrom) return;
+  var cid = group.moveCall;
+  group.moveFrom = null; group.moveCall = null;
+  if (group.moveTimer) { clearTimeout(group.moveTimer); group.moveTimer = null; }
+  if (group.moveEnd) { clearTimeout(group.moveEnd); group.moveEnd = null; }
+  if (call && call.id === cid) hangUp(null);
+  showGroupScreen();
+}
+
+/* ---------------------------------------------------- incoming call */
+
+function groupAutoJoin(room){
+  groupAuto = { room: room, until: Date.now() + 60000 };
+  if (group && group.id === room && group.state === "incoming") setTimeout(groupAccept, 50);
+}
+
+function groupRoomFrame(f){
+  var r = f.room;
+  if (!r || !state || !state.me) return;
+  var me = state.me;
+  if (group && group.id === r.id) {
+    if (group.state === "incoming") {
+      if (r.ended || !r.inv[me]) {
+        stopTone();
+        if (r.live && r.live[me]) { groupEnd(null, true); toast("Joined on another device"); }
+        else groupEnd("missed");
+        return;
+      }
+      group.room = r; paintGroup(); return;
+    }
+    if (r.ended) { groupEnd("ended"); return; }
+    groupApply(r);
+    return;
+  }
+  /* Somebody is asking us in. */
+  if (r.ended || !r.inv || !r.inv[me]) return;
+  /* Dealt with already - unless this is a new invitation into the same
+     call (somebody pressed Add again after a decline). */
+  if (state.grpSeen && state.grpSeen[r.id] >= r.inv[me].at) return;
+  var age = Math.max(0, (f.now || Date.now()) - r.inv[me].at);
+  if (age > 45000) return;
+  var by = r.inv[me].by;
+  if (call || group) {
+    if (!groupBusyNoted[r.id]) {
+      groupBusyNoted[r.id] = 1;
+      toast(gName(r, by) + " is asking you into a group call");
+    }
+    return;
+  }
+  group = newGroup(r.id, "incoming");
+  group.room = r; group.by = by; group.invAt = r.inv[me].at;
+  showGroupScreen();
+  paintGroup();
+  tone();
+  group.ringTimer = setTimeout(function(){
+    if (group && group.id === r.id && group.state === "incoming") groupEnd("missed");
+  }, Math.max(3000, 46000 - age));
+  if (groupAuto && groupAuto.room === r.id && groupAuto.until > Date.now()) {
+    groupAuto = null;
+    setTimeout(groupAccept, 50);
+  } else if (document.hidden) {
+    systemNotify(gName(r, by) + " is calling you", "Group call", r.id);
+  }
+}
+
+function groupAccept(){
+  if (!group || group.state !== "incoming") return;
+  var g = group;
+  stopTone();
+  if (g.ringTimer) { clearTimeout(g.ringTimer); g.ringTimer = null; }
+  clearCallNote(g.id);
+  g.state = "joining";
+  paintGroup();
+  gNote("Your browser should be asking to allow the microphone");
+  Promise.all([micStream(), ensureRelay()]).then(function(got){
+    if (group !== g) { stopStream(got[0]); return; }
+    g.stream = got[0];
+    gNote("");
+    return groupEnter("join");
+  }).catch(function(err){
+    toast(callError(err, "answer"));
+    if (group === g) groupLeave();
+  });
+}
+
+/* --------------------------------------------------------- the room */
+
+/* Brings the connections in line with who is in the call now. */
+function groupApply(r){
+  var g = group;
+  if (!g || !r || r.id !== g.id) return;
+  var prev = g.room;
+  g.room = r;
+  var me = state.me;
+  /* Who has just gone, and why - shown on their tile for a moment. */
+  Object.keys(r.out || {}).forEach(function(id){
+    if (!g.gone[id] && prev && (prev.live[id] || prev.inv[id]))
+      g.gone[id] = { why: r.out[id].why, at: Date.now() };
+  });
+  Object.keys(r.live).forEach(function(id){ delete g.gone[id]; });
+  Object.keys(r.inv).forEach(function(id){ delete g.gone[id]; });
+
+  if (g.state === "live") {
+    if (!r.live[me]) {
+      /* Left on purpose - on this page as it closes, or on another of
+         my devices: this copy stops too, it must not walk back in. */
+      if (g.leaving || (r.out && r.out[me] && r.out[me].why === "left")) {
+        if (!g.leaving) toast("You left the call on another device");
+        groupEnd(null, true);
+        return;
+      }
+      /* Taken out while this phone was unreachable - but it is still
+         here, so it goes straight back in. */
+      if (!g.rejoining) {
+        g.rejoining = true;
+        closeAllLinks(g);
+        groupEnter("join").then(function(){ if (group === g) g.rejoining = false; });
+      }
+      return;
+    }
+    var myAt = r.live[me].at;
+    Object.keys(g.links).forEach(function(id){
+      if (!r.live[id] || g.links[id].at !== r.live[id].at) closeLink(g, id);
+    });
+    Object.keys(r.live).forEach(function(id){
+      if (id === me || g.links[id]) return;
+      if (myAt > r.live[id].at) openLink(g, id, true, r.live[id].at);
+    });
+    if (g.moveFrom && r.live[g.moveFrom] && !g.moveEnd) {
+      /* They are in: show the group now, and if the new connection
+         somehow never carries sound, still let the old call go. */
+      showGroupScreen();
+      g.moveEnd = setTimeout(finishMove, 15000);
+    }
+    if (g.moveFrom && !r.live[g.moveFrom] && g.room && prev && prev.live[g.moveFrom]) finishMove();
+  }
+  paintGroup();
+  checkAlone();
+}
+
+/* Everyone else has gone: the call is over. */
+function checkAlone(){
+  var g = group;
+  if (!g || g.state !== "live" || !g.room || g.moveFrom) return;
+  var alone = !gOthers(g.room).length && !Object.keys(g.room.inv).length;
+  if (!alone) { if (g.aloneTimer) { clearTimeout(g.aloneTimer); g.aloneTimer = null; } return; }
+  if (!g.invited && !g.t0 && g.out) return;       /* still inviting */
+  if (g.aloneTimer) return;
+  g.aloneTimer = setTimeout(function(){
+    if (group !== g) return;
+    var still = !gOthers(g.room).length && !Object.keys(g.room.inv).length;
+    if (!still) { g.aloneTimer = null; return; }
+    gState(g.t0 ? "Everyone has left" : "Nobody answered");
+    setTimeout(function(){ if (group === g) groupLeave(); }, 1400);
+  }, 1800);
+}
+
+/* ------------------------------------------------------ connections */
+
+function openLink(g, id, offerer, at){
+  var pc;
+  try { pc = new RTCPeerConnection(gIce()); }
+  catch (e) { pc = new RTCPeerConnection({ iceServers: STUN.slice() }); }
+  var l = { id: id, pc: pc, offerer: offerer, at: at, state: "connecting",
+            pending: [], iceOut: [], restarts: 0, level: 0 };
+  g.links[id] = l;
+  if (g.stream) g.stream.getTracks().forEach(function(t){ pc.addTrack(t, g.stream); });
+
+  pc.onicecandidate = function(ev){
+    if (group !== g || g.links[id] !== l) return;
+    if (ev.candidate) {
+      l.iceOut.push(ev.candidate.toJSON ? ev.candidate.toJSON()
+                    : { candidate: ev.candidate.candidate, sdpMid: ev.candidate.sdpMid,
+                        sdpMLineIndex: ev.candidate.sdpMLineIndex });
+      if (!l.iceTimer) l.iceTimer = setTimeout(function(){ flushLink(g, l); }, 250);
+    } else flushLink(g, l);
+  };
+  pc.ontrack = function(ev){
+    if (!l.audio) {
+      l.audio = document.createElement("audio");
+      l.audio.autoplay = true;
+      l.audio.setAttribute("playsinline", "");
+      $("gAudio").appendChild(l.audio);
+      if (g.speaker) sinkTo(l.audio, true);
+    }
+    l.audio.srcObject = ev.streams[0] || new MediaStream([ev.track]);
+    var p = l.audio.play();
+    if (p && p.catch) p.catch(function(){ gTapForSound(); });
+  };
+  function changed(){
+    if (group !== g || g.links[id] !== l) return;
+    var ice = pc.iceConnectionState, con = pc.connectionState;
+    if (ice === "connected" || ice === "completed" || con === "connected") {
+      if (l.state !== "connected") {
+        l.state = "connected"; l.restarts = 0;
+        if (l.recTimer) { clearTimeout(l.recTimer); l.recTimer = null; }
+        g.met[id] = gName(g.room, id);
+        if (!g.t0) { g.t0 = Date.now(); groupTimer(); stopTone(); }
+        if (g.moveFrom === id) finishMove();
+        prioritise(pc);
+      }
+    } else if (ice === "failed" || con === "failed") {
+      l.state = "reconnecting"; relink(g, l, 0);
+    } else if (ice === "disconnected" && l.state === "connected") {
+      l.state = "reconnecting"; relink(g, l, 2500);
+    }
+    paintGroup();
+  }
+  pc.oniceconnectionstatechange = changed;
+  pc.onconnectionstatechange = changed;
+  /* A first connection that has not happened in 15 seconds is tried
+     again rather than left waiting. */
+  l.recTimer = setTimeout(function(){ if (l.state !== "connected") relink(g, l, 0); }, 15000);
+
+  if (offerer) sendOffer(g, l, false);
+  return l;
+}
+
+function flushLink(g, l){
+  if (l.iceTimer) { clearTimeout(l.iceTimer); l.iceTimer = null; }
+  if (!l.iceOut.length || group !== g) return;
+  var batch = l.iceOut; l.iceOut = [];
+  sendSig(l.id, { t: "g-ice", room: g.id, from: state.me, cs: batch }).catch(function(){});
+}
+
+function sendOffer(g, l, restart){
+  var pc = l.pc;
+  if (pc.signalingState !== "stable") return;
+  pc.createOffer(restart ? { iceRestart: true } : undefined).then(function(o){
+    return pc.setLocalDescription(o);
+  }).then(function(){
+    if (group !== g || g.links[l.id] !== l) return;
+    return sendSig(l.id, { t: "g-offer", room: g.id, from: state.me,
+                           at: g.room && g.room.live[state.me] ? g.room.live[state.me].at : 0,
+                           sdp: pc.localDescription.sdp });
+  }).catch(function(){});
+}
+
+/* Finding a new path after a network change: the phone that made the
+   connection makes it again; the other one asks it to. */
+function relink(g, l, delay){
+  if (l.recTimer) clearTimeout(l.recTimer);
+  l.recTimer = setTimeout(function(){
+    l.recTimer = null;
+    if (group !== g || g.links[l.id] !== l || l.state === "connected") return;
+    if (l.restarts >= 6) return;
+    l.restarts++;
+    if (l.offerer) sendOffer(g, l, true);
+    else sendSig(l.id, { t: "g-restart", room: g.id, from: state.me }).catch(function(){});
+    relink(g, l, 8000);
+  }, delay);
+}
+
+function closeLink(g, id){
+  var l = g.links[id];
+  if (!l) return;
+  delete g.links[id];
+  if (l.recTimer) clearTimeout(l.recTimer);
+  if (l.iceTimer) clearTimeout(l.iceTimer);
+  try { l.pc.close(); } catch (e) {}
+  if (l.audio) { try { l.audio.srcObject = null; l.audio.remove(); } catch (e) {} }
+}
+function closeAllLinks(g){ Object.keys(g.links).forEach(function(id){ closeLink(g, id); }); }
+
+function prioritise(pc){
+  try {
+    pc.getSenders().forEach(function(s){
+      if (!s.track || s.track.kind !== "audio" || !s.getParameters) return;
+      var p = s.getParameters();
+      if (!p.encodings || !p.encodings.length) return;
+      p.encodings[0].priority = "high";
+      p.encodings[0].networkPriority = "high";
+      s.setParameters(p).catch(function(){});
+    });
+  } catch (e) {}
+}
+
+/* Messages from the other phones in the call. */
+function groupSignal(msg){
+  if (msg.t === "g-move") { groupMoveIn(msg); return; }
+  var g = group;
+  if (!g || msg.room !== g.id || !msg.from || msg.from === state.me) return;
+  if (g.state !== "live") {
+    /* Arrived while this phone is still joining - kept for a moment. */
+    g.early = g.early || [];
+    g.early.push(msg);
+    if (!g.earlyTimer) g.earlyTimer = setInterval(function(){
+      if (group !== g) return;
+      if (g.state === "live") {
+        clearInterval(g.earlyTimer); g.earlyTimer = null;
+        var q = g.early; g.early = [];
+        q.forEach(groupSignal);
+      }
+    }, 150);
+    return;
+  }
+  var l = g.links[msg.from];
+  if (msg.t === "g-offer") {
+    var at = g.room && g.room.live[msg.from] ? g.room.live[msg.from].at : msg.at;
+    if (l && (l.offerer || (msg.at && l.at !== msg.at))) { closeLink(g, msg.from); l = null; }
+    if (!l) l = openLink(g, msg.from, false, at);
+    var pc = l.pc;
+    pc.setRemoteDescription({ type: "offer", sdp: msg.sdp }).then(function(){
+      l.pending.forEach(function(c){ pc.addIceCandidate(c).catch(function(){}); });
+      l.pending = [];
+      return pc.createAnswer();
+    }).then(function(a){ return pc.setLocalDescription(a); }).then(function(){
+      if (group !== g || g.links[msg.from] !== l) return;
+      return sendSig(msg.from, { t: "g-answer", room: g.id, from: state.me,
+                                 sdp: pc.localDescription.sdp });
+    }).catch(function(){});
+    return;
+  }
+  if (!l) return;
+  if (msg.t === "g-answer") {
+    if (l.pc.signalingState !== "have-local-offer") return;
+    l.pc.setRemoteDescription({ type: "answer", sdp: msg.sdp }).then(function(){
+      l.pending.forEach(function(c){ l.pc.addIceCandidate(c).catch(function(){}); });
+      l.pending = [];
+    }).catch(function(){});
+  } else if (msg.t === "g-ice") {
+    (msg.cs || []).forEach(function(c){
+      if (l.pc.remoteDescription) l.pc.addIceCandidate(c).catch(function(){});
+      else l.pending.push(c);
+    });
+  } else if (msg.t === "g-restart") {
+    if (l.offerer) { l.restarts = 0; sendOffer(g, l, true); }
+  }
+}
+
+/* ------------------------------------------------------------ ending */
+
+function groupLeave(){
+  var g = group;
+  if (!g) return;
+  var incoming = g.state === "incoming";
+  fsRequest({ k: "room", op: incoming ? "decline" : "leave", room: g.id }, 8000,
+            document.visibilityState === "hidden");
+  groupEnd(incoming ? "declined" : "left");
+}
+
+function groupEnd(why, quiet){
+  var g = group;
+  if (!g) return;
+  group = null;
+  stopTone();
+  ["ringTimer", "timer", "statTimer", "aloneTimer", "moveTimer", "moveEnd", "earlyTimer"].forEach(function(k){
+    if (g[k]) { clearTimeout(g[k]); clearInterval(g[k]); }
+  });
+  closeAllLinks(g);
+  stopStream(g.stream);
+  clearCallNote(g.id);
+  /* Remembered, so reconnecting does not ring for this invitation again. */
+  var mine = g.room && ((g.room.live && g.room.live[state.me]) || (g.room.inv && g.room.inv[state.me]));
+  var seenAt = Math.max(g.invAt || 0, (mine && mine.at) || 0, g.room ? g.room.t : 0);
+  state.grpSeen = state.grpSeen || {};
+  state.grpSeen[g.id] = seenAt;
+  var keys = Object.keys(state.grpSeen);
+  if (keys.length > 40) keys.sort(function(a, b){ return state.grpSeen[a] - state.grpSeen[b]; })
+    .slice(0, keys.length - 40).forEach(function(k){ delete state.grpSeen[k]; });
+  if (!quiet) {
+    var ids = Object.keys(g.met);
+    if (!ids.length && g.room) ids = gOthers(g.room).concat(Object.keys(g.room.inv))
+                                     .concat(g.want || []).filter(function(x, i, a){ return a.indexOf(x) === i; });
+    if (!ids.length && g.by) ids = [g.by];
+    var names = ids.map(function(id){ return g.met[id] || gName(g.room, id); });
+    var st = g.t0 ? "done" : why === "missed" ? "missed" : why === "declined" ? "declined"
+           : g.out ? "noanswer" : "done";
+    var e = { k: "call", dir: g.out ? "out" : "in", st: st, who: gList(names) || "Group call",
+              grp: 1, ids: ids, cid: g.id };
+    if (g.t0) e.dur = Math.round((Date.now() - g.t0) / 1000);
+    logCall(null, e.dir, st, e);
+    if (why === "missed") toast("Missed group call from " + gName(g.room, g.by));
+  } else save();
+  if (!call) releaseAwake();
+  hideGroupScreen();
+}
+
+/* ------------------------------------------------------------- look */
+
+function showGroupScreen(){
+  if (!group) return;
+  group.shown = true;
+  $("gcall").classList.add("on");
+  paintGroup();
+}
+function hideGroupScreen(){
+  $("gcall").classList.remove("on", "incoming");
+  $("gGrid").innerHTML = "";
+  $("gBtns").innerHTML = "";
+  gNote("");
+}
+function gState(t){ var e = $("gState"); if (e) e.textContent = t; }
+
+function groupTimer(){
+  var g = group;
+  if (!g) return;
+  if (g.timer) clearInterval(g.timer);
+  g.timer = setInterval(function(){
+    if (group !== g || !g.t0) return;
+    var s = Math.floor((Date.now() - g.t0) / 1000);
+    gState(("0" + Math.floor(s / 60)).slice(-2) + ":" + ("0" + (s % 60)).slice(-2));
+  }, 500);
+  /* Who is talking, from the audio levels the connections report. */
+  g.statTimer = setInterval(function(){
+    if (group !== g) return;
+    Object.keys(g.links).forEach(function(id){
+      var l = g.links[id];
+      if (!l.pc.getStats || l.state !== "connected") { l.level = 0; return; }
+      l.pc.getStats(null).then(function(st){
+        st.forEach(function(r){
+          if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio") &&
+              typeof r.audioLevel === "number") l.level = r.audioLevel;
+          if (r.type === "media-source" && r.kind === "audio" && typeof r.audioLevel === "number")
+            g.myLevel = r.audioLevel;
+        });
+      }).catch(function(){});
+    });
+    paintTalk();
+  }, 450);
+}
+
+function paintTalk(){
+  var g = group;
+  if (!g) return;
+  Array.prototype.forEach.call(document.querySelectorAll("#gGrid .gt"), function(t){
+    var id = t.getAttribute("data-id");
+    var lv = id === state.me ? (g.muted ? 0 : g.myLevel || 0) : (g.links[id] ? g.links[id].level : 0);
+    t.classList.toggle("talk", lv > 0.04);
+  });
+}
+
+function paintGroup(){
+  var g = group;
+  if (!g) return;
+  var box = $("gcall"), r = g.room, me = state.me;
+  box.classList.toggle("incoming", g.state === "incoming");
+  var grid = $("gGrid"); grid.innerHTML = "";
+
+  if (g.state === "incoming" && r) {
+    var by = gMember(r, g.by);
+    paintWho(box, by.colour);
+    $("gTitle").textContent = by.name;
+    var rest = gOthers(r).filter(function(x){ return x !== g.by; }).map(function(x){ return gName(r, x); });
+    var inv = Object.keys(r.inv).filter(function(x){ return x !== me; }).map(function(x){ return gName(r, x); });
+    gState("Group call" + (rest.length ? " with " + gList(rest) : ""));
+    var halo = document.createElement("div"); halo.className = "halo";
+    halo.innerHTML = '<span class="wave"></span><span class="wave"></span><span class="wave"></span>';
+    var av = document.createElement("div"); av.className = "avatar"; av.textContent = initials(by.name);
+    halo.appendChild(av); grid.appendChild(halo);
+    if (inv.length) {
+      var p = document.createElement("p"); p.className = "gmore";
+      p.textContent = "Also ringing: " + gList(inv);
+      grid.appendChild(p);
+    }
+    paintGroupButtons(true);
+    return;
+  }
+
+  paintWho(box, (memberById(me) || {}).colour);
+  $("gTitle").textContent = "Group call";
+  if (!g.t0) gState(g.state === "joining" ? "Joining…" : "Waiting for others…");
+  var ids = [me];
+  if (r) {
+    Object.keys(r.live).sort(function(a, b){ return r.live[a].at - r.live[b].at; })
+      .forEach(function(id){ if (id !== me) ids.push(id); });
+    Object.keys(r.inv).forEach(function(id){ if (ids.indexOf(id) === -1) ids.push(id); });
+  }
+  var now = Date.now();
+  Object.keys(g.gone).forEach(function(id){
+    if (now - g.gone[id].at < 8000 && ids.indexOf(id) === -1) ids.push(id);
+  });
+  ids.forEach(function(id){
+    var who = id === me ? { name: nameOf(me), colour: (memberById(me) || {}).colour } : gMember(r, id);
+    var t = document.createElement("div");
+    t.className = "gt"; t.setAttribute("data-id", id);
+    paintWho(t, who.colour);
+    var av = document.createElement("div"); av.className = "av"; av.textContent = initials(who.name);
+    var nm = document.createElement("div"); nm.className = "nm";
+    nm.textContent = id === me ? "You" : who.name;
+    var st = document.createElement("div"); st.className = "st";
+    var l = g.links[id];
+    if (id === me) st.textContent = g.muted ? "Muted" : "";
+    else if (r && r.inv[id]) { st.textContent = "Ringing…"; t.classList.add("wait"); }
+    else if (g.gone[id] && !(r && r.live[id])) {
+      var w = g.gone[id].why;
+      st.textContent = w === "declined" ? "Declined" : w === "noanswer" ? "No answer"
+                     : w === "cancelled" ? "Cancelled" : w === "dropped" ? "Lost connection" : "Left";
+      t.classList.add("gone");
+    }
+    else if (r && r.live[id] && r.live[id].lost) { st.textContent = "Reconnecting…"; t.classList.add("wait"); }
+    else if (!l || l.state === "connecting") { st.textContent = "Connecting…"; t.classList.add("wait"); }
+    else if (l.state === "reconnecting") { st.textContent = "Reconnecting…"; t.classList.add("wait"); }
+    t.appendChild(av); t.appendChild(nm); t.appendChild(st);
+    grid.appendChild(t);
+  });
+  paintGroupButtons(false);
+  paintTalk();
+}
+
+function paintGroupButtons(incoming){
+  var box = $("gBtns");
+  var key = incoming ? "in" : "live";
+  if (box.getAttribute("data-k") === key && box.children.length) {
+    /* Only the toggles change - rebuilding would drop a press in progress. */
+    var mb = box.querySelector(".mute"), sb = box.querySelector(".spk");
+    if (mb) { mb.classList.toggle("on", !!group.muted); mb.innerHTML = group.muted ? ICON.micoff : ICON.mic;
+              mb.nextSibling.textContent = group.muted ? "Unmute" : "Mute"; }
+    if (sb) sb.classList.toggle("on", !!group.speaker);
+    return;
+  }
+  box.setAttribute("data-k", key);
+  box.innerHTML = "";
+  function add(cls, icon, label, fn){
+    var w = document.createElement("div"); w.className = "cb";
+    var b = document.createElement("button");
+    b.className = "rnd " + cls; b.innerHTML = icon; b.setAttribute("aria-label", label);
+    b.onclick = fn;
+    var t = document.createElement("span"); t.textContent = label;
+    w.appendChild(b); w.appendChild(t); box.appendChild(w);
+    return b;
+  }
+  if (incoming) {
+    add("hang", ICON.cross, "Decline", groupLeave);
+    add("answer", ICON.phone, "Join", groupAccept);
+    return;
+  }
+  add("mute", ICON.mic, "Mute", function(){
+    if (!group || !group.stream) return;
+    group.muted = !group.muted;
+    group.stream.getAudioTracks().forEach(function(t){ t.enabled = !group.muted; });
+    paintGroup();
+  });
+  add("spk", ICON.spk, "Speaker", function(){
+    if (!group) return;
+    group.speaker = !group.speaker;
+    Object.keys(group.links).forEach(function(id){
+      if (group.links[id].audio) sinkTo(group.links[id].audio, group.speaker);
+    });
+    if (!document.createElement("audio").setSinkId)
+      gNote(group.speaker ? "Use your phone's volume buttons — this browser picks the speaker itself" : "");
+    paintGroup();
+  });
+  add("add", ICON.addp, "Add", function(){
+    if (!group || group.state !== "live") return;
+    openGroupPicker("add");
+  });
+  add("hang", ICON.end, "Leave", groupLeave);
+}
+
+function sinkTo(el, loud){
+  if (!el.setSinkId || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  navigator.mediaDevices.enumerateDevices().then(function(list){
+    var outs = list.filter(function(d){ return d.kind === "audiooutput"; });
+    var sp = outs.filter(function(d){ return /speaker|loud/i.test(d.label) && !/ear|receiver|handset/i.test(d.label); })[0];
+    var ear = outs.filter(function(d){ return /ear|receiver|handset/i.test(d.label); })[0];
+    var target = loud ? sp : (ear || outs.filter(function(d){ return d.deviceId === "default"; })[0]);
+    if (target) el.setSinkId(target.deviceId).catch(function(){});
+  }).catch(function(){});
+}
+
+function gTapForSound(){
+  gNote("Tap anywhere to hear everyone");
+  function go(){
+    Array.prototype.forEach.call(document.querySelectorAll("#gAudio audio"), function(a){
+      var p = a.play(); if (p && p.catch) p.catch(function(){});
+    });
+    gNote("");
+    document.removeEventListener("click", go, true);
+    document.removeEventListener("touchend", go, true);
+  }
+  document.addEventListener("click", go, true);
+  document.addEventListener("touchend", go, true);
+}
+
+/* Leaving the page mid-call leaves the call properly. */
+window.addEventListener("beforeunload", function(){
+  if (!group) return;
+  if (group.state === "incoming") { stopTone(); return; }
+  group.leaving = true;
+  try { fsRequest({ k: "room", op: "leave", room: group.id }, 3000, true); } catch (e) {}
+  /* Belt and braces: the socket usually still gets a frame out too. */
+  try { if (fsOpen && fsWs) fsWs.send(JSON.stringify({ k: "room", op: "leave", room: group.id })); } catch (e) {}
+  groupEnd("left");
+});
 
 /* -------------------------------------------------------------- start */
 
