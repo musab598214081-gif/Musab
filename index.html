@@ -179,6 +179,23 @@
   .log b{color:var(--paper);font-weight:500}
   .log.missed .ic, .log.missed .tx, .log.missed .det{color:#FF8589}
   .log.missed b{color:#FF8589}
+  /* The main list: one line a row - name, count, outcome, time. */
+  .log.compact{align-items:center;padding:10px 2px}
+  .log.compact .ic{padding-top:0}
+  .log.compact .tm{padding-top:0}
+  .log.compact .tx{display:flex;align-items:baseline;gap:6px;overflow:hidden}
+  .log.compact .tx b{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .log.compact .tx .cnt{flex:0 0 auto;font-size:13px;color:var(--mist)}
+  .log.compact.missed .tx .cnt{color:#FF8589}
+  .log.compact .tx .det{display:block;flex:1 1 auto;min-width:0;margin-top:0;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .log.compact .tx .det::before{content:"· ";color:var(--seam)}
+  .hchips{display:flex;gap:8px;margin:10px 0 2px}
+  .hchip{border:1px solid var(--seam);background:transparent;color:var(--mist);border-radius:999px;
+    padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
+  .hchip.sel{background:#22364D;border-color:#22364D;color:var(--paper)}
+  .hfoot{display:flex;justify-content:space-between;align-items:center}
+  .hfoot .clr{color:var(--mist);margin-left:auto}
 
   .sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(5,11,18,.7);
     display:none;align-items:flex-end;justify-content:center;z-index:40}
@@ -300,6 +317,14 @@
   details.adv[open] > summary::after{transform:rotate(-135deg);margin-bottom:-4px}
   details.adv[open]{padding-bottom:14px}
   details.adv .sectiontitle:first-of-type{margin-top:8px}
+  /* Their local time. */
+  .acttime{margin:-6px 0 14px;font-size:14px;color:var(--mist)}
+  .person .pres .lt{color:var(--mist)} .person .pres .lt.night{color:#B9C4FF}
+  .acttime.night{color:#B9C4FF}
+  .tile .moon{position:absolute;left:-4px;bottom:-4px;width:22px;height:22px;border-radius:50%;
+    background:#2A3A66;color:#DDE3FF;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 2px var(--night)}
+  .tile .moon svg{width:13px;height:13px}
   /* The doorbell panel, for bigger families. */
   .homebar{display:flex;gap:8px;align-items:stretch;margin:8px 0 14px}
   .homebar .hometabs{flex:1;margin:0}
@@ -608,10 +633,21 @@
   <div class="sheetbody">
     <h2 id="actTitle">—</h2>
     <p class="actinfo" id="actInfo"></p>
+    <p class="acttime" id="actTime" style="display:none"></p>
     <button class="btn green" id="doCall">Call</button>
     <button class="btn ghost" id="doBuzz">Buzz them instead</button>
     <div class="acthist" id="actHist"></div>
     <button class="btn ghost" data-close="actSheet">Close</button>
+  </div>
+</div>
+
+<div class="sheet" id="nightSheet">
+  <div class="sheetbody">
+    <h2 id="nightTitle">It's night for them</h2>
+    <p class="sub" id="nightSub"></p>
+    <button class="btn" id="nightCall">Call anyway</button>
+    <button class="btn ghost" id="nightBuzz">Buzz instead</button>
+    <button class="btn ghost" data-close="nightSheet">Cancel</button>
   </div>
 </div>
 
@@ -728,6 +764,9 @@
       <div class="sectiontitle">Your status</div>
       <p class="sub" id="presNote"></p>
       <button class="btn ghost" id="presBtn">—</button>
+      <div class="sectiontitle">Your local time</div>
+      <p class="sub" id="tzNote"></p>
+      <button class="btn ghost" id="tzBtn">—</button>
     </div>
 
     <div id="adminArea" data-pages="admin"></div>
@@ -841,7 +880,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-10-01b";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-10-04a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -916,13 +955,17 @@ var saveWarned = false;
 
 function snapshot(){
   if (!state) return null;
-  return { house: state.house, me: state.me, members: state.members,
+  /* The cookie travels with every page load to the web host: no keys. */
+  var members = (state.members || []).map(function(m){
+    var o = {}; for (var k in m) if (k !== "sk") o[k] = m[k]; return o;
+  });
+  return { house: state.house, me: state.me, members: members,
            rev: state.rev || 0, turn: state.turn || null,
            turn2: state.turn2 || null, route: state.route || null,
            server: state.server || null, token: state.token || null,
            fs: state.fs || null,
            tone: state.tone || "classic",
-           pending: state.pending || [], presOff: !!state.presOff,
+           pending: state.pending || [], presOff: !!state.presOff, tzOff: !!state.tzOff,
            missedIds: state.missedIds || [], grpSeen: state.grpSeen || {},
            admin: state.admin || null,
            joining: state.joining || null, inFam: !!state.inFam,
@@ -1111,7 +1154,11 @@ function viewFor(viewer){
   var v = memberById(viewer);
   var out = [];
   state.members.forEach(function(m){
-    var inTouch = !v || !v.c || m.id === viewer || v.c.indexOf(m.id) !== -1;
+    /* Both ways: someone kept to "only people I choose" is sent only to
+       those people - also when the viewer is set to see everyone. */
+    var inTouch = !v || m.id === viewer ||
+      ((!v.c || v.c.indexOf(m.id) !== -1) &&
+       (m.id === aid || !m.c || m.c.indexOf(viewer) !== -1));
     if (m.id === aid) {
       var a = cloneMember(m, false);
       if (!inTouch) a.h = 1;
@@ -1173,9 +1220,16 @@ function decodeConfig(str){
  * claimed the same person, and calls went to a topic nobody was
  * listening on. A link that arrives already meaning "this is you"
  * removes the choice, and with it the mistake. */
-function linkFor(memberId, whole){
+function linkFor(memberId, whole, withKey){
   var url = location.origin + location.pathname
           + "#j=" + encodeConfig(membersForLink(memberId, whole)) + "&m=" + memberId;
+  /* The key rides only in links that are that person's own: yours, or
+     one the admin made for somebody they added. */
+  if (withKey) {
+    var mk = memberId === state.me ? mySec()
+           : (isAdmin() && memberById(memberId) && memberById(memberId).sk) || "";
+    if (mk) url += "&s=" + mk;
+  }
   /* Somebody a member is inviting, not in the family yet: the link says
      so, and who invited them. Opening it asks for their name and sends
      the admin a request, instead of pretending they are already in. */
@@ -1196,7 +1250,40 @@ function inviteLink(){
    after a stretch of not visiting it - and without this the only way
    back is to open the family link and pick your name again, which is
    fine until it happens while you are waiting for a call. */
-function personalLink(){ return linkFor(state.me); }
+function personalLink(){ return linkFor(state.me, false, true); }
+
+/* ------------------------------------------------- this phone's key
+ *
+ * The family server only believes a phone is "Mum" if it holds Mum's
+ * secret key (see the server's auth). Made here the first time it is
+ * needed, or brought in by a link that carries it (&s=): your own link,
+ * or the invite link the admin made for you. It travels in no other
+ * link - not in call notifications, not in invites a member makes -
+ * and never in the backup cookie. */
+/* Bytes to base64url exactly as the server does it. (b64u() above is
+   for text: it encodes as UTF-8 first, which would change bytes above
+   127 - and with them every fingerprint.) */
+function bytesB64u(a){
+  var bin = "";
+  for (var i = 0; i < a.length; i++) bin += String.fromCharCode(a[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function randSecret(){
+  var a = new Uint8Array(24);
+  crypto.getRandomValues(a);
+  return bytesB64u(a);
+}
+function mySec(){
+  if (!state) return "";
+  if (!state.sec) { state.sec = randSecret(); save(); }
+  return state.sec;
+}
+/* The fingerprint the server keeps: all of SHA-256, base64url. */
+function secHash(sec){
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(sec))).then(function(d){
+    return bytesB64u(new Uint8Array(d));
+  });
+}
 
 /* ==================================================================== *
  * Family server (Cloudflare)
@@ -1239,8 +1326,9 @@ function fsSchedule(){
 function fsConnect(){
   if (!useFS()) return;
   fsClose();
+  if (state.authBad) return;               /* see takeAuthFail */
   var url = fsBase().replace(/^http/, "ws") + "/ws?me=" + encodeURIComponent(state.me)
-          + "&since=" + fsSince();
+          + "&since=" + fsSince() + "&sec=" + encodeURIComponent(mySec());
   var ws;
   try { ws = new WebSocket(url); } catch (e) { fsSchedule(); return; }
   fsWs = ws;
@@ -1308,6 +1396,8 @@ function fsFrame(f){
   } else if (f.k === "famrev") {
     /* The server's copy is older than the admin's: bring it up to date. */
     if (canSign() && (f.rev || 0) < (state.rev || 0)) publishFamily();
+  } else if (f.k === "auth" && f.ok === false) {
+    takeAuthFail();
   } else if (f.k === "caps") {
     fsCaps = { sfu: !!f.sfu, turn: !!f.turn };
   } else if (f.k === "guest") {
@@ -1324,7 +1414,7 @@ function fsFrame(f){
 }
 function fsTakePres(p){
   if (!p || !p.id || p.id === state.me || !memberById(p.id)) return;
-  PRES[p.id] = { s: p.s, at: p.at || Date.now() };
+  PRES[p.id] = { s: p.s, at: p.at || Date.now(), tz: typeof p.tz === "string" && p.tz ? p.tz : null };
 }
 /* A request that expects an answer. Over the live connection when it is
    up (cheapest and fastest), otherwise one plain HTTP request - which is
@@ -1344,6 +1434,7 @@ function fsRequest(frame, timeout, keepalive, viaHttp){
   }
   var body = {}; for (var k in frame) body[k] = frame[k];
   body.me = state.me;
+  body.sec = mySec();
   var opts = { method: "POST", headers: { "Content-Type": "application/json" },
                body: JSON.stringify(body) };
   if (keepalive) opts.keepalive = true;
@@ -1356,7 +1447,7 @@ function fsRequest(frame, timeout, keepalive, viaHttp){
 function fsSendPres(){
   if (!fsOpen || !fsWs) return;
   var s = (state && state.presOff) ? "off" : fsPres;
-  try { fsWs.send(JSON.stringify({ k: "pres", s: s })); } catch (e) {}
+  try { fsWs.send(JSON.stringify({ k: "pres", s: s, tz: (state && state.tzOff) ? "" : myTz() })); } catch (e) {}
 }
 
 /* ---- notifications on this device (Web Push through sw.js) ---- */
@@ -1544,7 +1635,7 @@ function swConfig(){
   fsVapidKey().then(function(key){
     return navigator.serviceWorker.getRegistration().then(function(reg){
       var w = reg && (reg.active || reg.waiting || reg.installing);
-      if (w) w.postMessage({ t: "cfg", send: fsBase() + "/send", me: state.me, key: key });
+      if (w) w.postMessage({ t: "cfg", send: fsBase() + "/send", me: state.me, key: key, sec: mySec() });
     });
   }).catch(function(){});
 }
@@ -1771,7 +1862,7 @@ try {
    alone for a few hours. */
 function autoRelayLink(){
   if (!useFS()) return null;
-  return fsBase() + "/turn?me=" + encodeURIComponent(state.me);
+  return fsBase() + "/turn?me=" + encodeURIComponent(state.me) + "&sec=" + encodeURIComponent(mySec());
 }
 function cfLink(){
   if (state && state.turn2 && state.turn2.api) return state.turn2.api;
@@ -2001,7 +2092,7 @@ function becomeAdmin(quiet){
    what restores admin control on a new phone - and so it is shown only
    as hidden, and copied only on purpose. */
 function adminLink(forId){
-  return linkFor(forId || state.me, true) + "&ak=" +
+  return linkFor(forId || state.me, true, !forId) + "&ak=" +
          b64u(JSON.stringify(state.adminKey));
 }
 
@@ -4677,6 +4768,7 @@ function paintMain(){
   if (!state || !state.me) { paintWelcome(main); return; }
 
   $("whoami").textContent = "You are " + nameOf(state.me);
+  if (state.authBad) { paintAuthBad(main); return; }
   if (state.joining) { paintJoining(main); return; }
   if (state.removed) { paintRemoved(main); return; }
 
@@ -4742,7 +4834,8 @@ function paintMain(){
     cl.className = "qa ring"; cl.innerHTML = ICON.phone;
     cl.setAttribute("aria-label", "Call " + m.name);
     cl.onclick = function(ev){
-      ev.stopPropagation(); unlockAudio(); askNotify(); startCall(m.id);
+      ev.stopPropagation(); unlockAudio(); askNotify();
+      nightCheck([m.id], function(){ startCall(m.id); });
     };
     go.appendChild(bz); go.appendChild(cl);
 
@@ -4966,12 +5059,18 @@ function paintTileNotes(){
       bd = document.createElement("span"); bd.className = "badge"; bd.textContent = last.count;
       av.appendChild(bd);
     }
-    var st = presenceOf(id);
+    var st = presenceOf(id), tt = theirTime(id);
     t.classList.toggle("on", st.k === "on");
     t.classList.toggle("away", st.k === "away");
-    t.setAttribute("aria-label", name + ", " + st.text +
+    var moon = av.querySelector(".moon");
+    if (tt && tt.night && !moon) {
+      moon = document.createElement("span"); moon.className = "moon"; moon.setAttribute("aria-hidden", "true");
+      moon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>';
+      av.appendChild(moon);
+    } else if (moon && !(tt && tt.night)) moon.remove();
+    t.setAttribute("aria-label", name + ", " + st.text + (tt ? ", " + tt.short : "") +
       (last && last.count ? ", " + last.count + " missed call" + (last.count > 1 ? "s" : "") : ""));
-    t.title = name + " · " + st.text;
+    t.title = name + " · " + st.text + (tt ? " · " + tt.short : "");
   });
   var sum = $("presSum");
   if (sum) {
@@ -5040,13 +5139,59 @@ function paintTabs(){
   });
 }
 
+/* ------------------------------------------------ recent, folded
+ *
+ * A busy day was a wall of near-identical lines - "Musab Mobile ·
+ * Declined" four times over. Now back-to-back entries with the same
+ * person on the same day fold into ONE line with a count, and the line
+ * says what matters: the latest outcome, and how many were missed. The
+ * details are one tap away: the person's card lists each call with its
+ * time (and, for the admin, route and quality).
+ *
+ * "Missed" narrows the list to the calls that want a call back. */
+var histFilter = "all";
+
+function runKey(r){
+  var who = r.grp ? "g:" + (r.ids || []).slice().sort().join(",") : (r.pid || r.who);
+  return r.k + "|" + who;
+}
+function foldRuns(list){
+  var runs = [];
+  list.forEach(function(r){
+    var last = runs[runs.length - 1];
+    if (last && last.key === runKey(r) && dayLabel(last.items[0].at) === dayLabel(r.at))
+      last.items.push(r);
+    else runs.push({ key: runKey(r), items: [r] });
+  });
+  return runs;
+}
+
 function paintRecent(){
   paintCardNotes();
   paintTabs();
   var box = $("recentBox");
   if (!box) return;
   box.innerHTML = "";
-  var list = recentList(histTab);
+  var all = recentList(histTab);
+  var missedN = histTab === "call"
+    ? all.filter(function(r){ return r.st === "missed"; }).length : 0;
+  if (histFilter === "missed" && (histTab !== "call" || !missedN)) histFilter = "all";
+
+  /* All / Missed, when there is anything missed to pick out. */
+  if (histTab === "call" && missedN) {
+    var chips = document.createElement("div"); chips.className = "hchips";
+    [["all", "All"], ["missed", "Missed"]].forEach(function(c){
+      var b = document.createElement("button");
+      b.className = "hchip" + (histFilter === c[0] ? " sel" : "");
+      b.setAttribute("aria-pressed", histFilter === c[0] ? "true" : "false");
+      b.textContent = c[1] + (c[0] === "missed" ? " · " + missedN : "");
+      b.onclick = function(){ histFilter = c[0]; paintRecent(); };
+      chips.appendChild(b);
+    });
+    box.appendChild(chips);
+  }
+
+  var list = histFilter === "missed" ? all.filter(function(r){ return r.st === "missed"; }) : all;
   if (!list.length) {
     var p = document.createElement("p");
     p.className = "hint";
@@ -5054,51 +5199,76 @@ function paintRecent(){
     box.appendChild(p); return;
   }
 
-  /* Today and yesterday up front, each under its own heading; anything
-     older waits behind "Show earlier", so a busy week does not bury
-     what happened this morning. */
-  var recent = [], earlier = [];
-  list.forEach(function(r){
-    var label = dayLabel(r.at);
-    (label === "Today" || label === "Yesterday" ? recent : earlier).push(r);
+  /* Today and yesterday up front; anything older waits behind "Show
+     earlier", so a busy week does not bury this morning. */
+  var runs = foldRuns(list), recent = [], earlier = [];
+  runs.forEach(function(run){
+    var label = dayLabel(run.items[0].at);
+    (label === "Today" || label === "Yesterday" ? recent : earlier).push(run);
   });
   if (!recent.length) {
     var none = document.createElement("p");
     none.className = "hint"; none.textContent = "Nothing today or yesterday.";
     box.appendChild(none);
   }
-  var shownList = showEarlier ? recent.concat(earlier) : recent;
+  var shownRuns = showEarlier ? recent.concat(earlier) : recent;
   var lastLabel = "";
-  shownList.forEach(function(r){
-    var label = dayLabel(r.at);
+  shownRuns.forEach(function(run){
+    var label = dayLabel(run.items[0].at);
     if (label !== lastLabel) {
       var h = document.createElement("div");
       h.className = "dayhead"; h.textContent = label;
       box.appendChild(h);
       lastLabel = label;
     }
-    box.appendChild(recentRow(r));
+    box.appendChild(recentRow(run.items[0], false, run.items));
   });
+  var foot = document.createElement("div"); foot.className = "hfoot";
   if (earlier.length) {
     var more = document.createElement("button");
     more.className = "more";
-    more.textContent = showEarlier ? "Show less"
-                                   : "Show earlier (" + earlier.length + ")";
+    var olderN = earlier.reduce(function(n, run){ return n + run.items.length; }, 0);
+    more.textContent = showEarlier ? "Show less" : "Show earlier (" + olderN + ")";
     more.onclick = function(){ showEarlier = !showEarlier; paintRecent(); };
-    box.appendChild(more);
+    foot.appendChild(more);
   }
+  /* A clean slate, when the list is only noise. Asks first. */
+  var clr = document.createElement("button");
+  clr.className = "more clr";
+  clr.textContent = histTab === "call" ? "Clear calls" : "Clear buzzes";
+  clr.onclick = function(){
+    var what = histTab === "call" ? "call" : "buzz";
+    if (!confirm("Clear all " + (what === "call" ? "calls" : "buzzes") +
+                 " from this phone's history?\n\nOnly this list is cleared — nothing on anyone else's phone.")) return;
+    state.recent = (state.recent || []).filter(function(r){ return r.k !== what; });
+    histFilter = "all"; showEarlier = false;
+    save(); paintRecent();
+  };
+  foot.appendChild(clr);
+  box.appendChild(foot);
 }
 
-function recentRow(r, withDate){
+function recentRow(r, withDate, run){
+  run = run || [r];
+  var n = run.length;
+  var missedIn = run.filter(function(x){ return x.k === "call" && x.st === "missed"; }).length;
   var missed = r.k === "call" && r.st === "missed";
   var d = document.createElement("div");
-  d.className = "log" + (missed ? " missed" : "");
+  /* The main list is one line a row; the person's card (withDate) keeps
+     two, so the route and quality details there are never cut off. */
+  d.className = "log" + (withDate ? "" : " compact") + (missed || (missedIn && !withDate) ? " missed" : "");
   var ic = document.createElement("span");
   ic.className = "ic " + r.k;
   ic.innerHTML = r.k === "buzz" ? ICON.bell : (r.dir === "out" ? ICON.outArr : ICON.inArr);
   var tx = document.createElement("span"); tx.className = "tx";
   var b = document.createElement("b"); b.textContent = r.pid ? nameOf(r.pid) : r.who;
   tx.appendChild(b);
+  if (n > 1) {
+    var cnt = document.createElement("span"); cnt.className = "cnt";
+    cnt.textContent = "(" + n + ")";
+    cnt.setAttribute("aria-label", n + " times");
+    tx.appendChild(cnt);
+  }
   var det = document.createElement("span");
   det.className = "det";
   if (r.k === "buzz") {
@@ -5108,8 +5278,13 @@ function recentRow(r, withDate){
       q.textContent = ": “" + r.msg + "”";
       det.appendChild(q);
     }
+  } else if (n > 1) {
+    /* The latest outcome - and, when the run mixes missed calls with
+       others, how many were missed. All missed says just that. */
+    det.textContent = missedIn === n ? (r.grp ? "Missed group calls" : "Missed calls")
+      : callLabel(r) + (missedIn && (!missed || missedIn > 1) ? " · " + missedIn + " missed" : "");
   } else {
-    det.textContent = callLabel(r) + (showTech() && r.det ? " · " + r.det : "");
+    det.textContent = callLabel(r) + (showTech() && r.det && withDate ? " · " + r.det : "");
   }
   tx.appendChild(det);
   var tm = document.createElement("span"); tm.className = "tm";
@@ -5192,9 +5367,15 @@ function openAct(id){
   var st = presenceOf(id);
   $("actInfo").textContent = st.k === "on" ? "Online now"
     : st.k === "away" ? st.text : st.text + " — a call still reaches their phone";
+  var tt = theirTime(id), at = $("actTime");
+  at.style.display = tt ? "" : "none";
+  at.classList.toggle("night", !!(tt && tt.night));
+  if (tt) at.textContent = (tt.night ? "\u263E " : "") + "It's " + tt.time +
+    (tt.day ? " " + tt.day : "") + " for " + nameOf(id) + (tt.city ? " in " + tt.city : "") +
+    " · " + tt.gap;
   var m = memberById(id), box = $("actHist");
   box.innerHTML = "";
-  var mine = m ? recentList().filter(function(r){ return entryFor(r, m); }).slice(0, 6) : [];
+  var mine = m ? recentList().filter(function(r){ return entryFor(r, m); }).slice(0, 12) : [];
   if (mine.length) {
     var h = document.createElement("div"); h.className = "dayhead"; h.textContent = "Recent with " + m.name;
     box.appendChild(h);
@@ -5340,8 +5521,15 @@ function paintSetNav(){
 
 
 function newMember(name){
-  return { id: rand(5), name: name,
-           colour: COLOURS[Math.floor(Math.random()*COLOURS.length)] };
+  var m = { id: rand(5), name: name,
+            colour: COLOURS[Math.floor(Math.random()*COLOURS.length)] };
+  /* Somebody the admin adds (or a new family's first people) gets a key
+     at once: it goes inside their invite link, and only its fingerprint
+     goes to the server - so nobody else can sign in as them first. A
+     member inviting someone makes no key: the newcomer's phone makes
+     its own when they join. */
+  if (!state || isAdmin() || !state.admin) m.sk = randSecret();
+  return m;
 }
 
 /* Your own avatar beside your name, in your colour, as others see it. */
@@ -5529,10 +5717,33 @@ function contactsPanel(m, withContacts){
     });
   }
   var h = document.createElement("p"); h.className = "hint2";
-  h.textContent = (m.name || "They") + " only gets the people ticked here — the others " +
-    "are never sent to their phone. You always see everyone. Changes are sent to " +
-    "their phone straight away.";
+  var nm = m.name || "They";
+  /* Kept both ways (see viewFor, and sees() on the server). */
+  h.textContent = (m.c
+    ? nm + " sees only the people ticked here, and only they see " + nm + ". Nobody else " +
+      "gets " + nm + "'s name or status — not even someone set to see everyone."
+    : nm + " sees everyone, except people you keep to \u201conly people I choose\u201d " +
+      "without " + nm + " ticked.") +
+    " You always see everyone. Changes reach their phone straight away.";
   p.appendChild(h);
+  /* A new phone, a lost app, a link that went to the wrong person: a
+     fresh key. The phone holding the old one is signed out at once. */
+  var live = state && isAdmin() && m.id !== state.me ? memberById(m.id) : null;
+  if (live) {
+    var rs = document.createElement("button");
+    rs.className = "mini"; rs.textContent = "Reset " + nm + "'s sign-in";
+    rs.onclick = function(){
+      if (!confirm("Reset " + nm + "'s sign-in?\n\nThe phone signed in as " + nm +
+                   " now is signed out. Then send " + nm + " their new link — the " +
+                   "phone that opens it becomes theirs.")) return;
+      var sk = randSecret(), rk = Date.now();
+      live.sk = sk; live.rk = rk; m.sk = sk; m.rk = rk;
+      bumpRev(); save(); broadcastRoster();
+      toast(nm + " is signed out — now send them their new link");
+      sendLink(live);
+    };
+    p.appendChild(rs);
+  }
   return p;
 }
 
@@ -5541,7 +5752,7 @@ function contactsPanel(m, withContacts){
    you closing the sheet yourself now falls back to copying the link. */
 function sendLink(m){
   var url;
-  try { url = linkFor(m.id); }
+  try { url = linkFor(m.id, false, true); }
   catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
   var data = { title: "Family Notifier — " + m.name, url: url };
   /* The system share window where there is one. Some computers - many
@@ -5637,7 +5848,7 @@ function paintInvites(){
     cp.className = "mini"; cp.innerHTML = ICON.copy + "<span>Copy</span>";
     cp.setAttribute("aria-label", "Copy " + m.name + "'s link");
     cp.onclick = function(){
-      var url; try { url = linkFor(m.id); }
+      var url; try { url = linkFor(m.id, false, true); }
       catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
       copy(url, "Link for " + m.name + " copied");
     };
@@ -5873,6 +6084,14 @@ function publishFamily(){
 }
 function doPublish(){
     var whole = state.members.map(function(m){ return cloneMember(m, true); });
+    /* Each key the admin issued, as a fingerprint only - with its reset
+       count, so the server knows a newer one replaces the old. */
+    return Promise.all(state.members.map(function(m, i){
+      if (!m.sk) return null;
+      return secHash(m.sk).then(function(h){ whole[i].kh = h; if (m.rk) whole[i].rk = m.rk; });
+    })).then(function(){ return doPublish2(whole); });
+}
+function doPublish2(whole){
     var ids = state.members.map(function(m){ return m.id; })
                            .filter(function(id){ return id !== state.me; });
     return Promise.all([signFamily(whole)].concat(ids.map(function(id){
@@ -6113,6 +6332,37 @@ function sendJoin(){
     });
 }
 
+/* The server did not accept this phone's key for its person: someone
+   else holds it (this is an old copy, or a copied link), or the admin
+   reset it. Retrying would only be turned away again, so this phone
+   stops and says what to do - open the new link the admin sends. */
+function takeAuthFail(){
+  if (!state || state.authBad) return;
+  state.authBad = true; save();
+  fsClose();
+  paintMain();
+}
+function paintAuthBad(main){
+  var hello = document.createElement("p"); hello.className = "greet";
+  hello.textContent = "Signed out";
+  main.appendChild(hello);
+  var card = document.createElement("div"); card.className = "onb";
+  var h = document.createElement("h3"), p = document.createElement("p");
+  var who = nameOf(state.me), adm = state.admin ? nameOf(state.admin.id) : "the admin";
+  h.textContent = "This copy of the app isn't signed in as " + who;
+  p.textContent = "It doesn't hold " + who + "'s key. That happens when a link without the " +
+    "key was opened here (a different browser, say), when " + who + " was set up on " +
+    "another phone, or when " + adm + " reset the sign-in. On your usual phone, " +
+    "Settings → You has your own link — open it here. Or ask " + adm + " for a new one.";
+  card.appendChild(h); card.appendChild(p);
+  var inp = document.createElement("input");
+  inp.type = "text"; inp.placeholder = "Paste the new link here"; inp.autocomplete = "off";
+  var go = document.createElement("button"); go.className = "btn"; go.textContent = "Open link";
+  go.onclick = function(){ openPastedLink(inp.value); };
+  card.appendChild(inp); card.appendChild(go);
+  main.appendChild(card);
+}
+
 /* The family server says this phone's person is not in the family. */
 function takeGuest(f){
   if (!state || !state.me || isAdmin()) return;
@@ -6321,6 +6571,7 @@ function tryJoin(){
   var named = location.hash.match(/[#&]m=([A-Za-z0-9\-_]+)/);
   var akey  = location.hash.match(/[#&]ak=([A-Za-z0-9\-_]+)/);
   var newcomer = /[#&]p=1(&|$)/.test(location.hash);
+  var keyIn = location.hash.match(/[#&]s=([A-Za-z0-9_-]{16,80})(&|$)/);
   var byM   = location.hash.match(/[#&]by=([A-Za-z0-9]{3,16})(&|$)/);
   history.replaceState(null, "", location.pathname);
   if (!cfg) { toast("That invite link looks damaged"); return false; }
@@ -6393,6 +6644,13 @@ function tryJoin(){
   }
 
   if (mine) {
+    /* The key: from the link if it carries one; kept if this is the
+       same person on the same phone; otherwise this phone makes its own
+       (and the server takes it only if nobody holds one already). */
+    if (keyIn) state.sec = keyIn[1];
+    else if (same && prev.me === mine && prev.sec) state.sec = prev.sec;
+    else if (!(same && prev.me === mine)) delete state.sec;
+    delete state.authBad;
     save();
     paintMain(); openStreams(); sayHello();
     fsCheckPush().then(paintPushWarn);
@@ -6622,7 +6880,42 @@ $("addMember").onclick = function(){
 };
 $("saveSetup").onclick = saveSetup;
 
-$("doCall").onclick = function(){ closeSheet("actSheet"); startCall(pendingId); };
+$("doCall").onclick = function(){
+  var id = pendingId; closeSheet("actSheet");
+  nightCheck([id], function(){ startCall(id); });
+};
+
+/* Before calling someone in the middle of their night: ask once. A yes
+   holds for half an hour, so calling back doesn't ask again. */
+var nightOk = {};
+function nightCheck(ids, go){
+  var asleep = ids.filter(function(id){
+    var tt = theirTime(id);
+    return tt && tt.night && !(nightOk[id] > Date.now() - 1800000);
+  });
+  if (!asleep.length) { go(); return; }
+  var first = theirTime(asleep[0]);
+  $("nightTitle").textContent = asleep.length === 1
+    ? "It's " + first.time + " for " + nameOf(asleep[0])
+    : "It's night for " + gList(asleep.map(nameOf));
+  $("nightSub").textContent = asleep.length === 1 && ids.length === 1
+    ? (first.city ? nameOf(asleep[0]) + " is in " + first.city + ". " : "") +
+      "They may be asleep. Call anyway, or send a buzz they'll see when they wake up?"
+    : asleep.length === 1
+    ? nameOf(asleep[0]) + (first.city ? " is in " + first.city + " and" : "") +
+      " may be asleep. Call everyone anyway?"
+    : asleep.map(function(id){ var t = theirTime(id); return nameOf(id) + ": " + t.short; }).join(" · ") +
+      ". Call everyone anyway?";
+  $("nightBuzz").style.display = asleep.length === 1 && ids.length === 1 ? "" : "none";
+  $("nightCall").onclick = function(){
+    asleep.forEach(function(id){ nightOk[id] = Date.now(); });
+    closeSheet("nightSheet"); go();
+  };
+  $("nightBuzz").onclick = function(){
+    closeSheet("nightSheet"); pendingId = asleep[0]; openMsgSheet();
+  };
+  openSheet("nightSheet");
+}
 $("doBuzz").onclick = function(){ closeSheet("actSheet"); openMsgSheet(); };
 
 $("sendCustom").onclick = function(){
@@ -7313,6 +7606,52 @@ function sendPresence(s, force){
   if (s !== "off" || force) fsPres = s;
   fsSendPres();
 }
+/* ------------------------------------------------- their local time
+ *
+ * A family across countries calls at the wrong hour without meaning
+ * to. Each phone shares its time zone (only with the people it is in
+ * touch with, and only while "Share my local time" is on), and the
+ * others see what time it is there: "9:14 pm in London", a moon while
+ * it's night, and a question before a call between 10 pm and 7 am. */
+var NIGHT_FROM = 22, NIGHT_TO = 7;
+function myTz(){
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; }
+}
+/* Minutes ahead of UTC in `tz` at this moment. */
+function tzOffset(tz, now){
+  var parts = {};
+  new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric",
+    month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" })
+    .formatToParts(now).forEach(function(x){ parts[x.type] = +x.value; });
+  var asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour % 24, parts.minute, parts.second);
+  return Math.round((asUtc - now.getTime()) / 60000);
+}
+function tzCity(tz){
+  if (/^Etc\//.test(tz) || tz === "UTC") return "";
+  return tz.split("/").pop().replace(/_/g, " ");
+}
+/* What time it is for `id`, or null when unknown or the same as here. */
+function theirTime(id){
+  var p = PRES[id];
+  if (!p || !p.tz) return null;
+  try {
+    var now = new Date();
+    var diff = tzOffset(p.tz, now) - tzOffset(myTz() || "UTC", now);
+    if (!diff) return null;
+    var time = new Intl.DateTimeFormat(undefined, { timeZone: p.tz, hour: "numeric", minute: "2-digit" }).format(now);
+    var h = Number(new Intl.DateTimeFormat("en-US", { timeZone: p.tz, hour: "numeric", hourCycle: "h23" }).format(now)) % 24;
+    var theirDay = new Intl.DateTimeFormat("en-CA", { timeZone: p.tz }).format(now);
+    var myDay = new Intl.DateTimeFormat("en-CA").format(now);
+    var hrs = Math.abs(diff) / 60;
+    var gap = (hrs % 1 ? hrs.toFixed(1).replace(/\.0$/, "") : hrs) + " h " +
+              (diff > 0 ? "ahead of you" : "behind you");
+    var city = tzCity(p.tz);
+    return { time: time, city: city, night: h >= NIGHT_FROM || h < NIGHT_TO, gap: gap,
+             day: theirDay > myDay ? "tomorrow" : theirDay < myDay ? "yesterday" : "",
+             short: time + (city ? " in " + city : " their time") };
+  } catch (e) { return null; }
+}
+
 function presenceOf(id){
   var p = PRES[id];
   if (!p) return { k: "off", text: "Offline" };
@@ -7326,9 +7665,24 @@ function paintPresence(){
     var st = presenceOf(card.getAttribute("data-id"));
     var d = card.querySelector(".pdot"), t = card.querySelector(".pres");
     if (d) d.className = "pdot " + st.k;
-    if (t) { t.className = "pres " + st.k; t.textContent = "● " + st.text; }
+    if (t) {
+      var tt = theirTime(card.getAttribute("data-id"));
+      t.className = "pres " + st.k;
+      t.textContent = "● " + st.text;
+      /* Short on the card ("9:13 AM there") so it stays on one line; the
+         city is on their card and in the night question. */
+      if (tt) {
+        var lt = document.createElement("span");
+        lt.className = "lt" + (tt.night ? " night" : "");
+        lt.textContent = " · " + tt.time + " there" + (tt.night ? " \u263E" : "");
+        lt.title = tt.short;
+        t.appendChild(lt);
+      }
+    }
   });
 }
+/* The clock moves: their times are redrawn every minute. */
+setInterval(function(){ if (state && state.me && !document.hidden) paintPresence(); }, 60000);
 function paintPresBlock(){
   var b = $("presBlock");
   if (!b) return;
@@ -7340,7 +7694,21 @@ function paintPresBlock(){
       "Away when it's in the background, and Offline when it's closed. " +
       "Offline doesn't stop calls reaching you.";
   $("presBtn").textContent = state.presOff ? "Show my status" : "Hide my status";
+  var here = "";
+  try { here = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date()) +
+               (tzCity(myTz()) ? " in " + tzCity(myTz()) : ""); } catch (e) {}
+  $("tzNote").textContent = state.tzOff
+    ? "Not shared. Nobody sees what time it is for you, and nobody is warned before calling you at night."
+    : "Shared with the people you're in touch with, so they see it's " + (here || "your time") +
+      " and are asked before calling you at night. Your time zone is all they get — never your location.";
+  $("tzBtn").textContent = state.tzOff ? "Share my local time" : "Stop sharing my local time";
 }
+$("tzBtn").onclick = function(){
+  if (!state) return;
+  state.tzOff = !state.tzOff; save();
+  fsSendPres();
+  paintPresBlock();
+};
 $("presBtn").onclick = function(){
   if (!state) return;
   state.presOff = !state.presOff; save();
@@ -7533,8 +7901,10 @@ $("grpGo").onclick = function(){
   closeSheet("grpSheet");
   askNotify();
   if (pickMode === "new") {
-    if (ids.length === 1) startCall(ids[0]);      /* one person is simply a call */
-    else groupStart(ids);
+    nightCheck(ids, function(){
+      if (ids.length === 1) startCall(ids[0]);    /* one person is simply a call */
+      else groupStart(ids);
+    });
   } else if (group && group.state === "live") groupInvite(ids);
   else if (call && call.state === "connected") groupFromCall(ids);
   else toast("The call has ended");
