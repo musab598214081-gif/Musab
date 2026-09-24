@@ -989,16 +989,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.3";
+var APP_VERSION = "1.3.1";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "A sync button, and updates in one tap";
+var WHATS_NEW   = "Calls ring every time, and stop the moment you pick up";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-10a";
+var VERSION  = "2026-10-11a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1510,6 +1510,13 @@ function fsFrame(f){
     fsTakePres(f); paintPresence();
   } else if (f.k === "presall") {
     (f.list || []).forEach(fsTakePres); paintPresence();
+    /* How far this phone's clock is from the server's - for the
+       notification helper, which judges whether a call is still ringing
+       by the server's time. Passed on when it changes noticeably. */
+    if (typeof f.now === "number") {
+      var sk = f.now - Date.now();
+      if (Math.abs(sk - fsSkew) > 5000) { fsSkew = sk; swConfig(); }
+    }
   } else if (f.k === "res" && fsReqs[f.q]) {
     var done = fsReqs[f.q]; delete fsReqs[f.q]; done(f);
   } else if (f.k === "fam") {
@@ -1756,12 +1763,14 @@ function ringPush(memberId, title, message, answerable, kind, opt){
 
 /* Tells the notification helper where to send a renewed registration,
    so a phone whose browser replaced it keeps ringing by itself. */
+var fsSkew = 0;
 function swConfig(){
   if (!useFS() || !("serviceWorker" in navigator)) return;
   fsVapidKey().then(function(key){
     return navigator.serviceWorker.getRegistration().then(function(reg){
       var w = reg && (reg.active || reg.waiting || reg.installing);
-      if (w) w.postMessage({ t: "cfg", send: fsBase() + "/send", me: state.me, key: key, sec: mySec() });
+      if (w) w.postMessage({ t: "cfg", send: fsBase() + "/send", me: state.me, key: key, sec: mySec(),
+                             skew: fsSkew });
     });
   }).catch(function(){});
 }
@@ -3570,6 +3579,9 @@ function answer(){
   if (!call || call.state !== "incoming") return;
   tellMyOtherCopies("answered");
   clearCallNote(call.id);
+  /* Picked up: the repeat notifications stop now, here and on this
+     person's other devices - not in a few seconds, once connected. */
+  try { fsRequest({ k: "ringstop", tag: call.id }, 5000); } catch (e) {}
   if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
   stopTone();
   setCallState("Asking for the microphone…");
@@ -9074,6 +9086,8 @@ function groupAccept(){
   if (!group || group.state !== "incoming") return;
   var g = group;
   stopTone();
+  clearCallNote(g.id);
+  try { fsRequest({ k: "ringstop", tag: g.id }, 5000); } catch (e) {}
   if (g.ringTimer) { clearTimeout(g.ringTimer); g.ringTimer = null; }
   clearCallNote(g.id);
   g.state = "joining";

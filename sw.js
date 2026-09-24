@@ -17,16 +17,67 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-10-10a";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-10-11a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var CALL_KINDS = { call: 1, group: 1 };
 var UA = self.navigator.userAgent || "";
 var IS_APPLE = /iPhone|iPad|iPod|Macintosh/.test(UA) && !/Chrome|Chromium|Edg|Firefox/.test(UA);
 
-/* Calls the person swiped away. Later rings of the same call still have
-   to show something (the browser insists), but they show it quietly. */
+/* Calls this phone has dealt with - picked up, declined, swiped away, or
+   answered in the app. Later rings of the same call still have to show
+   something (the browser insists), but they show it quietly and close it.
+   Kept in storage as well as here: a phone stops this helper within
+   seconds of idling, and memory alone was forgotten between two rings -
+   one reason a call sometimes rang and sometimes didn't. */
 var silenced = {};
+var STATE = "fmn-state-v1";
+function savedSilenced() {
+  return caches.open(STATE).then(function (c) { return c.match("silenced"); })
+    .then(function (r) { return r ? r.json() : {}; }).catch(function () { return {}; });
+}
+function markSilenced(tag) {
+  if (!tag) return Promise.resolve();
+  silenced[tag] = 1;
+  return caches.open(STATE).then(function (c) {
+    return savedSilenced().then(function (o) {
+      var now = Date.now();
+      o[tag] = now;
+      Object.keys(o).forEach(function (k) { if (now - o[k] > 15 * 60000) delete o[k]; });
+      return c.put("silenced", new Response(JSON.stringify(o)));
+    });
+  }).catch(function () {});
+}
+function isSilenced(tag) {
+  if (!tag) return Promise.resolve(false);
+  if (silenced[tag]) return Promise.resolve(true);
+  return savedSilenced().then(function (o) { if (o[tag]) silenced[tag] = 1; return !!o[tag]; });
+}
+/* Every notification belonging to one call, whichever of its two labels
+   it carries (see showRing). */
+function closeCall(tag) {
+  if (!tag) return Promise.resolve();
+  return self.registration.getNotifications().then(function (ns) {
+    ns.forEach(function (n) {
+      var d = n.data || {};
+      if (d.tag === tag || n.tag === tag || String(n.tag || "").indexOf(tag + "~") === 0) n.close();
+    });
+  }).catch(function () {});
+}
+function savedCfg() {
+  return caches.open(CFG).then(function (c) { return c.match("cfg"); })
+    .then(function (r) { return r ? r.json() : null; }).catch(function () { return null; });
+}
+/* Tells the family server this call was picked up here: its repeat rings
+   stop at once, and this person's other devices go quiet. */
+function ringStop(tag) {
+  return savedCfg().then(function (cfg) {
+    if (!cfg || !cfg.send || !tag) return;
+    return fetch(cfg.send, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ me: cfg.me, sec: cfg.sec || undefined, k: "ringstop", tag: tag }),
+      keepalive: true }).catch(function () {});
+  });
+}
 /* Calls the open app has confirmed it is ringing out loud for. Only
    those skip the repeat notifications while the app is on screen - an
    app that could not start its sound (no tap yet since it opened) used
@@ -96,8 +147,12 @@ function handlePush(d) {
   var kind = d.kind || "buzz";
   var tag = d.tag || null;
   var ringing = !!CALL_KINDS[kind];
+  var cfg = null, quietCall = false;
 
-  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (list) {
+  return Promise.all([savedCfg(), ringing ? isSilenced(tag) : false]).then(function (got) {
+    cfg = got[0]; quietCall = got[1];
+    return self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  }).then(function (list) {
     /* Any open copy of the app is told at once. A laptop tab that was
        asleep has usually lost its connection without noticing; this
        makes it reconnect now and pick the call up, instead of at its
@@ -110,8 +165,12 @@ function handlePush(d) {
     if (kind === "cancel") return cancel(tag, d, front);
 
     /* A call that arrives long after it was sent (the phone was offline)
-       is not ringing any more. */
-    if (ringing && d.ts && Date.now() - d.ts > 70000) {
+       is not ringing any more. "Long after" by the SERVER's clock: the
+       app measures how far this phone's clock is off, so a phone whose
+       clock runs a minute fast no longer turns every call into a silent
+       "missed call". */
+    var skew = (cfg && typeof cfg.skew === "number" && Math.abs(cfg.skew) < 86400000) ? cfg.skew : 0;
+    if (ringing && d.ts && Date.now() + skew - d.ts > 70000) {
       d = Object.assign({}, d, { title: "Missed call",
         body: String(d.title || "").replace(/\s+is calling you.*$/i, "") + " tried to call you",
         cb: d.from, dec: null, answer: null, ans: null });
@@ -123,8 +182,37 @@ function handlePush(d) {
        itself. (Apple needs every push to show something, so not there.) */
     if (ringing && d.n > 0 && front && !IS_APPLE && tag && audible[tag]) return;
 
-    var quiet = !!(ringing && tag && silenced[tag]);
-    return self.registration.showNotification(d.title || "Family Notifier", options(d, kind, quiet));
+    if (ringing && tag) {
+      /* Already picked up (or declined) here: nothing to ring. The
+         browser insists something is shown, so a quiet one - closed at
+         once - unless the app is on screen. */
+      if (quietCall) {
+        if (front && !IS_APPLE) return closeCall(tag);
+        return self.registration.showNotification(d.title || "Family Notifier", options(d, kind, true))
+          .then(function () { return new Promise(function (r) { setTimeout(r, 300); }); })
+          .then(function () { return closeCall(tag); });
+      }
+      return showRing(d, kind, tag);
+    }
+    return self.registration.showNotification(d.title || "Family Notifier", options(d, kind, false));
+  });
+}
+
+/* Each ring must make a sound. Re-showing a notification under the SAME
+   label re-alerts on Android, but Windows, macOS and iPhones often just
+   update it silently - so a call rang once and then went quiet. Each
+   ring alternates between two labels (…~0, …~1): to the phone every ring
+   is a new notification and sounds; the previous one is closed, so only
+   one is ever on screen. */
+function showRing(d, kind, tag) {
+  var n = d.n || 0;
+  var now = tag + "~" + (n % 2), before = tag + "~" + ((n + 1) % 2);
+  var o = options(Object.assign({}, d, { tag: now }), kind, false);
+  o.data.tag = tag;                                   /* the call, whichever label */
+  return self.registration.showNotification(d.title || "Family Notifier", o).then(function () {
+    return self.registration.getNotifications().then(function (ns) {
+      ns.forEach(function (x) { if (x.tag === before || x.tag === tag) x.close(); });
+    });
   });
 }
 
@@ -166,9 +254,8 @@ function options(d, kind, quiet) {
    notification goes. Where the browser needs something shown for every
    push, a quiet note takes its place instead. */
 function cancel(tag, d, front) {
-  return self.registration.getNotifications(tag ? { tag: tag } : undefined).then(function (ns) {
-    ns.forEach(function (n) { n.close(); });
-    if (tag) silenced[tag] = 1;
+  return Promise.all([tag ? closeCall(tag) : self.registration.getNotifications().then(function (ns) {
+    ns.forEach(function (n) { n.close(); }); }), markSilenced(tag)]).then(function () {
     if (front && !IS_APPLE) return;
     return self.registration.showNotification(d.title || "Call ended", {
       body: d.body || "", tag: tag || undefined, silent: true, renotify: false,
@@ -179,13 +266,21 @@ function cancel(tag, d, front) {
 
 self.addEventListener("notificationclose", function (e) {
   var d = e.notification.data || {};
-  if (d.tag && CALL_KINDS[d.kind]) silenced[d.tag] = 1;
+  /* Swiped away: later rings of this call stay quiet. (Closing one label
+     in favour of the other, above, is the helper's own doing and does
+     not come here - only a person's swipe does.) */
+  if (d.tag && CALL_KINDS[d.kind]) e.waitUntil(markSilenced(d.tag));
 });
 
 self.addEventListener("notificationclick", function (e) {
   e.notification.close();
   var d = e.notification.data || {};
-  if (d.tag) silenced[d.tag] = 1;
+  /* Picked up (or declined): the ringing stops now - here, on the
+     server, and on this person's other devices. */
+  if (d.tag && CALL_KINDS[d.kind]) {
+    e.waitUntil(Promise.all([markSilenced(d.tag), closeCall(d.tag),
+                             e.action === "decline" ? null : ringStop(d.tag)]));
+  } else if (d.tag) markSilenced(d.tag);
 
   if (e.action === "reject" && d.rej) {
     e.waitUntil(fetch(d.rej.u, { method: "POST", headers: { "Content-Type": "application/json" },
@@ -237,18 +332,17 @@ self.addEventListener("notificationclick", function (e) {
 self.addEventListener("message", function (e) {
   var m = e.data || {};
   if (m.t === "cfg" && m.send && m.me && m.key) {
+    /* skew: how far this phone's clock is from the family server's. */
     /* sec: this person's key, so a renewed registration is accepted
        (the family server only believes a phone that holds it). */
     e.waitUntil(caches.open(CFG).then(function (c) {
       return c.put("cfg", new Response(JSON.stringify({ send: m.send, me: m.me, key: m.key,
-                                                        sec: m.sec || null })));
+                                                        sec: m.sec || null,
+                                                        skew: typeof m.skew === "number" ? m.skew : 0 })));
     }));
   } else if (m.t === "silence" && m.tag) {
     /* The app answered, declined or ended this call itself. */
-    silenced[m.tag] = 1;
-    e.waitUntil(self.registration.getNotifications({ tag: m.tag }).then(function (ns) {
-      ns.forEach(function (n) { n.close(); });
-    }));
+    e.waitUntil(Promise.all([markSilenced(m.tag), closeCall(m.tag)]));
   } else if (m.t === "forget") {
     /* This phone was removed from the family: stop acting for anyone. */
     e.waitUntil(caches.delete(CFG));
