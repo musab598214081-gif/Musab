@@ -4,6 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="Musab B.">
+<meta name="description" content="Private calls and buzzes for your family.">
+<!-- The card messaging apps show above a shared link. The same for every
+     link - the part after # never reaches them, so nothing personal does. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Family Notifier">
+<meta property="og:title" content="You're invited to Family Notifier">
+<meta property="og:description" content="Private calls and buzzes, just for your family. Tap to join.">
+<meta property="og:image" content="https://musab598214081-gif.github.io/Musab/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -949,13 +960,13 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.0";
+var APP_VERSION = "1.1";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-07a";
+var VERSION  = "2026-10-08a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -5441,12 +5452,68 @@ function creditLine(){
   return c;
 }
 
+/* Opening a short link: the code is looked up on the family server, and
+   what comes back is exactly what the long link used to carry - so the
+   rest of joining works as it always did. */
+function redeemInvite(){
+  var m = location.hash.match(/[#&]i=([2-9A-Za-z]{10})(&|$)/);
+  if (!m) return false;
+  var code = m[1].toUpperCase();
+  var f = location.hash.match(/[#&]f=([A-Za-z0-9_-]+)/);
+  var base = DEFAULT_FS;
+  if (f) { try { base = unb64u(f[1]); } catch (e) {} }
+  base = String(base).replace(/\/+$/, "");
+  if (!/^(https:\/\/[A-Za-z0-9.-]+(:\d+)?|http:\/\/127\.0\.0\.1:\d+)$/.test(base)) base = DEFAULT_FS;
+  var main = $("main"); main.innerHTML = "";
+  var hello = document.createElement("p"); hello.className = "greet"; hello.textContent = "One moment…";
+  var p = document.createElement("p"); p.className = "hint"; p.textContent = "Opening your invitation.";
+  main.appendChild(hello); main.appendChild(p);
+  function failed(expired){
+    main.innerHTML = "";
+    var h = document.createElement("p"); h.className = "greet";
+    h.textContent = expired ? "This invitation has expired" : "Couldn't open the invitation";
+    var card = document.createElement("div"); card.className = "onb";
+    var t = document.createElement("p");
+    t.textContent = expired
+      ? "Invitations last 30 days, and stop working when a new one is made. Ask whoever invited you to send it again."
+      : "Check the internet connection and try again.";
+    card.appendChild(t);
+    if (!expired) {
+      var again = document.createElement("button"); again.className = "btn"; again.textContent = "Try again";
+      again.onclick = function(){ redeemInvite(); };
+      card.appendChild(again);
+    }
+    main.appendChild(h); main.appendChild(card); main.appendChild(creditLine());
+    if (expired) history.replaceState(null, "", location.pathname);
+  }
+  netFetch(base + "/i/" + code, {}, 2).then(function(r){
+    return r.json().then(function(d){ return { st: r.status, d: d }; });
+  }).then(function(x){
+    var d = x.d;
+    if (!d || !d.ok || !/^[A-Za-z0-9_-]+$/.test(String(d.j || "")) || !/^[A-Za-z0-9]{3,16}$/.test(String(d.m || ""))) {
+      failed(x.st === 404); return;
+    }
+    var h = "#j=" + d.j + "&m=" + d.m +
+            (d.s && /^[A-Za-z0-9_-]{16,80}$/.test(d.s) ? "&s=" + d.s : "") +
+            (d.p ? "&p=1" : "") + (d.by && /^[A-Za-z0-9]{3,16}$/.test(d.by) ? "&by=" + d.by : "");
+    history.replaceState(null, "", location.pathname + h);
+    readIntent();
+    if (!tryJoin()) paintMain();
+  }).catch(function(){ failed(false); });
+  return true;
+}
+
 /* Any text holding an invite link: the part after # is what matters. */
 function openPastedLink(text){
   var t = String(text || "").trim();
   var i = t.indexOf("#");
   var frag = i === -1 ? "" : t.slice(i);
   frag = frag.replace(/\s.*$/, "");
+  if (/[#&]i=[2-9A-Za-z]{10}/.test(frag)) {
+    history.replaceState(null, "", location.pathname + frag);
+    redeemInvite();
+    return;
+  }
   if (!/[#&]j=[A-Za-z0-9\-_]+/.test(frag)) {
     toast(t ? "That isn't an invite link — it should contain #j=" : "Paste the link first");
     return;
@@ -5568,6 +5635,7 @@ function setPage(name){
      open straight away on their own page. */
   var adv = $("advBlock"); if (adv) adv.open = name === "connection";
   if (name === "home") paintSetNav();
+  if (name === "invite") { try { paintPending(); } catch (e) {} }
   /* Always drawn fresh: the family may have changed since (a person
      approved, the admin role just arrived). */
   if (name === "family" && draft && state) {
@@ -5575,6 +5643,9 @@ function setPage(name){
        the family as it is now - unless a change is still on its way out. */
     if (!contactsTimer && state.me && !managedByOther()) draft = JSON.parse(JSON.stringify(state));
     try { paintMembers(); } catch (e) {}
+    /* The invite links below it, with their short codes made (or tried
+       again, if the last try found no connection). */
+    try { paintInvites(); } catch (e) {}
   }
   if (name === "usage") {
     /* Both parts drawn fresh: a phone's report may have arrived since. */
@@ -5946,6 +6017,7 @@ function contactsPanel(m, withContacts){
                    "phone that opens it becomes theirs.")) return;
       var sk = randSecret(), rk = Date.now();
       live.sk = sk; live.rk = rk; m.sk = sk; m.rk = rk;
+      if (state.invites) delete state.invites[live.id];
       bumpRev(); save(); broadcastRoster();
       toast(nm + " is signed out — now send them their new link");
       sendLink(live);
@@ -5955,14 +6027,91 @@ function contactsPanel(m, withContacts){
   return p;
 }
 
+/* ------------------------------------------------ short invite links
+ *
+ * A person's invite link used to be the family's whole setup written
+ * into the address - several hundred scrambled characters, alarming to
+ * receive, and carrying the relay's password. Now the family server
+ * keeps that setup and the link is short: …/#i=K7P2QX9M4T.
+ *
+ * The code is made ahead of time (when the Family or Invite page is
+ * shown), because a phone only lets a page open its share window while
+ * your tap is still "fresh" - there is no time to ask the server then.
+ * Until a code exists, the long link still works as before. */
+function pendingMember(id){
+  var p = ((state && state.pending) || []).filter(function(x){ return x.member.id === id; })[0];
+  return p ? p.member : null;
+}
+function keyTag(id){
+  var m = memberById(id) || pendingMember(id);
+  return m && m.sk ? m.sk.slice(-6) : "";
+}
+function cachedInvite(id){
+  var c = state && state.invites && state.invites[id];
+  if (!c || c.exp - Date.now() < 86400000 || c.fs !== fsUrl() || c.kt !== keyTag(id)) return null;
+  return c;
+}
+function shortLink(code){
+  var u = location.origin + location.pathname + "#i=" + code;
+  if (fsUrl() !== DEFAULT_FS) u += "&f=" + b64u(fsUrl());
+  return u;
+}
+/* The link to hand out: short when ready, the long one otherwise. */
+function inviteUrl(id){
+  var c = cachedInvite(id);
+  return c ? shortLink(c.code) : linkFor(id, false, true);
+}
+var inviteBusy = {};
+function ensureInvite(id, force){
+  var c = cachedInvite(id);
+  if (c && !force && c.rev === state.rev) return Promise.resolve(shortLink(c.code));
+  /* A request already on its way for the same person and server is
+     shared; one for a server the family has since left is not. */
+  var busyKey = id + "|" + fsUrl();
+  if (inviteBusy[busyKey]) return inviteBusy[busyKey];
+  var long = linkFor(id, false, true);
+  function part(re){ var x = long.match(re); return x ? x[1] : null; }
+  var frame = { k: "invite", m: id, j: part(/[#&]j=([A-Za-z0-9_-]+)/), s: part(/[#&]s=([A-Za-z0-9_-]+)/),
+                p: /[#&]p=1(&|$)/.test(long) ? 1 : 0, by: part(/[#&]by=([A-Za-z0-9]+)/) };
+  if (!frame.j || !useFS()) return Promise.resolve(c ? shortLink(c.code) : null);
+  inviteBusy[busyKey] = fsRequest(frame, 8000).then(function(r){
+    delete inviteBusy[busyKey];
+    if (!r || !r.ok || !r.code) return c ? shortLink(c.code) : null;
+    state.invites = state.invites || {};
+    state.invites[id] = { code: r.code, exp: r.exp, rev: state.rev, kt: keyTag(id), fs: fsUrl() };
+    save();
+    return shortLink(r.code);
+  }, function(){ delete inviteBusy[busyKey]; return c ? shortLink(c.code) : null; });
+  return inviteBusy[busyKey];
+}
+/* What goes with the link: who it's from and what it is, in words. */
+function inviteText(m){
+  var from = state && state.me ? String(nameOf(state.me)).split(/\s+/)[0] : "";
+  return (from ? from + " invited you" : "You're invited") +
+    " to our family on Family Notifier — private calls just for the family. Tap to join:";
+}
+
 /* Send opens the phone's share sheet. On a computer that sheet often
    refuses or never appears, and the button looked dead - so anything but
    you closing the sheet yourself now falls back to copying the link. */
 function sendLink(m){
+  /* Not ready yet (a person just added): made now, then the send box -
+     the share window would refuse, the tap is no longer fresh. */
+  if (!cachedInvite(m.id) && useFS()) {
+    ensureInvite(m.id).then(function(u){
+      var url;
+      try { url = u || linkFor(m.id, false, true); } catch (e) { toast("Couldn't make " + m.name + "'s link"); return; }
+      shareInvite(m, url);
+    });
+    return;
+  }
   var url;
-  try { url = linkFor(m.id, false, true); }
+  try { url = inviteUrl(m.id); }
   catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
-  var data = { title: "Family Notifier — " + m.name, url: url };
+  shareInvite(m, url);
+}
+function shareInvite(m, url){
+  var data = { title: "Family Notifier", text: inviteText(m), url: url };
   /* The system share window where there is one. Some computers - many
      company-managed Windows ones - block it, and Chrome reports that
      as "cancelled", instantly. A cancel that fast is not a person
@@ -5997,7 +6146,7 @@ function showSendBox(m, url){
   var p = document.createElement("p");
   p.className = "sub"; p.style.margin = "0 0 12px";
   p.textContent = "It signs them in as " + m.name + ", so send it only to them.";
-  var text = "Your Family Notifier link, " + m.name + ": " + url;
+  var text = inviteText(m) + " " + url;
   function close(){ if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
   function btn(label, cls, fn){
     var b = document.createElement("button");
@@ -6024,6 +6173,8 @@ function showSendBox(m, url){
 }
 
 function paintInvites(){
+  try { prepareInvites((state && state.members || []).filter(function(m){
+    return m.id !== state.me && (isAdmin() || !state.admin); }).map(function(m){ return m.id; })); } catch (e) {}
   var box = $("inviteList");
   if (!box || !state) return;
   box.innerHTML = "";
@@ -6056,12 +6207,21 @@ function paintInvites(){
     cp.className = "mini"; cp.innerHTML = ICON.copy + "<span>Copy</span>";
     cp.setAttribute("aria-label", "Copy " + m.name + "'s link");
     cp.onclick = function(){
-      var url; try { url = linkFor(m.id, false, true); }
+      var url; try { url = inviteUrl(m.id); }
       catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
       copy(url, "Link for " + m.name + " copied");
     };
     row.appendChild(dot); row.appendChild(nm); row.appendChild(send); row.appendChild(cp);
     box.appendChild(row);
+  });
+}
+/* Short codes for everyone on the list, made in the background. */
+function prepareInvites(ids){
+  if (!state || !state.me || !useFS()) return;
+  ids.forEach(function(id, i){
+    var c = cachedInvite(id);
+    if (c && c.rev === state.rev) return;
+    setTimeout(function(){ ensureInvite(id); }, 150 * i);
   });
 }
 
@@ -6379,6 +6539,8 @@ function resendPending(){
 function paintPending(){
   var box = $("pendingList");
   if (!box || !state) return;
+  try { prepareInvites((state.pending || []).filter(function(p){
+    return !p.done && !p.rejected && !memberById(p.member.id); }).map(function(p){ return p.member.id; })); } catch (e) {}
   box.innerHTML = "";
   (state.pending || []).forEach(function(p, i){
     var m = p.member, done = !!memberById(m.id) || p.done;
@@ -9232,7 +9394,7 @@ if (state) {
   }
 })();
 readIntent();
-if (!tryJoin()) paintMain();
+if (!redeemInvite() && !tryJoin()) paintMain();
 if (state && state.me) { openStreams(); fsCheckPush().then(paintPushWarn); }
 
 restoreFromIdb();
@@ -9296,6 +9458,7 @@ window.addEventListener("beforeunload", function(){
    changing only the part after the # - no reload, so nothing above
    would notice. Read it here as well. */
 window.addEventListener("hashchange", function(){
+  if (redeemInvite()) return;
   readIntent();
   if (/[#&]j=/.test(location.hash)) tryJoin();
 });
