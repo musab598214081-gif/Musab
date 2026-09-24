@@ -239,6 +239,56 @@
   details.adv[open] > summary::after{transform:rotate(-135deg);margin-bottom:-4px}
   details.adv[open]{padding-bottom:14px}
   details.adv .sectiontitle:first-of-type{margin-top:8px}
+  /* The doorbell panel, for bigger families. */
+  .homebar{display:flex;gap:8px;align-items:stretch;margin:8px 0 14px}
+  .homebar .hometabs{flex:1;margin:0}
+  .findbtn{flex:0 0 auto;width:48px;border:0;border-radius:12px;background:var(--hearth);
+    color:var(--mist);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .findbtn svg{width:20px;height:20px}
+  .findbtn.on{background:#22364D;color:var(--paper)}
+  .pressum{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;font-size:13px;
+    color:var(--mist);margin:10px 2px 0}
+  .pressum .pd{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;
+    vertical-align:-1px}
+  .pressum .pd.on{background:var(--go)} .pressum .pd.away{background:var(--amber)}
+  .hometabs .badge{margin-left:2px}
+  input.find{width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--seam);
+    background:var(--hearth);color:var(--paper);font:inherit;font-size:16px;margin:0 0 12px;
+    -webkit-appearance:none;appearance:none}
+  input.find:focus{outline:2px solid var(--brass);outline-offset:-1px}
+  .panel{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:8px 4px;
+    margin:2px 0 4px;align-items:start}
+  .tile{display:flex;flex-direction:column;align-items:center;min-width:0;padding:6px 2px 4px;
+    background:none;border:0;border-radius:16px;color:var(--paper);font:inherit;cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .tile .av{position:relative;width:56px;height:56px;border-radius:50%;display:flex;
+    align-items:center;justify-content:center;font-weight:700;font-size:19px;color:#0F1B2A;
+    box-shadow:0 0 0 3px var(--night),0 0 0 3px var(--night);
+    transition:box-shadow .25s ease-out,transform .1s}
+  /* Online: a lit ring round the doorbell. Away: amber. Offline: none -
+     and no dimming either, since a call still reaches a closed phone. */
+  .tile.on .av{box-shadow:0 0 0 3px var(--night),0 0 0 6px var(--go)}
+  .tile.away .av{box-shadow:0 0 0 3px var(--night),0 0 0 6px var(--amber)}
+  /* Up to two lines: "Grandma / Fatima" rather than "Grandm…". */
+  .tile .nm{margin-top:8px;font-size:12.5px;font-weight:500;line-height:1.2;max-width:100%;
+    text-align:center;overflow:hidden;overflow-wrap:anywhere;display:-webkit-box;
+    -webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .tile .badge{position:absolute;right:-5px;top:-5px;box-shadow:0 0 0 2px var(--night)}
+  .tile:active .av{transform:scale(.93)}
+  .tile:focus-visible{outline:2px solid var(--brass);outline-offset:0}
+  .tile.grp .av{background:transparent;border:2px dashed var(--seam);color:var(--go)}
+  .tile.grp .av svg{width:24px;height:24px}
+  .tile.grp .nm{color:var(--mist)}
+  /* Chosen for a group call: a brass ring and a tick. */
+  .tile.psel .av{box-shadow:0 0 0 3px var(--hearth),0 0 0 6px var(--brass)}
+  .tile.psel .av::after{content:"";position:absolute;right:-4px;bottom:-4px;width:22px;height:22px;
+    border-radius:50%;background:var(--brass);box-shadow:0 0 0 2px var(--hearth);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%232A1C02' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-size:16px;background-position:center;background-repeat:no-repeat}
+  .pickgrid .tile .av{box-shadow:none}
+  .pickgrid .tile.psel .av{box-shadow:0 0 0 3px var(--hearth),0 0 0 6px var(--brass)}
+  .quick{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+  @media (prefers-reduced-motion: reduce){ .tile .av{transition:none} }
   /* Somebody asking to join, at the top of the admin's home screen. */
   .req{background:var(--hearth);border:1px solid var(--brass);border-radius:20px;
     padding:14px;margin:0 0 12px}
@@ -711,7 +761,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-09-29a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-30a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -2256,6 +2306,7 @@ var ICON = {
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
   copy:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>',
   addp:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.6"/><path d="M3 20c.6-3.6 3.3-5.6 6.5-5.6s5.9 2 6.5 5.6M18.5 8v6M15.5 11h6"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>',
   group: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.5-3.2 3-5 6-5s5.5 1.8 6 5"/><circle cx="17" cy="9.5" r="2.5"/><path d="M16.5 14.6c2.4.2 4 1.8 4.5 4.4"/></svg>',
   outArr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>'
 };
@@ -4554,12 +4605,23 @@ function paintMain(){
   if (state.joining) { paintJoining(main); return; }
   if (state.removed) { paintRemoved(main); return; }
 
-  var hello = document.createElement("p");
-  hello.className = "greet";
-  hello.textContent = greeting() + ", " + String(nameOf(state.me)).split(/\s+/)[0];
-  main.appendChild(hello);
+  var big = state.members.filter(function(m){ return m.id !== state.me && shown(m); })
+                          .length >= PANEL_FROM;
+  if (!big) {
+    var hello = document.createElement("p");
+    hello.className = "greet";
+    hello.textContent = greeting() + ", " + String(nameOf(state.me)).split(/\s+/)[0];
+    main.appendChild(hello);
+  }
   paintJoinReqs(main);
   paintSetupCard(main);
+  if (big) {
+    paintPanel(main);
+    paintPushWarn();
+    paintStatus(streamLive());
+    paintPresence();
+    return;
+  }
 
   var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
   if (!others.length) {
@@ -4642,7 +4704,216 @@ function paintMain(){
   paintPresence();
 }
 
+/* ------------------------------------------------ the doorbell panel
+ *
+ * A big family as a list of cards meant scrolling past a dozen people to
+ * reach the one you wanted, and past all of them to reach your calls. From
+ * PANEL_FROM people the home screen becomes a panel of doorbells instead:
+ * everyone as a round button in their own colour, five across, so twenty
+ * people fit on one screen. The ring round a button says who is there
+ * right now; a red badge, a missed call. Recent calls move to their own
+ * tab. One tap opens the person, with Call as the big first button -
+ * never a call straight from the panel, so a brush of the thumb in a
+ * pocket calls nobody.
+ *
+ * The people you are in touch with most come first. The order is worked
+ * out when the screen is first drawn and then kept, so a name never
+ * jumps away from under a finger. Small families keep the big cards,
+ * with their one-tap call button - easier for grandparents. */
+var PANEL_FROM = 7, SEARCH_FROM = 13;
+var homeTab = "family", panelOrder = null, panelKey = "", panelFind = "", findOpen = false;
+
+function orderedPeople(list, keep){
+  var key = list.map(function(m){ return m.id; }).sort().join();
+  /* Anything but the home screen (the group picker) follows the home
+     screen's order and never changes it. */
+  if (!keep && panelOrder) {
+    return list.slice().sort(function(a, b){
+      var ia = panelOrder.indexOf(a.id), ib = panelOrder.indexOf(b.id);
+      return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib) || String(a.name).localeCompare(String(b.name));
+    });
+  }
+  if (!panelOrder || panelKey !== key) {
+    var since = Date.now() - 60 * 86400000, score = {};
+    var hist = recentList();
+    list.forEach(function(m){
+      score[m.id] = hist.filter(function(r){ return (r.at || 0) > since && entryFor(r, m); }).length;
+    });
+    panelOrder = list.slice().sort(function(a, b){
+      return (score[b.id] - score[a.id]) || String(a.name).localeCompare(String(b.name));
+    }).map(function(m){ return m.id; });
+    panelKey = key;
+  }
+  return panelOrder.map(function(id){
+    return list.filter(function(m){ return m.id === id; })[0];
+  }).filter(Boolean);
+}
+
+function paintHomeTabs(){
+  var t = $("homeTabs");
+  if (!t) return;
+  t.innerHTML = "";
+  var miss = missedCount(null);
+  [["family", "Family", ICON.group], ["recent", "Recent", ICON.phone]].forEach(function(d){
+    var b = document.createElement("button");
+    b.className = homeTab === d[0] ? "sel" : "";
+    b.setAttribute("aria-pressed", homeTab === d[0] ? "true" : "false");
+    b.innerHTML = d[2].replace("<svg", '<svg width="16" height="16"') + "<span>" + d[1] + "</span>" +
+                  (d[0] === "recent" && miss ? '<span class="badge">' + miss + "</span>" : "");
+    b.onclick = function(){
+      if (homeTab === d[0]) return;
+      homeTab = d[0]; panelFind = ""; findOpen = false;
+      paintMain();
+    };
+    t.appendChild(b);
+  });
+}
+
+function paintPanel(main){
+  var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
+  var bar = document.createElement("div"); bar.className = "homebar";
+  var seg = document.createElement("div");
+  seg.className = "tabs hometabs"; seg.id = "homeTabs";
+  bar.appendChild(seg);
+  /* Search sits behind a small button, so it costs no room until it is
+     wanted - on a small phone that row is the difference between the
+     whole family on one screen and scrolling. */
+  if (homeTab === "family" && others.length >= SEARCH_FROM) {
+    var fb = document.createElement("button");
+    fb.className = "findbtn" + (findOpen ? " on" : ""); fb.innerHTML = ICON.search;
+    fb.setAttribute("aria-label", findOpen ? "Close search" : "Find someone");
+    fb.setAttribute("aria-expanded", findOpen ? "true" : "false");
+    fb.onclick = function(){
+      findOpen = !findOpen;
+      if (!findOpen) panelFind = "";
+      paintMain();
+      /* Focused inside the tap itself: an iPhone only raises the
+         keyboard for focus that happens during the tap. */
+      if (findOpen) { var f = $("findPerson"); if (f) f.focus(); }
+    };
+    bar.appendChild(fb);
+  }
+  main.appendChild(bar);
+  paintHomeTabs();
+
+  if (homeTab === "recent") {
+    var tabs = document.createElement("div");
+    tabs.className = "tabs"; tabs.id = "histTabs"; tabs.style.marginTop = "6px";
+    main.appendChild(tabs);
+    var box = document.createElement("div"); box.id = "recentBox";
+    main.appendChild(box);
+    paintRecent();
+    statusLine(main);
+    return;
+  }
+
+  if (others.length >= SEARCH_FROM && findOpen) {
+    var find = document.createElement("input");
+    find.type = "search"; find.className = "find"; find.id = "findPerson";
+    find.placeholder = "Find someone"; find.autocomplete = "off";
+    find.setAttribute("aria-label", "Find someone");
+    find.value = panelFind;
+    find.oninput = function(){ panelFind = find.value; filterPanel(); };
+    main.appendChild(find);
+  }
+
+  var grid = document.createElement("div");
+  grid.className = "panel"; grid.id = "panel";
+  orderedPeople(others, true).forEach(function(m){
+    var b = document.createElement("button");
+    b.className = "tile";
+    b.setAttribute("data-id", m.id);
+    b.setAttribute("data-who", m.name);
+    var av = document.createElement("span");
+    av.className = "av"; av.style.background = m.colour;
+    av.textContent = initials(m.name);
+    var nm = document.createElement("span");
+    nm.className = "nm"; nm.textContent = m.name;
+    b.appendChild(av); b.appendChild(nm);
+    b.onclick = function(){ openAct(m.id); };
+    grid.appendChild(b);
+  });
+  if (others.length >= 2) {
+    var gb = document.createElement("button");
+    gb.className = "tile grp"; gb.id = "grpTile";
+    gb.innerHTML = '<span class="av">' + ICON.group + '</span><span class="nm">Group call</span>';
+    gb.setAttribute("aria-label", "Group call — call several people at once");
+    gb.onclick = function(){ unlockAudio(); askNotify(); openGroupPicker("new"); };
+    grid.appendChild(gb);
+  }
+  main.appendChild(grid);
+  var none = document.createElement("p");
+  none.className = "hint"; none.id = "findNone"; none.style.display = "none";
+  main.appendChild(none);
+  /* What the rings mean, in the same colours - and a count worth
+     knowing anyway: who could pick up right now. */
+  var sum = document.createElement("div"); sum.className = "pressum"; sum.id = "presSum";
+  main.appendChild(sum);
+  statusLine(main);
+  paintCardNotes();
+  filterPanel();
+}
+
+function statusLine(main){
+  var st = document.createElement("div");
+  st.className = "status"; st.id = "statusLine";
+  st.style.marginTop = "14px";
+  st.innerHTML = '<span class="led"></span><span>Connecting…</span>';
+  main.appendChild(st);
+}
+
+/* Narrows the panel as you type - without redrawing it, so the box
+   keeps the keyboard. Matches any part of any word of the name. */
+function filterPanel(){
+  var q = String(panelFind || "").trim().toLowerCase(), shownN = 0;
+  Array.prototype.forEach.call(document.querySelectorAll("#panel .tile[data-id]"), function(t){
+    var hit = !q || String(t.getAttribute("data-who")).toLowerCase().indexOf(q) !== -1;
+    t.style.display = hit ? "" : "none";
+    if (hit) shownN++;
+  });
+  var g = $("grpTile"); if (g) g.style.display = q ? "none" : "";
+  var none = $("findNone");
+  if (none) {
+    none.style.display = q && !shownN ? "" : "none";
+    none.textContent = "Nobody called \u201c" + panelFind.trim() + "\u201d in your family.";
+  }
+}
+
+/* Each doorbell's badge and spoken label: name, whether they are there,
+   and missed calls. */
+function paintTileNotes(){
+  Array.prototype.forEach.call(document.querySelectorAll(".tile[data-id]"), function(t){
+    var id = t.getAttribute("data-id"), name = t.getAttribute("data-who");
+    var last = lastWith(name), av = t.querySelector(".av");
+    var bd = av.querySelector(".badge");
+    if (bd) bd.remove();
+    if (last && last.count) {
+      bd = document.createElement("span"); bd.className = "badge"; bd.textContent = last.count;
+      av.appendChild(bd);
+    }
+    var st = presenceOf(id);
+    t.classList.toggle("on", st.k === "on");
+    t.classList.toggle("away", st.k === "away");
+    t.setAttribute("aria-label", name + ", " + st.text +
+      (last && last.count ? ", " + last.count + " missed call" + (last.count > 1 ? "s" : "") : ""));
+    t.title = name + " · " + st.text;
+  });
+  var sum = $("presSum");
+  if (sum) {
+    var on = 0, away = 0;
+    Array.prototype.forEach.call(document.querySelectorAll("#panel .tile[data-id]"), function(t){
+      var k = presenceOf(t.getAttribute("data-id")).k;
+      if (k === "on") on++; else if (k === "away") away++;
+    });
+    sum.innerHTML = (on ? '<span class="pi"><span class="pd on"></span>' + on + " online</span>" : "") +
+                    (away ? '<span class="pi"><span class="pd away"></span>' + away + " away</span>" : "") +
+                    (!on && !away ? "Nobody has the app open right now — a call still rings their phone" : "");
+  }
+  paintHomeTabs();
+}
+
 function paintCardNotes(){
+  paintTileNotes();
   Array.prototype.forEach.call(document.querySelectorAll(".person[data-who]"), function(card){
     var sub = card.querySelector(".sub");
     if (!sub) return;
@@ -6836,6 +7107,7 @@ function presenceOf(id){
   return { k: "off", text: "Offline · last seen " + ago(p.at) };
 }
 function paintPresence(){
+  paintTileNotes();
   Array.prototype.forEach.call(document.querySelectorAll(".person[data-id]"), function(card){
     var st = presenceOf(card.getAttribute("data-id"));
     var d = card.querySelector(".pdot"), t = card.querySelector(".pres");
@@ -6955,7 +7227,58 @@ function openGroupPicker(mode, preset){
                                    : "Everyone you can call is already on it.";
     list.appendChild(p);
   }
-  cands.forEach(function(m){
+  /* A big family picks from the same panel as the home screen, with a
+     tick on each chosen doorbell - and can take everyone, or everyone
+     who is online, in one tap. */
+  var gridMode = cands.length >= PANEL_FROM, grid = null;
+  function mark(el, id){
+    el.classList.toggle(gridMode ? "psel" : "sel", !!picked[id]);
+    el.setAttribute("aria-pressed", picked[id] ? "true" : "false");
+  }
+  if (gridMode) {
+    var quick = document.createElement("div"); quick.className = "quick";
+    [["Everyone online", function(m){ return presenceOf(m.id).k === "on"; }],
+     ["Everyone", function(){ return true; }]].forEach(function(q){
+      var qb = document.createElement("button"); qb.className = "mini"; qb.textContent = q[0];
+      qb.onclick = function(){
+        var take = cands.filter(q[1]);
+        if (!take.length) { toast("Nobody is online right now"); return; }
+        picked = {};
+        take.slice(0, room).forEach(function(m){ picked[m.id] = 1; });
+        if (take.length > room) toast("A call can have " + groupMax() + " people — picked the first " + room);
+        Array.prototype.forEach.call(grid.querySelectorAll(".tile"), function(t){
+          mark(t, t.getAttribute("data-id"));
+        });
+        paintPickGo();
+      };
+      quick.appendChild(qb);
+    });
+    list.appendChild(quick);
+    grid = document.createElement("div"); grid.className = "panel pickgrid";
+    list.appendChild(grid);
+  }
+  orderedPeople(cands).forEach(function(m){
+    if (gridMode) {
+      var t = document.createElement("button");
+      var st0 = presenceOf(m.id);
+      t.className = "tile";
+      t.setAttribute("data-id", m.id);
+      t.setAttribute("aria-label", m.name + ", " + st0.text);
+      t.innerHTML = '<span class="av"></span><span class="nm"></span>';
+      t.querySelector(".av").style.background = m.colour;
+      t.querySelector(".av").textContent = initials(m.name);
+      t.querySelector(".nm").textContent = m.name;
+      mark(t, m.id);
+      t.onclick = function(){
+        if (!picked[m.id] && Object.keys(picked).length >= room) {
+          toast("A call can have " + groupMax() + " people at most"); return;
+        }
+        if (picked[m.id]) delete picked[m.id]; else picked[m.id] = 1;
+        mark(t, m.id); paintPickGo();
+      };
+      grid.appendChild(t);
+      return;
+    }
     var b = document.createElement("button");
     b.className = "pick" + (picked[m.id] ? " sel" : "");
     b.setAttribute("aria-pressed", picked[m.id] ? "true" : "false");
