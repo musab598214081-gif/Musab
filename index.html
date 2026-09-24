@@ -146,6 +146,7 @@
   .utable th{color:var(--mist);font-weight:500}
   .utable td small{display:block;color:var(--mist);font-size:11px}
   .utable tr.tot td{font-weight:700;border-bottom:0}
+  .utable .qv.ok{color:var(--go)} .utable .qv.warn{color:var(--amber)} .utable .qv.bad{color:#FF8589}
   .memberrow .cbtn{width:auto;min-width:64px;padding:0 10px;color:var(--mist);
     font-size:13px;margin-right:8px}
   .contacts{background:var(--hearth);border-radius:12px;padding:10px 12px;margin:-2px 0 12px}
@@ -710,7 +711,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-09-27a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-28a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -1120,6 +1121,7 @@ function fsConnect(){
     fsSendPres();
     fsSendSub();
     swConfig();
+    lookEdge();
     fsPingTimer = setInterval(function(){
       try { ws.send("ping"); } catch (e) {}
       /* No answer for a long while: the connection died without saying. */
@@ -2416,6 +2418,64 @@ function setBoost(on){
   }
 }
 
+/* ------------------------------------------------ the voice itself
+ *
+ * Long international routes lose packets now and then - a burst of
+ * them on a busy mobile network. By default a lost packet is a gap you
+ * hear. With RED ("redundant audio") each packet also carries a copy of
+ * the one before, so a lost packet is simply filled in from the next.
+ * It is what Google Meet does for the same reason. It roughly doubles a
+ * call's data (about 60 kbit/s instead of 30 - still tiny next to video)
+ * and is only used when both phones support it; otherwise the call uses
+ * plain Opus with its own loss recovery, as before. */
+function tuneAudio(pc){
+  try {
+    if (!pc.getTransceivers || !window.RTCRtpReceiver || !RTCRtpReceiver.getCapabilities) return;
+    var caps = RTCRtpReceiver.getCapabilities("audio");
+    if (!caps || !caps.codecs) return;
+    var red = [], opus = [], rest = [];
+    caps.codecs.forEach(function(c){
+      var m = String(c.mimeType || "").toLowerCase();
+      if (m === "audio/red") red.push(c);
+      else if (m === "audio/opus") opus.push(c);
+      else rest.push(c);
+    });
+    if (!opus.length) return;
+    var order = red.concat(opus, rest);
+    pc.getTransceivers().forEach(function(t){
+      var kind = (t.receiver && t.receiver.track && t.receiver.track.kind) ||
+                 (t.sender && t.sender.track && t.sender.track.kind);
+      if (kind === "audio" && t.setCodecPreferences && !t.stopped) {
+        try { t.setCodecPreferences(order); } catch (e) {}
+      }
+    });
+  } catch (e) {}
+}
+
+/* Which voice codec a call ended up with, for the call's record. Read
+   from what the two phones agreed: the browser's own statistics name
+   only the codec inside RED (Opus), so they can't tell the two apart. */
+function codecOfPc(pc){
+  try {
+    var sdp = (pc.currentRemoteDescription || pc.remoteDescription || {}).sdp || "";
+    var m = sdp.match(/^m=audio \S+ \S+ (\d+)/m);
+    if (!m) return "";
+    var map = sdp.match(new RegExp("^a=rtpmap:" + m[1] + " ([A-Za-z0-9-]+)/", "m"));
+    var name = map ? map[1] : "";
+    return /^red$/i.test(name) ? "RED" : /^opus$/i.test(name) ? "Opus" : name;
+  } catch (e) { return ""; }
+}
+function codecOf(stats){
+  var name = "";
+  stats.forEach(function(r){
+    if (r.type === "outbound-rtp" && (r.kind === "audio" || r.mediaType === "audio") && r.codecId) {
+      var c = stats.get ? stats.get(r.codecId) : null;
+      if (c && c.mimeType) name = c.mimeType.replace(/^audio\//i, "");
+    }
+  });
+  return /red/i.test(name) ? "RED" : /opus/i.test(name) ? "Opus" : name;
+}
+
 function newPeer(peerId){
   var pc;
   try {
@@ -2426,6 +2486,10 @@ function newPeer(peerId){
     if (call && call.viaCloudflare) {
       config = { iceServers: iceServers("cloudflare"), iceTransportPolicy: "relay" };
     }
+    /* Starts finding network paths (and reserving the relay) as soon as
+       the connection exists, instead of when the answer is sent - see
+       warmUp, which creates it while the phone is still ringing. */
+    config.iceCandidatePoolSize = 1;
     pc = new RTCPeerConnection(config);
   } catch (e) {
     /* Bad relay details should cost you the relay, not the call. Try
@@ -2799,6 +2863,7 @@ function startCall(peerId){
       watchMic(stream);
       call.pc = newPeer(peerId);
       stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
+      tuneAudio(call.pc);
       return call.pc.createOffer();
     })
     .then(function(offer){
@@ -2884,10 +2949,30 @@ function startCall(peerId){
     });
 }
 
+/* While the phone rings: fetch fresh relay details and create the
+   call's connection, which starts reserving the network path at once.
+   Nothing is sent and the microphone stays closed until Answer - but
+   Answer then goes straight to talking instead of "Connecting…" while
+   all of this happens. Thrown away unused if the call is not answered. */
+function warmUp(){
+  var c = call;
+  if (!c || c.warmPc || c.warming) return;
+  c.warming = true;
+  ensureRelay().then(function(){
+    if (call !== c || c.state !== "incoming" || c.pc || c.warmPc) return;
+    c.viaCloudflare = (c.wantCf || routeMode() === "cloudflare") &&
+                      cloudflareServers().length > 0;
+    c.forcedRelay = c.viaCloudflare ||
+                    !!((c.wantRelay || state.preferRelay) && hasRelay());
+    try { c.warmPc = newPeer(c.peer); } catch (e) { c.warmPc = null; }
+  }).catch(function(){});
+}
+
 function ringIncoming(msg){
   showCallScreen(msg.from, true);
   setCallState("Incoming call");
   tone({ incoming: true, tag: msg.call, title: nameOf(msg.from) + " is calling" });
+  warmUp();
   /* A backstop in case the goodbye never arrives - the caller's phone
      lost signal, say. The caller gives up at 45 seconds, so ringing
      past 50 is always ringing for nobody. The offer's age counts, so
@@ -3074,6 +3159,7 @@ function onSignal(msg){
     if (call.ringTimer) { clearTimeout(call.ringTimer); call.ringTimer = null; }
     /* The line goes dead now; the words stay up just long enough to read. */
     if (call.pc) { try { call.pc.close(); } catch (e) {} }
+    if (call.warmPc) { try { call.warmPc.close(); } catch (e) {} call.warmPc = null; }
     /* Marked as over at once. Caught-up messages arrive together, and
        the NEXT call's offer used to land inside these 700 ms and be
        answered "busy" - so opening the app to answer a second call
@@ -3110,23 +3196,33 @@ function answer(){
   $("callNote").textContent = "Your browser should be asking to allow it";
   $("call").classList.remove("incoming");
 
-  Promise.all([micStream(), ensureRelay()])
+  /* Warmed up while ringing: the relay details are here and the path
+     is already being reserved - no waiting for either now. */
+  var warm = call.warmPc || null;
+  Promise.all([micStream(), warm ? Promise.resolve(true) : ensureRelay()])
     .then(function(got){
       var stream = got[0];
       if (!call) { stopStream(stream); return null; }
-      call.viaCloudflare = (call.wantCf || routeMode() === "cloudflare") &&
-                           cloudflareServers().length > 0;
-      call.forcedRelay = call.viaCloudflare ||
-                         !!((call.wantRelay || state.preferRelay) && hasRelay());
+      if (warm && call.warmPc === warm) {
+        call.pc = warm;
+      } else {
+        if (call.warmPc) { try { call.warmPc.close(); } catch (e) {} }
+        call.viaCloudflare = (call.wantCf || routeMode() === "cloudflare") &&
+                             cloudflareServers().length > 0;
+        call.forcedRelay = call.viaCloudflare ||
+                           !!((call.wantRelay || state.preferRelay) && hasRelay());
+        call.pc = newPeer(call.peer);
+      }
+      call.warmPc = null;
       call.stream = stream;
       watchMic(stream);
-      call.pc = newPeer(call.peer);
       stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
       return call.pc.setRemoteDescription({ type:"offer", sdp: call.offer });
     })
     .then(function(){
       if (!call || !call.pc) return null;
       drainPending();
+      tuneAudio(call.pc);
       return call.pc.createAnswer();
     })
     .then(function(ans){
@@ -3195,6 +3291,7 @@ function hangUp(why){
             { keepalive: true })
       .catch(function(){});
   if (call.pc) { try { call.pc.close(); } catch (e) {} }
+  if (call.warmPc) { try { call.warmPc.close(); } catch (e) {} call.warmPc = null; }
   stopStream(call.stream);
   try { $("remoteAudio").srcObject = null; } catch (e) {}
   if (why === "declined" && !call.out) logCall(call.peer, "in", "declined", { cid: call.id });
@@ -3529,6 +3626,17 @@ function sampleQuality(stats){
   var dl = lost - q.lost, dg = got - q.got;
   call.q = { lost: lost, got: got };
   var loss = (dl + dg) > 0 ? dl / (dl + dg) : 0;
+  /* Kept for the whole call, so its record can say how it really went:
+     average delay, share of voice lost, and the moments it was poor. */
+  var qs = call.qs = call.qs || { n: 0, rtt: 0, rttN: 0, lost: 0, got: 0, poor: 0 };
+  qs.n++;
+  if (rtt !== null) { qs.rtt += rtt * 1000; qs.rttN++; }
+  if (dl > 0) qs.lost += dl;
+  if (dg > 0) qs.got += dg;
+  if ((rtt !== null && rtt > 0.4) || loss > 0.05) qs.poor++;
+  if (!qs.codec || qs.n % 10 === 1) {
+    var cd = codecOfPc(call.pc) || codecOf(stats); if (cd) qs.codec = cd;
+  }
   var level = 3;
   if ((rtt !== null && rtt > 0.35) || loss > 0.03) level = 2;
   if ((rtt !== null && rtt > 0.7) || loss > 0.1 || dg === 0) level = 1;
@@ -3555,6 +3663,33 @@ function monthKey(){
   return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2);
 }
 
+/* One call's quality, in numbers and in words. "Poor" means a quarter
+   or more of the call had long delay or lost voice. */
+function callQuality(qs){
+  if (!qs || qs.n < 2) return null;
+  var rtt = qs.rttN ? Math.round(qs.rtt / qs.rttN) : 0;
+  var loss = (qs.lost + qs.got) ? qs.lost / (qs.lost + qs.got) : 0;
+  var poor = qs.poor / qs.n >= 0.25;
+  var ms = !qs.rttN ? "" : rtt < 1 ? "<1 ms" : rtt + " ms";
+  var text = ms + (ms ? " · " : "") +
+             (loss < 0.001 ? "no loss" : (loss * 100).toFixed(1) + "% lost") +
+             (qs.codec ? " · " + qs.codec : "") + (poor ? " · poor" : "");
+  return { rtt: rtt, loss: Math.round(loss * 10000), poor: poor, codec: qs.codec || "", text: text };
+}
+
+/* Which Cloudflare city this phone reaches the internet through - a
+   good stand-in for "where in the world" a call was made from, without
+   asking for the phone's location. Looked up on connecting, at most
+   every half hour. */
+var netEdge = null, netEdgeAt = 0;
+function lookEdge(){
+  if (!useFS() || Date.now() - netEdgeAt < 1800000) return;
+  netEdgeAt = Date.now();
+  netFetch(fsBase() + "/ping", {}, 1).then(function(r){ return r.json(); })
+    .then(function(j){ if (j && j.edge && /^[A-Z]{3}$/.test(j.edge)) netEdge = j.edge; })
+    .catch(function(){ netEdgeAt = 0; });
+}
+
 function finishUsage(){
   if (!call || !call.t0 || call.usageDone) return;
   call.usageDone = true;
@@ -3578,7 +3713,9 @@ function finishUsage(){
   /* The entry written when the call was placed becomes the full one;
      an answered call gets its own. */
   var secs0 = Math.round((Date.now() - call.t0) / 1000);
-  var tech = [how, total ? fmtBytes(total) : ""].filter(Boolean).join(" · ");
+  var qsum = callQuality(call.qs);
+  var tech = [how, total ? fmtBytes(total) : "", qsum ? qsum.text : ""]
+               .filter(Boolean).join(" · ");
   var entry = null;
   (state.recent || []).forEach(function(r){
     if (!entry && call.logAt && r.at === call.logAt) entry = r;
@@ -3593,6 +3730,14 @@ function finishUsage(){
   ledgerAdd(function(m){
     m.calls++; if (out) m.out++;
     m.secs += secs;
+    if (qsum) {
+      m.qn = (m.qn || 0) + 1;
+      m.qrtt = (m.qrtt || 0) + qsum.rtt;
+      m.qloss = (m.qloss || 0) + qsum.loss;
+      if (qsum.poor) m.qpoor = (m.qpoor || 0) + 1;
+      if (qsum.codec === "RED") m.qred = (m.qred || 0) + 1;
+    }
+    if (netEdge) { m.edge = m.edge || {}; m.edge[netEdge] = (m.edge[netEdge] || 0) + 1; }
     Object.keys(u.by).forEach(function(route){
       var n = u.by[route] || 0;
       if (route === "direct") m.direct += n;
@@ -6370,6 +6515,16 @@ function takeUsage(msg){
     Object.keys(v.relay || {}).slice(0, 6).forEach(function(n){
       r.relay[String(n).slice(0, 24)] = Math.max(0, Number(v.relay[n]) || 0);
     });
+    /* Call quality, and which Cloudflare cities the calls went through. */
+    ["qn", "qrtt", "qloss", "qpoor", "qred"].forEach(function(f){
+      var x = Math.max(0, Number(v[f]) || 0);
+      if (x) r[f] = x;
+    });
+    Object.keys(v.edge || {}).slice(0, 12).forEach(function(e){
+      if (!/^[A-Z]{3}$/.test(e)) return;
+      r.edge = r.edge || {};
+      r.edge[e] = Math.max(0, Number(v.edge[e]) || 0);
+    });
     clean[k] = r;
   });
   var info = null;
@@ -6383,6 +6538,25 @@ function takeUsage(msg){
 function sumMonth(into, m){
   ["calls", "out", "secs", "buzz", "direct"].forEach(function(f){ into[f] += m[f] || 0; });
   Object.keys(m.relay || {}).forEach(function(n){ into.relay[n] = (into.relay[n] || 0) + m.relay[n]; });
+  ["qn", "qrtt", "qloss", "qpoor", "qred"].forEach(function(f){
+    if (m[f]) into[f] = (into[f] || 0) + m[f];
+  });
+  Object.keys(m.edge || {}).forEach(function(e){
+    into.edge = into.edge || {};
+    into.edge[e] = (into.edge[e] || 0) + m.edge[e];
+  });
+}
+/* A month's call quality for the admin's table. */
+function qualityCell(m){
+  if (!m.qn) return "—";
+  var rtt = Math.round((m.qrtt || 0) / m.qn), loss = (m.qloss || 0) / m.qn / 100;
+  var cls = (m.qpoor || 0) / m.qn > 0.2 ? "bad" : rtt > 300 || loss > 2 ? "warn" : "ok";
+  var edges = Object.keys(m.edge || {}).sort(function(a, b){ return m.edge[b] - m.edge[a]; });
+  return '<span class="qv ' + cls + '">' + (rtt < 1 ? "<1" : rtt) + " ms · " +
+         (loss < 0.1 ? "no loss" : loss.toFixed(1) + "% lost") + "</span>" +
+         "<small>" + (m.qpoor ? m.qpoor + " poor of " + m.qn : "all " + m.qn + " good") +
+         (edges.length ? " · via " + edges.slice(0, 2).map(cityOf).join(", ") : "") +
+         "</small>";
 }
 function relayTotal(m){
   return Object.keys(m.relay || {}).reduce(function(t, n){ return t + (m.relay[n] || 0); }, 0);
@@ -6484,7 +6658,7 @@ function paintFamUsage(){
   }
   var all = blankMonth();
   var html = '<table class="utable"><tr><th>Person</th><th>Calls</th><th>Talk</th>' +
-             '<th>Buzzes</th><th>Relay data</th><th>Direct</th></tr>';
+             '<th>Call quality</th><th>Buzzes</th><th>Relay data</th><th>Direct</th></tr>';
   rows.forEach(function(r){
     sumMonth(all, r.m);
     html += "<tr><td>" + escapeHtml(r.name) + "<small>" +
@@ -6492,12 +6666,14 @@ function paintFamUsage(){
             (r.phones > 1 ? " · " + r.phones + " phones" : "") + "</small></td>" +
             "<td>" + r.m.calls + (r.m.out ? "<small>" + r.m.out + " made</small>" : "") + "</td>" +
             "<td>" + (r.m.secs ? fmtLength(r.m.secs * 1000) : "—") + "</td>" +
+            "<td>" + qualityCell(r.m) + "</td>" +
             "<td>" + r.m.buzz + "</td>" +
             "<td>" + (relayTotal(r.m) ? fmtBytes(relayTotal(r.m)) : "—") + "</td>" +
             "<td>" + (r.m.direct ? fmtBytes(r.m.direct) : "—") + "</td></tr>";
   });
   html += '<tr class="tot"><td>Everyone</td><td>' + all.calls + "</td><td>" +
-          (all.secs ? fmtLength(all.secs * 1000) : "—") + "</td><td>" + all.buzz + "</td><td>" +
+          (all.secs ? fmtLength(all.secs * 1000) : "—") + "</td><td>" + qualityCell(all) +
+          "</td><td>" + all.buzz + "</td><td>" +
           (relayTotal(all) ? fmtBytes(relayTotal(all)) : "—") + "</td><td>" +
           (all.direct ? fmtBytes(all.direct) : "—") + "</td></tr></table>";
   /* Each call counts on both phones - a call between two people is
@@ -6748,7 +6924,7 @@ function gNote(t){ var e = $("gNote"); if (e) e.textContent = t || ""; }
 function gIce(){
   var list = iceServers();
   if (routeMode() === "cloudflare") list = list.concat(cloudflareServers());
-  return { iceServers: list };
+  return { iceServers: list, iceCandidatePoolSize: 1 };
 }
 
 /* ---------------------------------------------------------- choosing */
@@ -7140,6 +7316,7 @@ function openLink(g, id, offerer, at){
             pending: [], iceOut: [], restarts: 0, level: 0 };
   g.links[id] = l;
   if (g.stream) g.stream.getTracks().forEach(function(t){ pc.addTrack(t, g.stream); });
+  tuneAudio(pc);
 
   pc.onicecandidate = function(ev){
     if (group !== g || g.links[id] !== l) return;
@@ -7278,6 +7455,7 @@ function groupSignal(msg){
     pc.setRemoteDescription({ type: "offer", sdp: msg.sdp }).then(function(){
       l.pending.forEach(function(c){ pc.addIceCandidate(c).catch(function(){}); });
       l.pending = [];
+      tuneAudio(pc);
       return pc.createAnswer();
     }).then(function(a){ return pc.setLocalDescription(a); }).then(function(){
       if (group !== g || g.links[msg.from] !== l) return;
