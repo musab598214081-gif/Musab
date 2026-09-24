@@ -17,7 +17,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-10-11a";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-10-12a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var CALL_KINDS = { call: 1, group: 1 };

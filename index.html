@@ -989,16 +989,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.3.1";
+var APP_VERSION = "1.3.2";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Calls ring every time, and stop the moment you pick up";
+var WHATS_NEW   = "Co-admins keep their admin rights";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-11a";
+var VERSION  = "2026-10-12a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1317,6 +1317,7 @@ function encodeConfig(members){
                                  t2: state.turn2 || null,
                                  rt: state.route || null,
                                  a: state.admin || null,
+                                 ad: (state.admins && state.admins.length) ? state.admins : null,
                                  r: state.rev || 0,
                                  s: state.server || null,
                                  k: state.token || null,
@@ -2267,10 +2268,14 @@ function takeAdminKey(raw){
     return false;
   }
   state.adminKey = jwk;
-  if (state.admin.id !== state.me) state.admin = { id: state.me, pub: state.admin.pub };
+  /* A co-admin restoring their phone stays a co-admin: the family's own
+     admin is not replaced. (A hand-over link is for someone who isn't an
+     admin yet - that does make them the admin.) */
+  if (state.admin.id !== state.me && !isCoAdmin(state.me))
+    state.admin = { id: state.me, pub: state.admin.pub };
   bumpRev(); save();
   broadcastRoster();
-  toast("This device is now the family admin");
+  toast(isCoAdmin(state.me) ? "This device is a co-admin again" : "This device is now the family admin");
   if ($("setupSheet").classList.contains("on")) openSetup();
   return true;
 }
@@ -2386,7 +2391,7 @@ function paintAdmin(){
   }
 
   var waiting = state.admin.id === state.me && !state.adminKey;
-  var handing = canSign() && state.admin.id !== state.me;
+  var handing = canSign() && state.admin.id !== state.me && !isCoAdmin(state.me);
   if (handing) {
     para("You're handing the family over to " + nameOf(state.admin.id) + ". " +
          "Until they open the hand-over link, this phone can still send it again.");
@@ -2437,7 +2442,21 @@ function paintAdmin(){
 /* A verified update from the admin: it is the family's settings, whole -
    including clearing things the admin cleared. */
 function takeSignedFamily(fam){
-  if ((fam.rev || 0) <= (state.rev || 0) && state.admin) return;
+  if ((fam.rev || 0) <= (state.rev || 0) && state.admin) {
+    /* Nothing newer - but the same family can still bring back who its
+       admins are, if this phone had lost track (a phone set up again
+       from a link, which carries no admin list). */
+    if ((fam.rev || 0) === (state.rev || 0) && fam.admin && state.admin &&
+        fam.admin.id === state.admin.id &&
+        JSON.stringify(fam.admins || []) !== JSON.stringify(state.admins || [])) {
+      state.admins = fam.admins || [];
+      save();
+      if (isAdminId(state.me) && !keyFits()) setTimeout(coRequest, 800);
+      paintMain();
+      if ($("setupSheet").classList.contains("on")) { try { applyLock(); paintAdmin(); } catch (e) {} }
+    }
+    return;
+  }
   var wasAdmin = isAdmin();
   /* On an admin's phone, the people's invite keys (sk) stay: another
      admin's update never carries them - unless that admin reset the
@@ -6903,8 +6922,9 @@ function doPublish(){
     })).then(function(){ return doPublish2(whole); });
 }
 function doPublish2(whole){
-    var ids = state.members.map(function(m){ return m.id; })
-                           .filter(function(id){ return id !== state.me; });
+    /* Every person's copy - the publisher's own too: a co-admin's phone
+       that loses track gets the family back from the server. */
+    var ids = state.members.map(function(m){ return m.id; });
     return Promise.all([signFamily(whole)].concat(ids.map(function(id){
       return signFamily(viewFor(id));
     }))).then(function(all){
@@ -7452,6 +7472,11 @@ function tryJoin(){
             route:  older ? (prev.route || cfg.rt || null)
                           : (cfg.rt || (same && prev.route) || null),
             admin:  (same && prev.admin) || cfg.a || null,
+            /* Who the co-admins are - so a phone set up from a link (a
+               co-admin's own recovery link, say) knows it at once. */
+            admins: (same && prev.admins && prev.admins.length) ? prev.admins
+                    : (Array.isArray(cfg.ad) ? cfg.ad.filter(function(x){
+                        return /^[A-Za-z0-9]{3,16}$/.test(String(x)); }) : []),
             adminKey: (same && prev.adminKey) || undefined,
             preferRelay: same ? prev.preferRelay : undefined,
             usage: same ? prev.usage : undefined,
@@ -7460,6 +7485,18 @@ function tryJoin(){
                           : (cfg.k || (same && prev.token) || null),
             fs:     older ? (prev.fs || null) : (cfg.fs || null) };
   if (state.adminKey === undefined) delete state.adminKey;
+  /* The same person on the same phone (a call notification, their own
+     link, an invite opened again): everything this phone already knows
+     stays - only the family's details come from the link. It used to
+     start afresh and quietly drop the rest: the co-admin list (so a
+     co-admin lost their admin rights after tapping a call notification),
+     "hide my status", "don't share my local time", people waiting to be
+     approved, a name change on its way… */
+  if (same && prev.me && prev.me === mine) {
+    Object.keys(prev).forEach(function(k){
+      if (!(k in state) && k !== "authBad") state[k] = prev[k];
+    });
+  }
   if (akey && (!named || named[1] === state.me)) takeAdminKey(akey[1]);
 
   /* Somebody new, invited by a member: nothing is theirs yet. They say
