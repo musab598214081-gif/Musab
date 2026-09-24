@@ -230,6 +230,56 @@
   .memberrow button{background:transparent;border:1px solid var(--seam);color:var(--stop);
     border-radius:14px;width:46px;height:48px;font-size:18px;cursor:pointer;flex:0 0 auto}
 
+  /* Settings as a menu. */
+  .sethead{position:sticky;top:-22px;z-index:2;display:flex;align-items:center;gap:6px;
+    margin:-22px -18px 8px;padding:14px 10px 10px;background:var(--hearth);
+    border-bottom:1px solid transparent}
+  .sethead h2{flex:1;margin:0;font-size:20px;text-align:center}
+  .setback,.setx{width:44px;height:44px;flex:0 0 auto;border:0;border-radius:12px;background:none;
+    color:var(--mist);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .setback svg,.setx svg{width:22px;height:22px}
+  .setback:active,.setx:active{background:var(--night)}
+  .pg-off{display:none !important}
+  #setupSheet .sheetbody{max-height:94%}
+  #setNav{margin-top:4px;border-radius:18px;overflow:hidden;background:var(--night)}
+  .navrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:8px 12px;
+    background:none;border:0;border-bottom:1px solid var(--hearth);color:var(--paper);
+    font:inherit;cursor:pointer;min-height:54px}
+  .navrow:last-child{border-bottom:0}
+  .navrow:active{background:#15263A}
+  .navic{width:34px;height:34px;border-radius:10px;background:#1C3048;color:var(--mist);
+    display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .navic svg{width:18px;height:18px}
+  .navav{width:34px;height:34px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-weight:700;font-size:13px;color:#0F1B2A}
+  .navtx{flex:1;min-width:0}
+  .navtx b{display:block;font-weight:500;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .navtx small{display:block;font-size:12.5px;color:var(--mist);margin-top:1px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .navrow.warn .navtx small{color:var(--amber)}
+  .navrow.warn .navic{background:rgba(240,161,58,.15);color:var(--amber)}
+  .navch{color:var(--seam);display:flex;flex:0 0 auto}
+  .navch svg{width:18px;height:18px}
+  .setfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-top:16px;padding:0 4px;font-size:12.5px;color:var(--mist)}
+  .linkbtn{background:none;border:0;font:inherit;font-size:13px;cursor:pointer;padding:10px 0}
+  .linkbtn.danger{color:var(--stop)}
+  #setupSheet .sectiontitle:first-child{margin-top:4px}
+  #setupSheet #mineBlock{margin-top:26px}
+  #setupSheet #mineBlock .sectiontitle:first-child{margin-top:0}
+  #lockNote{margin-bottom:10px}
+  .profrow{display:flex;align-items:center;gap:10px}
+  .profrow input{flex:1;min-width:0}
+  .profav{width:46px;height:46px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-weight:700;font-size:16px;color:#0F1B2A;background:var(--seam)}
+  .sub.small{font-size:12.5px;margin:-2px 0 10px}
+  .memberrow .mdot{width:40px;height:40px;border-radius:50%;flex:0 0 auto;margin-right:8px;border:0;
+    color:#0F1B2A;font-weight:700;font-size:13px;cursor:pointer;
+    box-shadow:0 0 0 2px var(--hearth),0 0 0 2px var(--hearth)}
+  .memberrow .mdot.open{box-shadow:0 0 0 2px var(--hearth),0 0 0 4px var(--brass)}
+  .contacts .clab{font-size:12px;color:var(--mist);margin:2px 0 6px;font-weight:500}
+  .contacts .clab + .seg{margin-top:0}
+  .swatches.mini .swatch{width:30px;height:30px;margin:0 8px 8px 0}
   details.adv{margin-top:26px;border:1px solid var(--seam);border-radius:16px;padding:0 14px}
   details.adv > summary{cursor:pointer;padding:14px 0;font-weight:700;list-style:none;
     display:flex;align-items:center;justify-content:space-between}
@@ -567,13 +617,24 @@
 </div>
 
 <div class="sheet" id="setupSheet">
-  <div class="sheetbody">
-    <h2 id="setupTitle">Set up your family</h2>
-    <p class="sub" id="setupSub">Do this once on one phone, then send each person their link.</p>
-    <p class="notice" id="lockNote" style="display:none"></p>
+  <div class="sheetbody" id="setupBody">
+    <!-- Settings is a short menu (the "home" page); each row opens one
+         topic on its own page. Every block below says which pages it
+         belongs to in data-pages - see setPage(). -->
+    <div class="sethead">
+      <button class="setback" id="setBack" aria-label="Back to Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <h2 id="setupTitle">Settings</h2>
+      <button class="setx" data-close="setupSheet" aria-label="Close Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="sub" id="setupSub" data-pages="setup">Do this once on one phone, then send each person their link.</p>
+    <p class="notice" id="lockNote" data-pages="home" style="display:none"></p>
+    <div id="setNav" data-pages="home"></div>
 
-    <!-- A member's own details: the only family setting that is theirs. -->
-    <div id="meBlock" style="display:none">
+    <div id="meBlock" style="display:none" data-pages="profile">
       <label for="meName">Your name</label>
       <input type="text" id="meName" placeholder="Your name" autocomplete="off" maxlength="40">
       <label>Your colour</label>
@@ -581,20 +642,27 @@
       <button class="btn" id="meSave">Save</button>
     </div>
 
-    <div id="familyBlock">
-    <label for="myName">Who are you?</label>
-    <input type="text" id="myName" placeholder="Your name" autocomplete="off">
-
-    <label>Your colour</label>
-    <div class="swatches" id="swatches"></div>
-
-    <label>Everyone in the family</label>
-    <div id="members"></div>
-    <button class="btn ghost" id="addMember">+ Add a person</button>
-    <button class="btn" id="saveSetup">Save</button>
+    <div id="profileBlock" data-pages="setup profile">
+      <label for="myName">Your name</label>
+      <div class="profrow">
+        <span class="profav" id="profAv" aria-hidden="true">?</span>
+        <input type="text" id="myName" placeholder="Your name" autocomplete="off">
+      </div>
+      <label>Your colour</label>
+      <div class="swatches" id="swatches"></div>
     </div>
 
-    <div id="memberAddBlock" style="display:none">
+    <div id="membersBlock" data-pages="setup family">
+      <label>Everyone in the family</label>
+      <p class="sub small" id="membersHint">Tap a colour dot to change that person's colour and who they can see.</p>
+      <div id="members"></div>
+      <button class="btn ghost" id="addMember">+ Add a person</button>
+    </div>
+    <div id="saveBlock" data-pages="setup profile family">
+      <button class="btn" id="saveSetup">Save</button>
+    </div>
+
+    <div id="memberAddBlock" style="display:none" data-pages="invite">
       <div class="sectiontitle">Invite someone</div>
       <p class="sub">Type their name and send them the link. They join as soon as
         <span id="approverName">the admin</span> approves.</p>
@@ -603,7 +671,7 @@
       <div id="pendingList"></div>
     </div>
 
-    <div id="shareArea" style="display:none">
+    <div id="shareArea" data-pages="family" style="display:none">
       <div id="inviteBlock">
       <div class="sectiontitle">Invite the others</div>
       <p class="sub">
@@ -612,7 +680,9 @@
       </p>
       <div id="inviteList"></div>
       </div>
+    </div>
 
+    <div id="mineBlock" data-pages="profile">
       <div class="sectiontitle">Your own link</div>
       <p class="sub">Bookmark this on this phone. It brings everything back —
         including who you are — if the browser ever forgets. Send it to
@@ -621,38 +691,37 @@
       <button class="btn ghost" id="copyMine">Copy my link</button>
     </div>
 
-    <div id="fsPushBlock">
+    <div id="fsPushBlock" data-pages="calls">
     <div class="sectiontitle">Calls on this phone</div>
     <p class="sub" id="fsPushState">—</p>
     <button class="btn" id="fsPushBtn">Turn on calls</button>
     <button class="btn ghost" id="fsPushTest">Send a test notification</button>
     </div>
 
-    <div id="micBlock">
+    <div id="micBlock" data-pages="calls">
     <div class="sectiontitle">Microphone</div>
     <p class="sub" id="micState">—</p>
     <p class="notice" id="micHow" style="display:none"></p>
     <button class="btn ghost" id="micAllow">Allow the microphone now</button>
     </div>
 
+    <div id="toneBlock" data-pages="ringtone">
     <div class="sectiontitle">Ringtone</div>
     <p class="sub">How this phone sounds when somebody calls or buzzes you.
       Tap one to hear it at full ring volume. This is your own setting — it
       doesn't change what anyone else hears.</p>
     <div id="toneList"></div>
+    </div>
 
-    <div id="presBlock" style="display:none">
+    <div id="presBlock" style="display:none" data-pages="status">
       <div class="sectiontitle">Your status</div>
       <p class="sub" id="presNote"></p>
       <button class="btn ghost" id="presBtn">—</button>
     </div>
 
-    <div id="adminArea"></div>
+    <div id="adminArea" data-pages="admin"></div>
 
-    <!-- The admin's technical settings. They work by themselves: the
-         family server and its relay need nothing here, so this stays
-         folded away, and is never shown to members at all. -->
-    <details id="advBlock" class="adv">
+    <details id="advBlock" class="adv" data-pages="setup connection">
       <summary>Connection and relay</summary>
       <p class="sub" style="margin-top:10px">Nothing here needs setting up. Every phone
         gets these settings from you automatically, in the background.</p>
@@ -721,13 +790,13 @@
       <p class="sub" id="relayUsage" style="margin-top:10px"></p>
     </details>
 
-    <div id="overviewBlock" style="display:none">
+    <div id="overviewBlock" data-pages="usage" style="display:none">
       <div class="sectiontitle">Family overview</div>
       <p class="sub">What each phone last told you. Only you see this.</p>
       <div id="overviewList"></div>
     </div>
 
-    <div id="famUsageBlock" style="display:none">
+    <div id="famUsageBlock" data-pages="usage" style="display:none">
       <div class="sectiontitle">Family usage</div>
       <p class="sub">Every phone reports its calls to you after each one.
         Kept on this phone separately from the family settings — Start over
@@ -737,10 +806,10 @@
       <button class="btn ghost" id="famUsageCsv">Download as spreadsheet (CSV)</button>
     </div>
 
-    <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
-
-    <button class="btn ghost" data-close="setupSheet" style="margin-top:22px">Close</button>
-    <button class="btn danger" id="resetAll">Start over</button>
+    <div class="setfoot" data-pages="home">
+      <span class="ver">Version <b id="verTag">—</b></span>
+      <button class="linkbtn danger" id="resetAll">Start over on this phone</button>
+    </div>
   </div>
 </div>
 
@@ -761,7 +830,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-09-30a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-10-01a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -1376,6 +1445,7 @@ function fsVapidKey(){
 function paintFsPush(){
   var box = $("fsPushBlock");
   if (!box) return;
+  if (setPageNow === "home" && $("setupSheet").classList.contains("on")) { try { paintSetNav(); } catch (e) {} }
   var el = $("fsPushState"), btn = $("fsPushBtn");
   if (!el) return;
   var t = {
@@ -2192,10 +2262,11 @@ function applyLock(){
      at all - only what is theirs: their name and colour, ringing on this
      phone, the ringtone, their status, and inviting someone. Everything
      technical reaches their phone from the admin by itself. */
-  ["familyBlock", "advBlock", "inviteBlock", "overviewBlock", "famUsageBlock"].forEach(function(id){
+  ["profileBlock", "membersBlock", "saveBlock", "advBlock", "inviteBlock",
+   "overviewBlock", "famUsageBlock"].forEach(function(id){
     var el = $(id);
     if (el && locked) el.style.display = "none";
-    else if (el && (id === "familyBlock" || id === "advBlock" || id === "inviteBlock"))
+    else if (el && ["profileBlock", "membersBlock", "saveBlock", "advBlock", "inviteBlock"].indexOf(id) !== -1)
       el.style.display = "";
   });
   $("meBlock").style.display = locked ? "block" : "none";
@@ -2211,17 +2282,6 @@ function applyLock(){
      the middle of being handed the family. */
   var handing = !!(state && state.admin && state.admin.id === state.me && !state.adminKey);
   if ($("adminArea")) $("adminArea").style.display = (locked && !handing) ? "none" : "";
-  /* For the admin, Family admin sits near the top - it is their section.
-     For a member it is an emergency tool (hand-over, recovery, lost key),
-     so it goes to the bottom, below what they actually come here for. */
-  var area = $("adminArea");
-  var closeBtn = document.querySelector('#setupSheet [data-close="setupSheet"]');
-  if (area && closeBtn) {
-    if (!applyLock.home) applyLock.home = area.nextSibling;
-    if (locked) closeBtn.parentNode.insertBefore(area, closeBtn);
-    else if (applyLock.home && applyLock.home.parentNode)
-      applyLock.home.parentNode.insertBefore(area, applyLock.home);
-  }
   Array.prototype.forEach.call(document.querySelectorAll(".routeopt"), function(b){
     b.disabled = locked; b.classList.toggle("locked", locked);
   });
@@ -2306,6 +2366,10 @@ var ICON = {
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
   copy:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>',
   addp:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.6"/><path d="M3 20c.6-3.6 3.3-5.6 6.5-5.6s5.9 2 6.5 5.6M18.5 8v6M15.5 11h6"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 19 4M16 7l2.5 2.5M14 9l2 2"/></svg>',
+  chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>',
+  plug: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>',
   group: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.5-3.2 3-5 6-5s5.5 1.8 6 5"/><circle cx="17" cy="9.5" r="2.5"/><path d="M16.5 14.6c2.4.2 4 1.8 4.5 4.4"/></svg>',
   outArr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>'
@@ -5181,21 +5245,112 @@ function openSetup(){
   safe(paintFsAdmin);
   if (useFS()) fsCheckPush();
   safe(applyLock);
+  safe(paintProfAv);
+  setPage(state ? "home" : "setup");
   openSheet("setupSheet");
 }
+
+/* ------------------------------------------------ Settings, as a menu
+ *
+ * Settings used to be one page holding everything, a long scroll for
+ * the admin. Now it opens on a short menu - one row per topic, each
+ * showing where it stands ("Calls on this phone · On") - and a row
+ * opens its topic on its own page, with a back arrow. Every block in
+ * the sheet lists the pages it belongs to (data-pages); setPage shows
+ * those and hides the rest. What a block shows inside, and whether a
+ * member may see it at all, is still decided where it always was. */
+var setPageNow = "home";
+var PAGE_TITLES = { home: "Settings", setup: "Set up your family", profile: "You",
+  family: "Family", invite: "Invite someone", calls: "Calls on this phone",
+  ringtone: "Ringtone", status: "Your status", admin: "Family admin",
+  usage: "Usage and call quality", connection: "Connection and relay" };
+function setPage(name){
+  setPageNow = name;
+  Array.prototype.forEach.call(document.querySelectorAll("#setupSheet [data-pages]"), function(el){
+    el.classList.toggle("pg-off", (" " + el.getAttribute("data-pages") + " ").indexOf(" " + name + " ") === -1);
+  });
+  $("setupTitle").textContent = PAGE_TITLES[name] || "Settings";
+  $("setBack").style.visibility = (name === "home" || name === "setup") ? "hidden" : "visible";
+  /* The technical settings are folded away while creating a family, and
+     open straight away on their own page. */
+  var adv = $("advBlock"); if (adv) adv.open = name === "connection";
+  if (name === "home") paintSetNav();
+  if (name === "usage") { try { paintFamUsage(); } catch (e) {} }
+  var body = $("setupBody"); if (body) body.scrollTop = 0;
+}
+$("setBack").onclick = function(){ setPage("home"); };
+$("myName").addEventListener("input", paintProfAv);
+
+function paintSetNav(){
+  var box = $("setNav");
+  if (!box || !state) return;
+  box.innerHTML = "";
+  var admin = isAdmin(), locked = managedByOther();
+  var handing = !!(state.admin && state.admin.id === state.me && !state.adminKey);
+  var mine = memberById(state.me) || { name: "", colour: COLOURS[0] };
+  var shownOthers = others().length;
+  var callsOk = fsPushState === "on" || fsPushState === "unknown";
+  function row(page, title, value, opts){
+    opts = opts || {};
+    var b = document.createElement("button");
+    b.className = "navrow" + (opts.warn ? " warn" : "");
+    b.setAttribute("data-go", page);
+    var ic = document.createElement("span"); ic.className = "navic";
+    if (opts.avatar) {
+      ic.className = "navav"; ic.style.background = opts.avatar; ic.textContent = initials(title);
+    } else ic.innerHTML = opts.icon || "";
+    var tx = document.createElement("span"); tx.className = "navtx";
+    var t = document.createElement("b"); t.textContent = title;
+    var v = document.createElement("small"); v.textContent = value;
+    tx.appendChild(t); tx.appendChild(v);
+    var ch = document.createElement("span"); ch.className = "navch"; ch.setAttribute("aria-hidden", "true");
+    ch.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
+    b.appendChild(ic); b.appendChild(tx); b.appendChild(ch);
+    b.onclick = function(){ setPage(page); };
+    box.appendChild(b);
+  }
+  row("profile", mine.name || "Your name", admin ? "Family admin · name, colour, your link"
+      : "Your name, colour and your own link", { avatar: mine.colour });
+  if (!locked) row("family", "Family", (state.members.length) + " people · add, invite, who sees whom", { icon: ICON.group });
+  else if (!handing) {
+    var waiting = (state.pending || []).filter(function(p){ return !memberById(p.member.id) && !p.rejected; }).length;
+    row("invite", "Invite someone", waiting ? waiting + " waiting for " + nameOf(state.admin.id) : "Send a link to someone new", { icon: ICON.share });
+  }
+  row("calls", "Calls on this phone", callsOk ? "On" : fsPushState === "needhome" ? "Add to Home Screen first"
+      : fsPushState === "blocked" ? "Blocked — tap to fix" : "Off — tap to turn on",
+      { icon: ICON.phone, warn: !callsOk });
+  row("ringtone", "Ringtone", (TONES[toneName()] || TONES.classic).name, { icon: ICON.bell });
+  row("status", "Your status", state.presOff ? "Hidden" : "Shown to the people you're in touch with", { icon: ICON.eye || ICON.group });
+  if (admin || !state.admin || handing)
+    row("admin", "Family admin", admin ? "Recovery link, hand over" : handing ? "Finish taking over" : "Nobody manages this family yet", { icon: ICON.key || ICON.share });
+  if (admin) row("usage", "Usage and call quality", "Calls, data and quality per person", { icon: ICON.chart || ICON.phone });
+  if (!locked) row("connection", "Connection and relay", "Works by itself — for troubleshooting", { icon: ICON.plug || ICON.share });
+}
+
 
 function newMember(name){
   return { id: rand(5), name: name,
            colour: COLOURS[Math.floor(Math.random()*COLOURS.length)] };
 }
 
+/* Your own avatar beside your name, in your colour, as others see it. */
+function paintProfAv(){
+  var av = $("profAv"); if (!av) return;
+  av.style.background = chosenColour;
+  av.textContent = initials($("myName").value || "?");
+}
 function paintSwatches(){
   var box = $("swatches"); box.innerHTML = "";
   COLOURS.forEach(function(c){
     var s = document.createElement("div");
     s.className = "swatch" + (c === chosenColour ? " sel" : "");
     s.style.background = c;
-    s.onclick = function(){ chosenColour = c; paintSwatches(); };
+    s.onclick = function(){
+      chosenColour = c; paintSwatches(); paintProfAv();
+      /* Your own dot in the family list follows. */
+      if (state && draft) draft.members.forEach(function(d){ if (d.id === state.me) d.colour = c; });
+      if ($("members")) paintMembers();
+    };
     box.appendChild(s);
   });
 }
@@ -5208,10 +5363,21 @@ function paintMembers(){
   var privacy = !!(state && isAdmin());
   draft.members.forEach(function(m, i){
     var row = document.createElement("div"); row.className = "memberrow";
+    /* Their colour, visible at a glance - and the way into their colour
+       and who they can see. */
+    var isMe = state && m.id === state.me;
+    var md = document.createElement("button");
+    md.className = "mdot" + (openContacts === m.id ? " open" : "");
+    md.style.background = isMe ? chosenColour : m.colour;
+    md.textContent = initials(m.name || "?");
+    md.setAttribute("aria-label", "Colour" + (privacy && !isMe ? " and who they see" : "") + " for " + (m.name || "this person"));
+    md.setAttribute("aria-expanded", openContacts === m.id ? "true" : "false");
+    md.onclick = function(){ openContacts = openContacts === m.id ? null : m.id; paintMembers(); };
+    row.appendChild(md);
     var inp = document.createElement("input");
     inp.type = "text"; inp.value = m.name;
     inp.placeholder = "Name"; inp.autocomplete = "off";
-    inp.oninput = function(){ draft.members[i].name = inp.value; };
+    inp.oninput = function(){ draft.members[i].name = inp.value; md.textContent = initials(inp.value || "?"); };
     inp.onchange = function(){ contactsChanged(); };
     row.appendChild(inp);
     if (privacy && m.id !== state.me) {
@@ -5233,7 +5399,7 @@ function paintMembers(){
     del.textContent = "×";
     del.onclick = function(){ draft.members.splice(i,1); paintMembers(); };
     row.appendChild(del); box.appendChild(row);
-    if (privacy && openContacts === m.id) box.appendChild(contactsPanel(m));
+    if (openContacts === m.id) box.appendChild(contactsPanel(m, privacy && !isMe));
   });
 }
 
@@ -5265,7 +5431,7 @@ function contactsChanged(){
   clearTimeout(contactsTimer);
   contactsTimer = setTimeout(function(){
     contactsTimer = null;
-    var touched = [], added = [], renamed = false;
+    var touched = [], added = [], renamed = false, recoloured = false;
     draft.members.forEach(function(d){
       var name = String(d.name || "").trim().slice(0, 40);
       if (!name || memberById(d.id)) return;
@@ -5279,6 +5445,8 @@ function contactsChanged(){
       if (!m) return;
       var name = String(d.name || "").trim().slice(0, 40);
       if (name && name !== m.name && m.id !== state.me) { m.name = name; renamed = true; }
+      if (d.colour && d.colour !== m.colour && m.id !== state.me &&
+          COLOURS.indexOf(d.colour) !== -1) { m.colour = d.colour; recoloured = true; }
       var want = d.c ? d.c.filter(function(id){ return id !== d.id && !!memberById(id); })
                      : null;
       var have = m.c || null;
@@ -5286,9 +5454,9 @@ function contactsChanged(){
       if (want) m.c = want.slice(); else delete m.c;
       if (touched.indexOf(m.id) === -1) touched.push(m.id);
     });
-    if (!touched.length && !added.length && !renamed) return;
+    if (!touched.length && !added.length && !renamed && !recoloured) return;
     bumpRev(); save();
-    if (added.length || renamed) broadcastRoster();
+    if (added.length || renamed || recoloured) broadcastRoster();
     else {
       touched.forEach(function(id){ if (id !== state.me) broadcastRoster(id); });
       /* Nobody else's copy changed, so everyone is up to date. */
@@ -5300,14 +5468,34 @@ function contactsChanged(){
       ? added.map(function(m){ return m.name; }).join(", ") +
         " added — their invite link is ready under Invite the others"
       : renamed ? "Name updated on everyone's phone"
+      : recoloured && !touched.length ? "Colour updated on everyone's phone"
       : touched.length === 1 && touched[0] !== state.me
         ? "Sent to " + nameOf(touched[0]) + "'s phone"
         : "Sent to the family");
   }, 800);
 }
 
-function contactsPanel(m){
+function contactsPanel(m, withContacts){
   var p = document.createElement("div"); p.className = "contacts";
+  var isMe = state && m.id === state.me;
+  var cl = document.createElement("div"); cl.className = "clab"; cl.textContent = "Colour";
+  p.appendChild(cl);
+  var sw = document.createElement("div"); sw.className = "swatches mini";
+  COLOURS.forEach(function(c){
+    var d = document.createElement("button");
+    var cur = isMe ? chosenColour : m.colour;
+    d.className = "swatch" + (c === cur ? " sel" : "");
+    d.style.background = c; d.setAttribute("aria-label", "Colour " + c);
+    d.onclick = function(){
+      if (isMe) { chosenColour = c; paintSwatches(); paintProfAv(); }
+      m.colour = c; paintMembers(); contactsChanged();
+    };
+    sw.appendChild(d);
+  });
+  p.appendChild(sw);
+  if (!withContacts) return p;
+  var cl2 = document.createElement("div"); cl2.className = "clab"; cl2.textContent = "Can see";
+  p.appendChild(cl2);
   var seg = document.createElement("div"); seg.className = "seg";
   var all = document.createElement("button");
   all.textContent = "Everyone"; all.className = m.c ? "" : "sel";
@@ -5577,6 +5765,18 @@ function saveSetup(){
   });
   draft.pending = (state && state.pending) || [];
   draft.presOff = !!(state && state.presOff);
+  /* Save changes what this form edits - and nothing else. Everything
+     else is taken from the family as it is NOW, not as it was when the
+     form was opened: the admin key arrives a moment after a new family
+     is first saved, and a second Save in the same visit used to write
+     the form's older copy back, quietly dropping the admin role - after
+     which every other phone ignored the family's updates. */
+  var FORM_OWNS = ["members", "me", "recent", "turn", "turn2", "tone", "fs", "server",
+                   "token", "route", "pending", "presOff"];
+  if (state) Object.keys(state).forEach(function(k){
+    if (FORM_OWNS.indexOf(k) === -1) draft[k] = state[k];
+  });
+  if (state && !state.adminKey) delete draft.adminKey;
   state = draft;
   bumpRev();
   save();
@@ -5589,6 +5789,7 @@ function saveSetup(){
   $("shareArea").style.display = "block";
   paintInvites();
   $("mineLink").textContent = maskLink(personalLink());
+  if (creating) setPage("family");
   /* The form becomes a fresh copy again. It used to BE the saved
      family after Save, so every later tap in the same visit changed the
      family directly - never saved, never sent - and the automatic
