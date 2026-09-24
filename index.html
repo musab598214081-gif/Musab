@@ -711,7 +711,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-09-28a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-29a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -1178,6 +1178,8 @@ function fsFrame(f){
   } else if (f.k === "famrev") {
     /* The server's copy is older than the admin's: bring it up to date. */
     if (canSign() && (f.rev || 0) < (state.rev || 0)) publishFamily();
+  } else if (f.k === "caps") {
+    fsCaps = { sfu: !!f.sfu, turn: !!f.turn };
   } else if (f.k === "guest") {
     takeGuest(f);
   } else if (f.k === "joinreq") {
@@ -6897,7 +6899,7 @@ setInterval(function(){
  * a room, and the old connection is only closed once the new one
  * between them carries sound - no gap, no hanging up.
  * ==================================================================== */
-var GROUP_MAX = 8;
+var GROUP_MAX = 8;    /* phone to phone; see groupMax() for the SFU */
 var group = null;
 var groupAuto = null;          /* { room, until } - opened from "Join" */
 var groupBusyNoted = {};
@@ -6940,10 +6942,10 @@ function openGroupPicker(mode, preset){
     Object.keys(group.room.live).forEach(function(id){ busy[id] = 1; });
     Object.keys(group.room.inv).forEach(function(id){ busy[id] = 1; });
   }
-  var room = GROUP_MAX - 1 - Object.keys(busy).length;
+  var room = groupMax() - 1 - Object.keys(busy).length;
   $("grpTitle").textContent = mode === "new" ? "Group call" : "Add to the call";
   $("grpSub").textContent = mode === "new"
-    ? "Pick who to call. Everyone hears everyone, up to " + GROUP_MAX + " people."
+    ? "Pick who to call. Everyone hears everyone, up to " + groupMax() + " people."
     : "Their phones ring now. Everyone already on the call stays on it.";
   var list = $("grpList"); list.innerHTML = "";
   var cands = others().filter(function(m){ return !busy[m.id]; });
@@ -6967,7 +6969,7 @@ function openGroupPicker(mode, preset){
     b.appendChild(dot); b.appendChild(nm); b.appendChild(tick);
     b.onclick = function(){
       if (!picked[m.id] && Object.keys(picked).length >= room) {
-        toast("A call can have " + GROUP_MAX + " people at most"); return;
+        toast("A call can have " + groupMax() + " people at most"); return;
       }
       if (picked[m.id]) delete picked[m.id]; else picked[m.id] = 1;
       b.classList.toggle("sel", !!picked[m.id]);
@@ -7037,7 +7039,8 @@ function groupStart(ids){
 function groupEnter(op){
   var g = group;
   var me = memberById(state.me) || {};
-  return fsRequest({ k: "room", op: op, room: g.id, name: me.name || "", colour: me.colour || "" }, 10000)
+  return fsRequest({ k: "room", op: op, room: g.id, name: me.name || "", colour: me.colour || "",
+                     sfu: 1 }, 10000)
     .then(function(r){
       if (group !== g) return false;
       if (!r || !r.ok || !r.room) {
@@ -7123,6 +7126,7 @@ function groupAbandon(g){
   if (group !== g) return;
   fsRequest({ k: "room", op: "leave", room: g.id }, 8000);
   closeAllLinks(g);
+  sfuStop(g);
   stopStream(g.stream);
   if (g.moveTimer) clearTimeout(g.moveTimer);
   group = null;
@@ -7265,18 +7269,23 @@ function groupApply(r){
       if (!g.rejoining) {
         g.rejoining = true;
         closeAllLinks(g);
+        sfuStop(g);
         groupEnter("join").then(function(){ if (group === g) g.rejoining = false; });
       }
       return;
     }
-    var myAt = r.live[me].at;
-    Object.keys(g.links).forEach(function(id){
-      if (!r.live[id] || g.links[id].at !== r.live[id].at) closeLink(g, id);
-    });
-    Object.keys(r.live).forEach(function(id){
-      if (id === me || g.links[id]) return;
-      if (myAt > r.live[id].at) openLink(g, id, true, r.live[id].at);
-    });
+    if (sfuOn(g)) {
+      if (!g.sfu) sfuStart(g); else sfuSync(g);
+    } else {
+      var myAt = r.live[me].at;
+      Object.keys(g.links).forEach(function(id){
+        if (!r.live[id] || g.links[id].at !== r.live[id].at) closeLink(g, id);
+      });
+      Object.keys(r.live).forEach(function(id){
+        if (id === me || g.links[id]) return;
+        if (myAt > r.live[id].at) openLink(g, id, true, r.live[id].at);
+      });
+    }
     if (g.moveFrom && r.live[g.moveFrom] && !g.moveEnd) {
       /* They are in: show the group now, and if the new connection
          somehow never carries sound, still let the old call go. */
@@ -7304,6 +7313,204 @@ function checkAlone(){
     gState(g.t0 ? "Everyone has left" : "Nobody answered");
     setTimeout(function(){ if (group === g) groupLeave(); }, 1400);
   }, 1800);
+}
+
+/* ------------------------------------------ calls through the SFU
+ *
+ * When the family server has Cloudflare's SFU set up, a group call
+ * works differently underneath: each phone has ONE connection, to
+ * Cloudflare. It sends its own voice there once, and receives everyone
+ * else's over the same connection. Phone to phone, a call of 8 meant
+ * each phone sending its voice 7 times - fine on wifi, too much on
+ * mobile data across countries; this way a call of 20 costs each phone
+ * one upload.
+ *
+ * Everything the call screen shows is kept the same: each other person
+ * still has their own entry in group.links, with its own state, audio
+ * and voice level - only it shares the one connection ("virtual"). */
+var fsCaps = {};
+function groupMax(){ return fsCaps.sfu ? 20 : 8; }
+
+function sfuOn(g){ return !!(g && g.room && g.room.mode === "sfu"); }
+
+/* One change at a time on the connection, as the SFU requires. */
+function sfuQueue(g, job){
+  var sf = g.sfu;
+  sf.q = sf.q.then(function(){ if (group === g && g.sfu === sf) return job(sf); })
+             .catch(function(e){ if (window.console) console.warn("sfu", e); });
+  return sf.q;
+}
+
+function sfuStart(g){
+  if (!g || g.sfu || !g.stream) return;
+  var ice = STUN.concat(cloudflareServers());
+  var pc;
+  try { pc = new RTCPeerConnection({ iceServers: ice, bundlePolicy: "max-bundle" }); }
+  catch (e) { pc = new RTCPeerConnection({ iceServers: STUN.slice(), bundlePolicy: "max-bundle" }); }
+  var sf = g.sfu = { pc: pc, q: Promise.resolve(), sid: null, byMid: {}, pulling: {}, fails: 0 };
+  pc.ontrack = function(ev){
+    var mid = ev.transceiver && ev.transceiver.mid;
+    var id = sf.byMid[mid];
+    var l = id && g.links[id];
+    if (!l) { sf.early = sf.early || {}; sf.early[mid] = ev.track; return; }
+    sfuAttach(g, l, ev.track);
+  };
+  pc.onconnectionstatechange = function(){
+    if (group !== g || g.sfu !== sf) return;
+    var st = pc.connectionState;
+    if (st === "connected") {
+      sf.fails = 0;
+      if (sf.lostTimer) { clearTimeout(sf.lostTimer); sf.lostTimer = null; }
+      prioritise(pc);
+      Object.keys(g.links).forEach(function(id){ sfuLinkUp(g, g.links[id]); });
+    } else if (st === "failed") {
+      sfuRestart(g);
+    } else if (st === "disconnected" && !sf.lostTimer) {
+      sf.lostTimer = setTimeout(function(){
+        sf.lostTimer = null;
+        if (group === g && g.sfu === sf && pc.connectionState !== "connected") sfuRestart(g);
+      }, 4000);
+    }
+    paintGroup();
+  };
+  g.stream.getAudioTracks().forEach(function(t){
+    pc.addTransceiver(t, { direction: "sendonly", streams: [g.stream] });
+  });
+  tuneAudio(pc);
+  sfuQueue(g, function(){
+    return pc.createOffer().then(function(o){ return pc.setLocalDescription(o); })
+      .then(function(){ return gathered(pc, 1500); })
+      .then(function(){
+        var mid = pc.getTransceivers()[0] && pc.getTransceivers()[0].mid;
+        return fsRequest({ k: "sfu", op: "push", room: g.id, sdp: pc.localDescription.sdp,
+                           mid: String(mid) }, 15000);
+      })
+      .then(function(r){
+        if (group !== g || g.sfu !== sf) return;
+        if (!r || !r.ok || !r.sdp) throw new Error("push " + (r && (r.why || r.status)));
+        sf.sid = r.sid;
+        return pc.setRemoteDescription({ type: r.type || "answer", sdp: r.sdp }).then(function(){
+          if (r.room) groupApply(r.room);
+        });
+      });
+  }).then(function(){
+    if (group === g && g.sfu === sf && !sf.sid) sfuFailed(g);
+  });
+}
+
+/* Could not start at all: tried once more, then said plainly. */
+function sfuFailed(g){
+  var sf = g.sfu;
+  if (!sf) return;
+  sf.fails = (sf.fails || 0) + 1;
+  if (sf.fails <= 2) { setTimeout(function(){ if (group === g) sfuRestart(g); }, 1500 * sf.fails); return; }
+  gNote("Couldn't connect the group call — check the connection and try again");
+}
+
+/* Starts the connection to Cloudflare again - after a network change,
+   say. The others pick up the new one from the room by themselves. */
+function sfuRestart(g){
+  var old = g.sfu;
+  var fails = old ? old.fails || 0 : 0;
+  if (old) { if (old.lostTimer) clearTimeout(old.lostTimer); try { old.pc.close(); } catch (e) {} }
+  g.sfu = null;
+  Object.keys(g.links).forEach(function(id){
+    var l = g.links[id];
+    if (l.virtual) { l.mid = null; l.src = null; if (l.state === "connected") l.state = "reconnecting"; }
+  });
+  sfuStart(g);
+  if (g.sfu) g.sfu.fails = fails;
+  paintGroup();
+}
+
+/* Brings what this phone receives in line with who is in the call. */
+function sfuSync(g){
+  var r = g.room, sf = g.sfu, me = state.me;
+  if (!sf || !sf.sid || !r || !r.live[me]) return;
+  /* The room lost track of this phone's voice (it was away too long):
+     publish again. */
+  if (!r.live[me].s || r.live[me].s.s !== sf.sid) { if (!sf.restarting) { sf.restarting = true; sfuRestart(g); } return; }
+  var drop = [], want = [];
+  Object.keys(g.links).forEach(function(id){
+    var l = g.links[id], e = r.live[id] && r.live[id].s;
+    if (!e || !l.src || l.src !== e.s) { if (l.mid) drop.push(l.mid); closeLink(g, id); }
+  });
+  Object.keys(r.live).forEach(function(id){
+    var e = r.live[id].s;
+    if (id === me || !e || g.links[id] || sf.pulling[id]) return;
+    want.push(id);
+  });
+  if (drop.length) sfuQueue(g, function(){
+    return fsRequest({ k: "sfu", op: "close", room: g.id, mids: drop }, 10000);
+  });
+  if (!want.length) return;
+  want.forEach(function(id){ sf.pulling[id] = true; });
+  sfuQueue(g, function(){
+    return fsRequest({ k: "sfu", op: "pull", room: g.id, ids: want }, 15000).then(function(res){
+      if (group !== g || g.sfu !== sf) return;
+      want.forEach(function(id){ delete sf.pulling[id]; });
+      if (!res || !res.ok) throw new Error("pull " + (res && (res.why || res.status)));
+      (res.tracks || []).forEach(function(t){
+        if (!t.id || !t.mid || t.err) return;
+        var l = { id: t.id, virtual: true, pc: sf.pc, mid: t.mid, src: t.s,
+                  at: g.room.live[t.id] ? g.room.live[t.id].at : 0, state: "connecting", level: 0 };
+        g.links[t.id] = l;
+        sf.byMid[t.mid] = t.id;
+      });
+      if (!res.sdp || res.type !== "offer") return;
+      var pc = sf.pc;
+      return pc.setRemoteDescription({ type: "offer", sdp: res.sdp })
+        .then(function(){ return pc.createAnswer(); })
+        .then(function(a){ return pc.setLocalDescription(a); })
+        .then(function(){ return gathered(pc, 1500); })
+        .then(function(){
+          return fsRequest({ k: "sfu", op: "answer", room: g.id, sdp: pc.localDescription.sdp }, 15000);
+        })
+        .then(function(a){
+          if (!a || !a.ok) throw new Error("answer " + (a && (a.why || a.status)));
+          /* Tracks that arrived before their person was known. */
+          Object.keys(sf.early || {}).forEach(function(mid){
+            var l2 = g.links[sf.byMid[mid]];
+            if (l2) { sfuAttach(g, l2, sf.early[mid]); delete sf.early[mid]; }
+          });
+          paintGroup();
+        });
+    });
+  });
+}
+
+function sfuAttach(g, l, track){
+  if (!l.audio) {
+    l.audio = document.createElement("audio");
+    l.audio.autoplay = true;
+    l.audio.setAttribute("playsinline", "");
+    $("gAudio").appendChild(l.audio);
+    if (g.speaker) sinkTo(l.audio, true);
+  }
+  l.audio.srcObject = new MediaStream([track]);
+  l.track = track;
+  var p = l.audio.play();
+  if (p && p.catch) p.catch(function(){ gTapForSound(); });
+  sfuLinkUp(g, l);
+}
+
+/* A person's voice is arriving: the same moment a phone-to-phone link
+   counts as connected. */
+function sfuLinkUp(g, l){
+  if (!l || !l.virtual || !l.track || l.state === "connected" || !g.sfu ||
+      g.sfu.pc.connectionState !== "connected") return;
+  l.state = "connected";
+  g.met[l.id] = gName(g.room, l.id);
+  if (!g.t0) { g.t0 = Date.now(); groupTimer(); stopTone(); }
+  if (g.moveFrom === l.id) finishMove();
+  paintGroup();
+}
+
+function sfuStop(g){
+  if (!g || !g.sfu) return;
+  if (g.sfu.lostTimer) clearTimeout(g.sfu.lostTimer);
+  try { g.sfu.pc.close(); } catch (e) {}
+  g.sfu = null;
 }
 
 /* ------------------------------------------------------ connections */
@@ -7409,7 +7616,8 @@ function closeLink(g, id){
   delete g.links[id];
   if (l.recTimer) clearTimeout(l.recTimer);
   if (l.iceTimer) clearTimeout(l.iceTimer);
-  try { l.pc.close(); } catch (e) {}
+  if (l.virtual) { if (g.sfu && l.mid) delete g.sfu.byMid[l.mid]; }
+  else { try { l.pc.close(); } catch (e) {} }
   if (l.audio) { try { l.audio.srcObject = null; l.audio.remove(); } catch (e) {} }
 }
 function closeAllLinks(g){ Object.keys(g.links).forEach(function(id){ closeLink(g, id); }); }
@@ -7501,6 +7709,7 @@ function groupEnd(why, quiet){
     if (g[k]) { clearTimeout(g[k]); clearInterval(g[k]); }
   });
   closeAllLinks(g);
+  sfuStop(g);
   stopStream(g.stream);
   clearCallNote(g.id);
   /* Remembered, so reconnecting does not ring for this invitation again. */
@@ -7557,7 +7766,23 @@ function groupTimer(){
   /* Who is talking, from the audio levels the connections report. */
   g.statTimer = setInterval(function(){
     if (group !== g) return;
+    if (g.sfu) {
+      g.sfu.pc.getStats(null).then(function(st){
+        var byMid = {};
+        st.forEach(function(r){
+          if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio") &&
+              typeof r.audioLevel === "number" && r.mid != null) byMid[r.mid] = r.audioLevel;
+          if (r.type === "media-source" && r.kind === "audio" && typeof r.audioLevel === "number")
+            g.myLevel = r.audioLevel;
+        });
+        Object.keys(g.links).forEach(function(id){
+          var l = g.links[id];
+          if (l.virtual) l.level = byMid[l.mid] || 0;
+        });
+      }).catch(function(){});
+    }
     Object.keys(g.links).forEach(function(id){
+      if (g.links[id].virtual) return;
       var l = g.links[id];
       if (!l.pc.getStats || l.state !== "connected") { l.level = 0; return; }
       l.pc.getStats(null).then(function(st){
