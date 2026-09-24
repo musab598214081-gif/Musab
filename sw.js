@@ -10,13 +10,14 @@
  *     seconds with the same tag, and each one replaces the last and
  *     rings again, until it is answered, declined or rings out;
  *   - Answer / Decline on the call itself, Call back on a missed call;
+ *   - Approve / Reject on the admin's "wants to join" notification;
  *   - keeps a copy of the app, so opening it from a notification is
  *     instant even on a slow network (the copy refreshes in the
  *     background each time);
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-09-26a";
+var SW_VERSION = "2026-09-27a";
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var CALL_KINDS = { call: 1, group: 1 };
@@ -26,6 +27,11 @@ var IS_APPLE = /iPhone|iPad|iPod|Macintosh/.test(UA) && !/Chrome|Chromium|Edg|Fi
 /* Calls the person swiped away. Later rings of the same call still have
    to show something (the browser insists), but they show it quietly. */
 var silenced = {};
+/* Calls the open app has confirmed it is ringing out loud for. Only
+   those skip the repeat notifications while the app is on screen - an
+   app that could not start its sound (no tap yet since it opened) used
+   to leave the phone silent after the first ring. */
+var audible = {};
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
@@ -113,9 +119,9 @@ function handlePush(d) {
       ringing = false;
     }
 
-    /* A repeat ring while the app is on screen: the app rings by itself.
-       (Apple needs every push to show something, so not there.) */
-    if (ringing && d.n > 0 && front && !IS_APPLE) return;
+    /* A repeat ring while the app is on screen and ringing out loud by
+       itself. (Apple needs every push to show something, so not there.) */
+    if (ringing && d.n > 0 && front && !IS_APPLE && tag && audible[tag]) return;
 
     var quiet = !!(ringing && tag && silenced[tag]);
     return self.registration.showNotification(d.title || "Family Notifier", options(d, kind, quiet));
@@ -128,7 +134,7 @@ function options(d, kind, quiet) {
   var o = {
     body: d.body || "",
     data: { url: url, answer: answer, dec: d.dec || null, kind: kind, tag: d.tag || null,
-            cb: d.cb || null },
+            cb: d.cb || null, jr: d.jr || null, rej: d.rej || null },
     timestamp: d.ts || Date.now()
   };
   if (d.tag) { o.tag = d.tag; o.renotify = !quiet; }
@@ -139,6 +145,14 @@ function options(d, kind, quiet) {
     o.actions = [];
     if (answer) o.actions.push({ action: "answer", title: kind === "group" ? "Join" : "Answer" });
     if (d.dec) o.actions.push({ action: "decline", title: "Decline" });
+  } else if (kind === "approve") {
+    /* Somebody wants to join: stays until the admin decides. */
+    o.requireInteraction = true;
+    o.vibrate = [300, 150, 300];
+    o.actions = [{ action: "approve", title: "Approve" }];
+    if (d.rej) o.actions.push({ action: "reject", title: "Reject" });
+  } else if (kind === "info") {
+    o.vibrate = [200];
   } else if (kind === "missed") {
     o.vibrate = [200, 120, 200];
     if (d.cb) o.actions = [{ action: "callback", title: "Call back" }];
@@ -173,6 +187,13 @@ self.addEventListener("notificationclick", function (e) {
   var d = e.notification.data || {};
   if (d.tag) silenced[d.tag] = 1;
 
+  if (e.action === "reject" && d.rej) {
+    e.waitUntil(fetch(d.rej.u, { method: "POST", headers: { "Content-Type": "application/json" },
+                                 body: JSON.stringify(d.rej.b), keepalive: true })
+      .catch(function () {}));
+    return;
+  }
+
   if (e.action === "decline" && d.dec) {
     /* Straight to the family server - no need to open the app to say no. */
     e.waitUntil(fetch(d.dec.u, { method: "POST", headers: { "Content-Type": "application/json" },
@@ -182,7 +203,11 @@ self.addEventListener("notificationclick", function (e) {
   }
 
   var url = d.url || "./";
-  if (e.action === "answer" && d.answer) url = d.answer;
+  /* Approve adds them as the app opens; a tap on the notification
+     itself opens the request so it can be looked at first. */
+  if (d.kind === "approve" && d.jr)
+    url = "./#" + (e.action === "approve" ? "approve=" : "jr=") + encodeURIComponent(d.jr);
+  else if (e.action === "answer" && d.answer) url = d.answer;
   else if ((e.action === "callback" || d.kind === "missed") && d.cb)
     url = url + (url.indexOf("#") === -1 ? "#" : "&") + "cb=" + encodeURIComponent(d.cb);
 
@@ -221,6 +246,8 @@ self.addEventListener("message", function (e) {
     e.waitUntil(self.registration.getNotifications({ tag: m.tag }).then(function (ns) {
       ns.forEach(function (n) { n.close(); });
     }));
+  } else if (m.t === "audible" && m.tag) {
+    if (m.on) audible[m.tag] = 1; else delete audible[m.tag];
   } else if (m.t === "version" && e.source) {
     e.source.postMessage({ t: "version", v: SW_VERSION });
   }

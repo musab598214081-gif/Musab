@@ -229,6 +229,34 @@
   .memberrow button{background:transparent;border:1px solid var(--seam);color:var(--stop);
     border-radius:14px;width:46px;height:48px;font-size:18px;cursor:pointer;flex:0 0 auto}
 
+  details.adv{margin-top:26px;border:1px solid var(--seam);border-radius:16px;padding:0 14px}
+  details.adv > summary{cursor:pointer;padding:14px 0;font-weight:700;list-style:none;
+    display:flex;align-items:center;justify-content:space-between}
+  details.adv > summary::-webkit-details-marker{display:none}
+  details.adv > summary::after{content:"";width:8px;height:8px;border:solid var(--mist);
+    border-width:0 2px 2px 0;transform:rotate(45deg);margin:0 4px 4px 0;transition:transform .15s}
+  details.adv[open] > summary::after{transform:rotate(-135deg);margin-bottom:-4px}
+  details.adv[open]{padding-bottom:14px}
+  details.adv .sectiontitle:first-of-type{margin-top:8px}
+  /* Somebody asking to join, at the top of the admin's home screen. */
+  .req{background:var(--hearth);border:1px solid var(--brass);border-radius:20px;
+    padding:14px;margin:0 0 12px}
+  .req .top{display:flex;align-items:center;gap:12px}
+  .req .dot{width:44px;height:44px;border-radius:50%;flex:0 0 auto;display:flex;
+    align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#0F1B2A}
+  .req .tx{flex:1;min-width:0}
+  .req .tx b{display:block;font-size:16px;font-weight:500}
+  .req .tx small{display:block;color:var(--mist);font-size:13px;margin-top:2px;line-height:1.4}
+  .req .row{gap:10px;margin-top:4px}
+  .req .row .btn{margin-top:10px;padding:12px}
+  .req .row .btn + .btn{margin-left:0}
+  /* A person's first minute: joining, and turning calls on. */
+  .onb{background:var(--hearth);border-radius:20px;padding:16px;margin:0 0 14px}
+  .onb h3{margin:0 0 6px;font-size:17px;font-weight:700}
+  .onb p{margin:0;color:var(--mist);font-size:14px;line-height:1.5}
+  .onb .btn{margin-top:14px}
+  .onb ol{margin:8px 0 0;padding-left:20px;color:var(--paper);font-size:14px;line-height:1.7}
+  .joinform label{margin-top:18px}
   .codebox{background:var(--night);border:1px solid var(--seam);border-radius:14px;
     padding:12px 14px;font-size:14px;word-break:break-all;color:var(--mist);line-height:1.5}
 
@@ -490,8 +518,17 @@
 <div class="sheet" id="setupSheet">
   <div class="sheetbody">
     <h2 id="setupTitle">Set up your family</h2>
-    <p class="sub" id="setupSub">Do this once on one phone, then share the invite link.</p>
+    <p class="sub" id="setupSub">Do this once on one phone, then send each person their link.</p>
     <p class="notice" id="lockNote" style="display:none"></p>
+
+    <!-- A member's own details: the only family setting that is theirs. -->
+    <div id="meBlock" style="display:none">
+      <label for="meName">Your name</label>
+      <input type="text" id="meName" placeholder="Your name" autocomplete="off" maxlength="40">
+      <label>Your colour</label>
+      <div class="swatches" id="meSwatches"></div>
+      <button class="btn" id="meSave">Save</button>
+    </div>
 
     <div id="familyBlock">
     <label for="myName">Who are you?</label>
@@ -507,20 +544,12 @@
     </div>
 
     <div id="memberAddBlock" style="display:none">
-      <div class="sectiontitle">Add someone</div>
-      <p class="sub">Add a person you want to be in touch with. They are
-        added straight away for you, and join the family as soon as the
-        admin's phone confirms it. They will see only you and the admin
-        until the admin decides otherwise.</p>
+      <div class="sectiontitle">Invite someone</div>
+      <p class="sub">Type their name and send them the link. They join as soon as
+        <span id="approverName">the admin</span> approves.</p>
       <input type="text" id="newPersonName" placeholder="Their name" autocomplete="off">
-      <button class="btn" id="newPersonAdd">Add and get their link</button>
+      <button class="btn" id="newPersonAdd">Get their invite link</button>
       <div id="pendingList"></div>
-    </div>
-
-    <div id="presBlock" style="display:none">
-      <div class="sectiontitle">Your status</div>
-      <p class="sub" id="presNote"></p>
-      <button class="btn ghost" id="presBtn">—</button>
     </div>
 
     <div id="shareArea" style="display:none">
@@ -541,24 +570,46 @@
       <button class="btn ghost" id="copyMine">Copy my link</button>
     </div>
 
-    <div id="adminArea"></div>
-
     <div id="fsPushBlock">
-    <div class="sectiontitle">Call notifications on this device</div>
+    <div class="sectiontitle">Calls on this phone</div>
     <p class="sub" id="fsPushState">—</p>
-    <button class="btn" id="fsPushBtn">Turn on call notifications</button>
-    <button class="btn ghost" id="fsPushTest">Test — this device should get a notification</button>
+    <button class="btn" id="fsPushBtn">Turn on calls</button>
+    <button class="btn ghost" id="fsPushTest">Send a test notification</button>
     </div>
 
+    <div id="micBlock">
     <div class="sectiontitle">Microphone</div>
     <p class="sub" id="micState">—</p>
     <p class="notice" id="micHow" style="display:none"></p>
     <button class="btn ghost" id="micAllow">Allow the microphone now</button>
+    </div>
 
-    <div class="sectiontitle">Connection</div>
-    <p class="sub" id="connState">Tap check to see whether this network
-      reaches the family server.</p>
-    <button class="btn ghost" id="checkConn">Check connection</button>
+    <div class="sectiontitle">Ringtone</div>
+    <p class="sub">How this phone sounds when somebody calls or buzzes you.
+      Tap one to hear it at full ring volume. This is your own setting — it
+      doesn't change what anyone else hears.</p>
+    <div id="toneList"></div>
+
+    <div id="presBlock" style="display:none">
+      <div class="sectiontitle">Your status</div>
+      <p class="sub" id="presNote"></p>
+      <button class="btn ghost" id="presBtn">—</button>
+    </div>
+
+    <div id="adminArea"></div>
+
+    <!-- The admin's technical settings. They work by themselves: the
+         family server and its relay need nothing here, so this stays
+         folded away, and is never shown to members at all. -->
+    <details id="advBlock" class="adv">
+      <summary>Connection and relay</summary>
+      <p class="sub" style="margin-top:10px">Nothing here needs setting up. Every phone
+        gets these settings from you automatically, in the background.</p>
+
+      <div class="sectiontitle">Connection</div>
+      <p class="sub" id="connState">Tap check to see whether this network
+        reaches the family server.</p>
+      <button class="btn ghost" id="checkConn">Check connection</button>
 
     <div id="serverBlock">
     <div id="fsAdminBlock">
@@ -574,14 +625,6 @@
     <p class="sub" style="margin-top:6px" id="fsState">—</p>
     </div>
     </div>
-
-    <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
-
-    <div class="sectiontitle">Ringtone</div>
-    <p class="sub">How this phone sounds when somebody calls or buzzes you.
-      Tap one to hear it. This is your own setting — it doesn't change
-      what anyone else hears.</p>
-    <div id="toneList"></div>
 
     <div id="relayBlock">
     <div class="sectiontitle">Relay server</div>
@@ -622,10 +665,10 @@
       Uses the least relay data.</span></button>
     </div>
 
-    <div class="sectiontitle">Calls on this network</div>
-
-    <button class="btn ghost" id="testTurn">Test relays on this network</button>
-    <p class="sub" id="relayUsage" style="margin-top:10px"></p>
+      <div class="sectiontitle">Calls on this network</div>
+      <button class="btn ghost" id="testTurn">Test relays on this network</button>
+      <p class="sub" id="relayUsage" style="margin-top:10px"></p>
+    </details>
 
     <div id="overviewBlock" style="display:none">
       <div class="sectiontitle">Family overview</div>
@@ -642,6 +685,8 @@
       <div id="famUsageTable" style="overflow-x:auto"></div>
       <button class="btn ghost" id="famUsageCsv">Download as spreadsheet (CSV)</button>
     </div>
+
+    <p class="sub" style="margin-top:18px">Version <b id="verTag">—</b></p>
 
     <button class="btn ghost" data-close="setupSheet" style="margin-top:22px">Close</button>
     <button class="btn danger" id="resetAll">Start over</button>
@@ -665,7 +710,7 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-09-26a";   /* shown in Settings, so you can tell at a
+var VERSION  = "2026-09-27a";   /* shown in Settings, so you can tell at a
                                    glance whether a phone is on the build
                                    you think it is */
 /* The family server every family uses unless its admin sets another
@@ -747,7 +792,10 @@ function snapshot(){
            fs: state.fs || null,
            tone: state.tone || "classic",
            pending: state.pending || [], presOff: !!state.presOff,
-           missedIds: state.missedIds || [], grpSeen: state.grpSeen || {} };
+           missedIds: state.missedIds || [], grpSeen: state.grpSeen || {},
+           admin: state.admin || null,
+           joining: state.joining || null, inFam: !!state.inFam,
+           renameReq: state.renameReq || null };
 }
 
 function b64u(str){
@@ -995,8 +1043,14 @@ function decodeConfig(str){
  * listening on. A link that arrives already meaning "this is you"
  * removes the choice, and with it the mistake. */
 function linkFor(memberId, whole){
-  return location.origin + location.pathname
-       + "#j=" + encodeConfig(membersForLink(memberId, whole)) + "&m=" + memberId;
+  var url = location.origin + location.pathname
+          + "#j=" + encodeConfig(membersForLink(memberId, whole)) + "&m=" + memberId;
+  /* Somebody a member is inviting, not in the family yet: the link says
+     so, and who invited them. Opening it asks for their name and sends
+     the admin a request, instead of pretending they are already in. */
+  if (!memberById(memberId) && managedByOther())
+    url += "&p=1&by=" + encodeURIComponent(state.me);
+  return url;
 }
 
 /* Still used when a link has to work for whoever opens it - a phone
@@ -1092,7 +1146,7 @@ function fsConnect(){
 }
 /* Kinds worth acting on after the fact. A call offer from an hour ago
    is not; a family update or an admin request is. */
-var FS_LASTING = ["roster", "addreq", "usage", "hello"];
+var FS_LASTING = ["roster", "addreq", "usage", "hello", "rename", "joinno"];
 function fsFrame(f){
   if (f.k === "msg") {
     fsSetSince(f.time);
@@ -1114,6 +1168,24 @@ function fsFrame(f){
     (f.list || []).forEach(fsTakePres); paintPresence();
   } else if (f.k === "res" && fsReqs[f.q]) {
     var done = fsReqs[f.q]; delete fsReqs[f.q]; done(f);
+  } else if (f.k === "fam") {
+    /* This person's signed copy of the family, from the server. */
+    quietRoster = true;
+    takeRoster({ fam: f.fam, sig: f.sig });
+    setTimeout(function(){ quietRoster = false; }, 800);
+  } else if (f.k === "famrev") {
+    /* The server's copy is older than the admin's: bring it up to date. */
+    if (canSign() && (f.rev || 0) < (state.rev || 0)) publishFamily();
+  } else if (f.k === "guest") {
+    takeGuest(f);
+  } else if (f.k === "joinreq") {
+    takeJoinReq(f.req);
+  } else if (f.k === "joindone") {
+    if (joinReqs[f.id]) { delete joinReqs[f.id]; paintMain(); }
+  } else if (f.k === "joinok") {
+    takeJoinOk(f);
+  } else if (f.k === "joinno") {
+    takeJoinNo(f);
   }
 }
 function fsTakePres(p){
@@ -1123,8 +1195,8 @@ function fsTakePres(p){
 /* A request that expects an answer. Over the live connection when it is
    up (cheapest and fastest), otherwise one plain HTTP request - which is
    also what a page that is closing uses, since it can still finish. */
-function fsRequest(frame, timeout, keepalive){
-  if (fsOpen && fsWs && !keepalive) {
+function fsRequest(frame, timeout, keepalive, viaHttp){
+  if (fsOpen && fsWs && !keepalive && !viaHttp) {
     return new Promise(function(resolve){
       var q = "q" + (++fsSeq);
       frame.q = q;
@@ -1212,7 +1284,7 @@ function fsEnablePush(){
   /* Asked first, inside the tap - iPhones only allow the question then. */
   var ask = ("Notification" in window && Notification.requestPermission)
     ? Notification.requestPermission() : Promise.resolve("granted");
-  Promise.resolve(ask).then(function(perm){
+  return Promise.resolve(ask).then(function(perm){
     if (perm === "denied") throw new Error("blocked");
     return Promise.all([fsSwReg(), fsVapidKey()]);
   }).then(function(got){
@@ -1555,10 +1627,29 @@ try {
   if (cachedRelay && typeof cachedRelay === "object") relayCache = cachedRelay;
 } catch (e) {}
 
+/* The family server's own relay. When whoever runs the server has
+   given it Cloudflare TURN keys, it hands relay details to every phone
+   in the family - so no one pastes a relay link anywhere, and a new
+   member's calls get through difficult networks from the first call.
+   Used unless the admin has set an additional (Cloudflare) relay of
+   their own; a server without the keys answers "off" and is then left
+   alone for a few hours. */
+function autoRelayLink(){
+  if (!useFS()) return null;
+  return fsBase() + "/turn?me=" + encodeURIComponent(state.me);
+}
+function cfLink(){
+  if (state && state.turn2 && state.turn2.api) return state.turn2.api;
+  var a = autoRelayLink();
+  var e = a && relayCache[a];
+  if (e && e.off && Date.now() - e.at < 6 * 3600000) return null;
+  return a;
+}
 function relayLinks(){
   var out = [];
   if (state && state.turn && state.turn.api) out.push(state.turn.api);
-  if (state && state.turn2 && state.turn2.api) out.push(state.turn2.api);
+  var cf = cfLink();
+  if (cf) out.push(cf);
   return out;
 }
 
@@ -1578,6 +1669,14 @@ function fetchRelay(link){
     return r.text().then(function(text){
       var body = null;
       try { body = JSON.parse(text); } catch (e) {}
+      /* The family server has no relay keys: remembered, not retried
+         before every call. */
+      if (r.ok && body && body.off) {
+        relayCache[link] = { servers: [], at: Date.now(), off: true };
+        try { localStorage.setItem("fmn-relays", JSON.stringify(relayCache)); } catch (e) {}
+        relayErrors[link] = "the family server has no relay keys set up";
+        return [];
+      }
       if (!r.ok) {
         /* The Worker says what is wrong in an "error" field. */
         relayErrors[link] = (body && body.error) ? body.error
@@ -1626,6 +1725,7 @@ function ensureRelay(){
     var e = relayCache[link];
     if (e && e.servers && e.servers.length && Date.now() - e.at < 3600000)
       return Promise.resolve(true);
+    if (e && e.off && Date.now() - e.at < 6 * 3600000) return Promise.resolve(false);
     return fetchRelay(link);
   });
   /* Never hold a call up for more than four seconds over it: a cached
@@ -1942,6 +2042,10 @@ function paintAdmin(){
                  "one of them the admin. Continue?")) return;
     state.admin = null;
     delete state.adminKey;
+    /* The family server still holds the old key; whoever becomes admin
+       next tells it to switch (it agrees once the old key has been
+       silent for a day). */
+    state.rekey = true;
     save(); openSetup();
     toast("This phone no longer follows an admin — now do the same on the others");
   });
@@ -1973,6 +2077,22 @@ function takeSignedFamily(fam){
   }
   var still = state.members.some(function(m){ return m.id === state.me; });
   if (!still) state.me = null;
+  var welcomed = false;
+  if (still) {
+    state.inFam = true;
+    delete state.removed;
+    if (state.joining) { delete state.joining; welcomed = true; }
+    /* A name change on its way to the admin: kept on this phone until
+       the family carries it, and sent again if it has been a while. */
+    var mine = memberById(state.me), rq = state.renameReq;
+    if (rq && mine) {
+      if (mine.name === rq.name && mine.colour === rq.colour) delete state.renameReq;
+      else {
+        mine.name = rq.name; mine.colour = rq.colour;
+        if (Date.now() - (rq.at || 0) > 3600000) setTimeout(sendRename, 1500);
+      }
+    }
+  }
   /* Somebody this phone asked to add is in the family now. */
   (state.pending || []).forEach(function(p){
     if (memberById(p.member.id) && !p.done) {
@@ -1984,12 +2104,17 @@ function takeSignedFamily(fam){
   paintMain();
   paintPending();
   if (state.me) {
-    openStreams();
+    if (!fsOpen) openStreams();
     fsCheckPush().then(paintPushWarn);
-    if (!wasAdmin && isAdmin()) toast("You manage this family now");
-    else toast("Family settings updated by " + nameOf(state.admin.id));
+    if (welcomed) toast("You're in — welcome to the family");
+    else if (!wasAdmin && isAdmin()) toast("You manage this family now");
+    else if (!quietRoster) toast("Family updated by " + nameOf(state.admin.id));
   } else toast("You were removed from the family");
+  if ($("setupSheet").classList.contains("on") && managedByOther()) applyLock();
 }
+/* The family server hands every phone its copy each time it connects.
+   That is not news, so it is taken in without a message. */
+var quietRoster = false;
 
 /* Shared settings are read-only on every phone but the admin's, and
    their secrets stay hidden - no Show button. */
@@ -2009,13 +2134,29 @@ function applyLock(){
     if ("disabled" in el) el.disabled = locked;
     if (el.tagName === "INPUT") el.readOnly = locked;
   });
-  /* On a member's phone the shared settings are not shown at all. Read-
-     only and masked, they told a member nothing and pushed the things
-     they CAN do off the bottom of the screen. */
-  ["familyBlock", "serverBlock", "relayBlock", "inviteBlock"].forEach(function(id){
+  /* On a member's phone the shared and technical settings are not shown
+     at all - only what is theirs: their name and colour, ringing on this
+     phone, the ringtone, their status, and inviting someone. Everything
+     technical reaches their phone from the admin by itself. */
+  ["familyBlock", "advBlock", "inviteBlock", "overviewBlock", "famUsageBlock"].forEach(function(id){
     var el = $(id);
-    if (el) el.style.display = locked ? "none" : "";
+    if (el && locked) el.style.display = "none";
+    else if (el && (id === "familyBlock" || id === "advBlock" || id === "inviteBlock"))
+      el.style.display = "";
   });
+  $("meBlock").style.display = locked ? "block" : "none";
+  if (locked) {
+    var mine = memberById(state.me);
+    if (document.activeElement !== $("meName")) $("meName").value = mine ? mine.name : "";
+    meColour = meColour || (mine && mine.colour) || COLOURS[0];
+    paintMeSwatches();
+  }
+  if ($("approverName")) $("approverName").textContent = state && state.admin
+    ? nameOf(state.admin.id) : "the admin";
+  /* Family admin is the admin's own section. A member only needs it in
+     the middle of being handed the family. */
+  var handing = !!(state && state.admin && state.admin.id === state.me && !state.adminKey);
+  if ($("adminArea")) $("adminArea").style.display = (locked && !handing) ? "none" : "";
   /* For the admin, Family admin sits near the top - it is their section.
      For a member it is an emergency tool (hand-over, recovery, lost key),
      so it goes to the bottom, below what they actually come here for. */
@@ -2050,10 +2191,8 @@ function applyLock(){
     ? "<b>You've been made the admin, but this device doesn't have the admin " +
       "key yet.</b> Open the hand-over link you were sent on this device, or " +
       "paste it under Family admin below. Until then, settings stay read-only."
-    : "<b>" + escapeHtml(nameOf(state.admin.id)) + " manages this family</b> · " +
-      others().length + " people you're in touch with. The family's settings are kept on " +
-      escapeHtml(nameOf(state.admin.id)) + "'s phone. Here you can set up ringing " +
-      "on this phone, choose your ringtone and test calls on this network.";
+    : "<b>" + escapeHtml(nameOf(state.admin.id)) + " manages this family.</b> " +
+      "Everything else is set up for you.";
   $("setupSub").style.display = state ? "none" : "";
 }
 function escapeHtml(t){
@@ -2074,10 +2213,11 @@ function escapeHtml(t){
 function routeMode(){
   if (!state) return "auto";
   if (state.route === "auto" || state.route === "cloudflare") return state.route;
-  return (state.turn2 && state.turn2.api) ? "cloudflare" : "auto";
+  return cfLink() ? "cloudflare" : "auto";
 }
 function cloudflareServers(){
-  return (state && state.turn2 && state.turn2.api) ? cachedServers(state.turn2.api) : [];
+  var link = cfLink();
+  return link ? cachedServers(link) : [];
 }
 
 /* Every relay that is set up, together. The phone gathers an address
@@ -2543,6 +2683,10 @@ function paintMicState(){
     how.style.display = needed ? "block" : "none";
     if (needed) how.innerHTML = micSteps();
     $("micAllow").style.display = st === "granted" ? "none" : "";
+    /* Nothing to do about a microphone that already works - so for a
+       member, the section is not shown at all then. */
+    if ($("micBlock")) $("micBlock").style.display =
+      (st === "granted" && managedByOther()) ? "none" : "";
   });
 }
 
@@ -2743,7 +2887,7 @@ function startCall(peerId){
 function ringIncoming(msg){
   showCallScreen(msg.from, true);
   setCallState("Incoming call");
-  tone();
+  tone({ incoming: true, tag: msg.call, title: nameOf(msg.from) + " is calling" });
   /* A backstop in case the goodbye never arrives - the caller's phone
      lost signal, say. The caller gives up at 45 seconds, so ringing
      past 50 is always ringing for nobody. The offer's age counts, so
@@ -2863,6 +3007,8 @@ function onSignal(msg){
   if (typeof msg.t === "string" && msg.t.indexOf("g-") === 0) { groupSignal(msg); return; }
   if (msg.t === "roster") { takeRoster(msg); return; }
   if (msg.t === "addreq") { takeAddRequest(msg); return; }
+  if (msg.t === "rename") { takeRename(msg); return; }
+  if (msg.t === "joinno") { takeJoinNo(msg); return; }
   if (msg.t === "usage") { takeUsage(msg); return; }
   /* A phone that has just joined asks the admin for its copy. */
   if (msg.t === "hello") {
@@ -3720,18 +3866,247 @@ function toneBuffer(key){
   return buf;
 }
 
-function tone(){
+/* ----------------------------------------------------- the loud ring
+ *
+ * Why incoming calls were often silent, while the ring you hear when
+ * YOU call was fine: both were played through the page's audio engine
+ * (Web Audio), and a browser keeps that engine switched off until the
+ * page has been tapped. Calling someone is a tap, so the ring-back
+ * played. A call arriving on a page nobody had touched since it opened -
+ * opened from a notification, or left open on the table - tried to ring
+ * on an engine that was still off, and made no sound at all. It was also
+ * quiet when it did play: a pure tone at about a quarter of full volume,
+ * much of it below what a phone's small speaker can reproduce.
+ *
+ * Now the incoming ring is a real sound file, drawn here on the phone at
+ * full volume with overtones a phone speaker carries, played through an
+ * <audio> element. That element is unlocked by the first tap anywhere
+ * in the app, and stays unlocked. If sound still cannot start, the app
+ * says so and the phone's own notification keeps ringing instead of
+ * going quiet after the first ring. */
+var RING_SR = 22050;
+var ringSamples = {}, ringUrls = {};
+function toneSamples(key){
+  if (ringSamples[key]) return ringSamples[key];
+  var spec = TONES[key] || TONES.classic;
+  var len = spec.gap;
+  spec.steps.forEach(function(st){ len += st.d + st.r; });
+  var data = new Float32Array(Math.ceil(len * RING_SR));
+  var at = 0, peak = 0, i;
+  spec.steps.forEach(function(st){
+    var n0 = Math.floor(at * RING_SR), n = Math.floor(st.d * RING_SR);
+    for (i = 0; i < n && n0 + i < data.length; i++) {
+      var t = i / RING_SR;
+      var env = Math.max(0, Math.min(1, t / 0.008, (st.d - t) / 0.03));
+      var v = 0;
+      for (var k = 0; k < st.f.length; k++) {
+        var f = st.f[k], w = 2 * Math.PI * f * t;
+        /* Overtones: a phone speaker hardly moves below ~500 Hz, so a
+           low tone is heard mostly through its second and third
+           harmonics. Low tones get more of them. */
+        var h2 = f < 500 ? 0.55 : 0.3, h3 = f < 500 ? 0.35 : 0.12;
+        v += Math.sin(w) + h2 * Math.sin(2 * w) + h3 * Math.sin(3 * w);
+      }
+      data[n0 + i] += v * env / st.f.length;
+    }
+    at += st.d + st.r;
+  });
+  for (i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+  var gain = peak ? 0.97 / peak : 1;
+  for (i = 0; i < data.length; i++) data[i] *= gain;
+  ringSamples[key] = data;
+  return data;
+}
+function toneWavUrl(key){
+  if (ringUrls[key]) return ringUrls[key];
+  var d = toneSamples(key), n = d.length;
+  var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), o = 0;
+  function str(t){ for (var j = 0; j < t.length; j++) v.setUint8(o++, t.charCodeAt(j)); }
+  function u32(x){ v.setUint32(o, x, true); o += 4; }
+  function u16(x){ v.setUint16(o, x, true); o += 2; }
+  str("RIFF"); u32(36 + n * 2); str("WAVE"); str("fmt "); u32(16); u16(1); u16(1);
+  u32(RING_SR); u32(RING_SR * 2); u16(2); u16(16); str("data"); u32(n * 2);
+  for (var i = 0; i < n; i++) {
+    var x = Math.max(-1, Math.min(1, d[i]));
+    v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7FFF, true); o += 2;
+  }
+  ringUrls[key] = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  return ringUrls[key];
+}
+
+var ringEl = null, ringPrimed = false, ringLoud = false;
+function ringElement(){
+  if (!ringEl) {
+    ringEl = new Audio();
+    ringEl.loop = true; ringEl.preload = "auto";
+    ringEl.setAttribute("playsinline", "");
+  }
+  return ringEl;
+}
+function ringSrc(el, key){
+  var url = toneWavUrl(key);
+  if (el.getAttribute("data-tone") !== key) { el.src = url; el.setAttribute("data-tone", key); }
+}
+/* On iPhone the ring should sound through the loudspeaker even with the
+   silent switch on, like a phone call - "playback" does that. Put back
+   to "auto" when the ring stops, so the call's microphone works. */
+function audioSession(type){
+  try { if (navigator.audioSession) navigator.audioSession.type = type; } catch (e) {}
+}
+/* The first tap anywhere unlocks the ring for later: the element is
+   played once, muted, and stopped. A browser lets an element that has
+   played on a tap play again later without one. */
+function primeRinger(){
   unlockAudio();
-  if (!audioCtx) return;
-  stopTone();
-  var key = toneName(), spec = TONES[key] || TONES.classic, src = null, vib = null;
+  if (ringPrimed || ringLoud) return;
+  var el = ringElement();
+  try { ringSrc(el, toneName()); } catch (e) { return; }
+  el.muted = true;
+  var p;
+  try { p = el.play(); } catch (e) { el.muted = false; return; }
+  Promise.resolve(p).then(function(){
+    if (!ringLoud) { el.pause(); try { el.currentTime = 0; } catch (e) {} }
+    el.muted = false; ringPrimed = true;
+  }, function(){ el.muted = false; });
+}
+["pointerdown", "touchend", "click", "keydown"].forEach(function(ev){
+  document.addEventListener(ev, primeRinger, true);
+});
+
+/* Tells the notification helper and the family server whether this
+   screen is ringing out loud, so the repeat notifications stop only
+   when it really is. */
+function reportAudible(tag, on){
+  if (!tag) return;
   try {
-    src = audioCtx.createBufferSource();
-    src.buffer = toneBuffer(key);
+    if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistration().then(function(reg){
+      var w = reg && reg.active; if (w) w.postMessage({ t: "audible", tag: tag, on: !!on });
+    }).catch(function(){});
+  } catch (e) {}
+  if (fsOpen && fsWs) { try { fsWs.send(JSON.stringify({ k: "ringing", tag: tag, audible: !!on })); } catch (e) {} }
+}
+
+/* The ring of the page's own audio engine, for a browser that refuses
+   the sound file. Loud version for incoming, as before for ring-back. */
+function engineRing(key, loud){
+  if (!audioCtx) return null;
+  try {
+    var src = audioCtx.createBufferSource();
+    if (loud) {
+      var d = toneSamples(key);
+      var b = audioCtx.createBuffer(1, d.length, RING_SR);
+      b.getChannelData(0).set(d);
+      src.buffer = b;
+    } else src.buffer = toneBuffer(key);
     src.loop = true;
     src.connect(audioCtx.destination);
     src.start();
-  } catch (e) { src = null; }
+    return src;
+  } catch (e) { return null; }
+}
+
+/* The ring could not make a sound. Said on the call screen, one tap
+   anywhere brings it in, and meanwhile the phone's own notification
+   rings (the family server keeps re-sending it; without notifications
+   turned on, this page raises one itself every few seconds). */
+var ringHintFor = null;
+function ringBlocked(opts){
+  reportAudible(opts.tag, false);
+  var note = opts.group ? $("gNote") : $("callNote");
+  var hint = "Tap anywhere to hear the ring";
+  if (note && !note.textContent) { note.textContent = hint; ringHintFor = note; }
+  var loop = null;
+  if (fsPushState !== "on" && opts.tag) {
+    loop = setInterval(function(){
+      if (!toneStop) { clearInterval(loop); return; }
+      systemNotify(opts.title || "Incoming call", "Tap to answer", opts.tag);
+    }, 4000);
+    systemNotify(opts.title || "Incoming call", "Tap to answer", opts.tag);
+  }
+  function retry(){
+    document.removeEventListener("pointerdown", retry, true);
+    document.removeEventListener("touchend", retry, true);
+    if (loop) clearInterval(loop);
+    if (ringHintFor && ringHintFor.textContent === hint) ringHintFor.textContent = "";
+    var still = opts.group ? (group && group.state === "incoming")
+                           : (call && call.state === "incoming");
+    if (still && toneStop) setTimeout(function(){
+      var ok = opts.group ? (group && group.state === "incoming")
+                          : (call && call.state === "incoming");
+      if (ok) tone(opts);
+    }, 60);
+  }
+  document.addEventListener("pointerdown", retry, true);
+  document.addEventListener("touchend", retry, true);
+  return function(){ if (loop) clearInterval(loop);
+    document.removeEventListener("pointerdown", retry, true);
+    document.removeEventListener("touchend", retry, true); };
+}
+
+/* tone()            the ring-back you hear while calling someone
+   tone({incoming})  somebody calling you - loud, and never silently
+   tone({buzz})      a buzz - loud, a few seconds */
+function tone(opts){
+  opts = opts || {};
+  unlockAudio();
+  stopTone();
+  var key = toneName(), spec = TONES[key] || TONES.classic;
+  var loud = !!(opts.incoming || opts.buzz);
+  var stops = [], on = true;
+
+  if (loud) {
+    audioSession("playback");
+    var el = ringElement();
+    try { ringSrc(el, key); } catch (e) {}
+    el.loop = true; el.muted = false; el.volume = 1;
+    try { el.currentTime = 0; } catch (e) {}
+    ringLoud = true;
+    var p = null;
+    try { p = el.play(); } catch (e) { p = Promise.reject(e); }
+    Promise.resolve(p).then(function(){
+      if (!on) return;
+      ringPrimed = true;
+      if (opts.incoming) reportAudible(opts.tag, true);
+    }, function(){
+      if (!on) return;
+      ringLoud = false;
+      /* The file was refused; the audio engine may still be allowed. */
+      var tryEngine = function(){
+        if (!on) return;
+        if (audioCtx && audioCtx.state === "running") {
+          var src = engineRing(key, true);
+          if (src) {
+            stops.push(function(){ try { src.stop(); src.disconnect(); } catch (e) {} });
+            if (opts.incoming) reportAudible(opts.tag, true);
+            return;
+          }
+        }
+        if (opts.incoming) stops.push(ringBlocked(opts));
+      };
+      if (audioCtx && audioCtx.state === "suspended" && audioCtx.resume)
+        audioCtx.resume().then(tryEngine, tryEngine);
+      else tryEngine();
+    });
+    stops.push(function(){
+      ringLoud = false;
+      try { el.pause(); el.currentTime = 0; } catch (e) {}
+      audioSession("auto");
+      if (opts.incoming) reportAudible(opts.tag, false);
+    });
+  } else if (audioCtx) {
+    var src = engineRing(key, false);
+    if (src) stops.push(function(){ try { src.stop(); src.disconnect(); } catch (e) {} });
+    else {
+      /* A very old browser: one pass at a time. */
+      var iv = null;
+      (function round(){
+        if (!on) return;
+        var wait = playPattern(key);
+        iv = setTimeout(round, Math.max(400, wait * 1000));
+      })();
+      stops.push(function(){ if (iv) clearTimeout(iv); });
+    }
+  }
 
   /* Vibration follows the pattern's own shape, so the phone in a pocket
      rings in the same rhythm as the phone on the table - handed over
@@ -3746,32 +4121,30 @@ function tone(){
     try { navigator.vibrate(pat); } catch (e) {}
   }
   vibrate();
-  vib = setInterval(vibrate, 15000);
-
-  /* No buffer (a very old browser): the old way, one pass at a time. */
-  var iv = null, on = true;
-  if (!src) {
-    (function round(){
-      if (!on) return;
-      var wait = playPattern(key);
-      iv = setTimeout(round, Math.max(400, wait * 1000));
-    })();
-  }
+  var vib = setInterval(vibrate, 15000);
+  stops.push(function(){
+    clearInterval(vib);
+    if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
+  });
 
   toneStop = function(){
     on = false;
-    if (src) { try { src.stop(); src.disconnect(); } catch (e) {} }
-    if (iv) clearTimeout(iv);
-    if (vib) clearInterval(vib);
-    if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
+    stops.forEach(function(f){ try { f(); } catch (e) {} });
   };
 }
 
-/* A single pass, for the preview buttons in Settings. */
+/* A single pass, for the preview buttons in Settings - the loud version,
+   the one that will actually ring. */
 function previewTone(key){
   unlockAudio();
   stopTone();
-  playPattern(key);
+  var el = ringElement();
+  try { ringSrc(el, key); } catch (e) { playPattern(key); return; }
+  el.loop = false; el.muted = false; el.volume = 1;
+  try { el.currentTime = 0; } catch (e) {}
+  var p; try { p = el.play(); } catch (e) { p = Promise.reject(e); }
+  Promise.resolve(p).then(function(){ ringPrimed = true; }, function(){ playPattern(key); });
+  toneStop = function(){ try { el.pause(); el.currentTime = 0; el.loop = true; } catch (e) {} };
 }
 
 function stopTone(){ if (toneStop) { toneStop(); toneStop = null; } }
@@ -3853,7 +4226,7 @@ function showBuzz(from, what){
   paintWho($("ring"), m && m.colour);
   $("ringWhat").textContent = what || "wants your attention";
   $("ring").classList.add("on");
-  tone();
+  tone({ buzz: true });
   if (document.hidden) systemNotify(from, what || "wants your attention");
   setTimeout(stopTone, 5000);
 }
@@ -4027,20 +4400,27 @@ function lastWith(name){
 function paintMain(){
   var main = $("main");
   main.innerHTML = "";
+  if (joinForm && state) { $("whoami").textContent = "joining"; paintJoinForm(main); return; }
   if (!state || !state.me) { paintWelcome(main); return; }
 
   $("whoami").textContent = "You are " + nameOf(state.me);
+  if (state.joining) { paintJoining(main); return; }
+  if (state.removed) { paintRemoved(main); return; }
 
   var hello = document.createElement("p");
   hello.className = "greet";
   hello.textContent = greeting() + ", " + String(nameOf(state.me)).split(/\s+/)[0];
   main.appendChild(hello);
+  paintJoinReqs(main);
+  paintSetupCard(main);
 
   var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
   if (!others.length) {
     var none = document.createElement("p");
     none.className = "hint";
-    none.textContent = "Nobody else here yet. Add your family in Settings, then send each of them their link.";
+    none.textContent = isAdmin() || !state.admin
+      ? "Nobody else here yet. Add your family in Settings, then send each of them their link."
+      : "Nobody to call yet. " + nameOf(state.admin.id) + " decides who you can reach.";
     main.appendChild(none);
   }
 
@@ -4256,15 +4636,57 @@ function recentRow(r, withDate){
 
 function paintWelcome(main){
   $("whoami").textContent = "not set up yet";
+  var hello = document.createElement("p");
+  hello.className = "greet"; hello.textContent = "Welcome";
+  main.appendChild(hello);
+  var card = document.createElement("div"); card.className = "onb";
+  var h = document.createElement("h3"); h.textContent = "Were you sent a link?";
   var p = document.createElement("p");
-  p.className = "hint";
-  p.textContent = "Nothing set up on this phone yet. Create your family here, " +
-                  "or open the invite link someone sent you.";
-  main.appendChild(p);
-  var b = document.createElement("button");
-  b.className = "btn"; b.textContent = "Set up my family";
-  b.onclick = openSetup;
-  main.appendChild(b);
+  p.textContent = "Open it on this phone and everything sets itself up. If this app opened " +
+    "empty (an iPhone Home Screen app starts empty), paste the link here instead.";
+  card.appendChild(h); card.appendChild(p);
+  /* Reading the clipboard needs the tap itself, and not every browser
+     allows it - the box below always works. */
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    var paste = document.createElement("button"); paste.className = "btn";
+    paste.textContent = "Paste my link";
+    paste.onclick = function(){
+      navigator.clipboard.readText().then(openPastedLink, function(){
+        toast("Paste it into the box below instead");
+        try { inp.focus(); } catch (e) {}
+      });
+    };
+    card.appendChild(paste);
+  }
+  var lb = document.createElement("label"); lb.htmlFor = "pasteLink"; lb.textContent = "Invite link";
+  var inp = document.createElement("input");
+  inp.type = "text"; inp.id = "pasteLink"; inp.placeholder = "Paste the link here";
+  inp.autocomplete = "off";
+  var go = document.createElement("button"); go.className = "btn ghost"; go.textContent = "Open link";
+  go.onclick = function(){ openPastedLink(inp.value); };
+  inp.onkeydown = function(e){ if (e.key === "Enter") openPastedLink(inp.value); };
+  card.appendChild(lb); card.appendChild(inp); card.appendChild(go);
+  main.appendChild(card);
+
+  var make = document.createElement("button");
+  make.className = "more"; make.textContent = "Start a new family instead";
+  make.onclick = openSetup;
+  main.appendChild(make);
+}
+
+/* Any text holding an invite link: the part after # is what matters. */
+function openPastedLink(text){
+  var t = String(text || "").trim();
+  var i = t.indexOf("#");
+  var frag = i === -1 ? "" : t.slice(i);
+  frag = frag.replace(/\s.*$/, "");
+  if (!/[#&]j=[A-Za-z0-9\-_]+/.test(frag)) {
+    toast(t ? "That isn't an invite link — it should contain #j=" : "Paste the link first");
+    return;
+  }
+  history.replaceState(null, "", location.pathname + frag);
+  readIntent();
+  if (!tryJoin()) paintMain();
 }
 
 /* ------------------------------------------------------------ sheets */
@@ -4377,9 +4799,12 @@ function paintMembers(){
     if (privacy && m.id !== state.me) {
       var cb = document.createElement("button");
       cb.className = "cbtn";
-      cb.textContent = m.c ? "Sees " + m.c.filter(function(id){
+      var seesN = m.c ? m.c.filter(function(id){
         return draft.members.some(function(d){ return d.id === id && d.id !== m.id; });
-      }).length : "Sees all";
+      }) : null;
+      cb.textContent = !seesN ? "Sees all"
+        : (seesN.length === 1 && seesN[0] === state.me) ? "Only you"
+        : "Sees " + seesN.length;
       cb.setAttribute("aria-label", "Who " + (m.name || "this person") + " can see");
       cb.onclick = function(){
         openContacts = openContacts === m.id ? null : m.id; paintMembers();
@@ -4628,11 +5053,14 @@ function paintTones(){
    where the fix is, rather than as a banner across the home screen -
    and marked with a small dot on the Settings button until it is done. */
 function paintPushWarn(){
-  var needed = !!(state && state.me && fsPushState !== "on" && fsPushState !== "unknown");
+  var needed = !!(state && state.me && !callsReady());
+  /* The old banner across the top is replaced by the "Get calls on this
+     phone" card on the home screen, which says what to do in words. */
   var bar = $("pushwarn");
-  if (bar) bar.style.display = (needed && fsPushState !== "unsupported") ? "block" : "none";
+  if (bar) bar.style.display = "none";
   var dot = $("setDot");
   if (dot) dot.style.display = needed ? "block" : "none";
+  if ($("setupCard") || needed) paintSetupCard($("setupCard") ? null : $("main"));
 }
 
 
@@ -4695,6 +5123,11 @@ function saveSetup(){
 
   draft.me = mine.id;
   draft.recent = (state && state.recent) || [];
+  /* A new family starts private: each person sees only you, the admin,
+     until you choose otherwise (Settings → "Sees" next to their name). */
+  if (creating) draft.members.forEach(function(m){
+    if (m.id !== mine.id) m.c = [mine.id];
+  });
   /* Read from the boxes rather than from the last saved state, so
      typing relay details and then pressing Save (instead of Save relay)
      does not silently throw them away. */
@@ -4765,6 +5198,13 @@ function broadcastRoster(onlyId, route){
      in touch with - see viewFor. One copy for everybody would put the
      whole family on every phone, which is what privacy rules out. */
   if (!onlyId) { state.bcRev = state.rev; state.bcAt = Date.now(); save(); }
+  /* The server learns the new family first - it only passes messages
+     between people it knows are in touch, so a copy sent to somebody
+     just added would otherwise be refused. */
+  var ready = canSign() ? publishFamily() : Promise.resolve();
+  ready.then(function(){ sendRosters(onlyId, route); });
+}
+function sendRosters(onlyId, route){
   state.members.forEach(function(m){
     if (m.id === state.me || (onlyId && m.id !== onlyId)) return;
     var view = viewFor(m.id);
@@ -4783,13 +5223,59 @@ function broadcastRoster(onlyId, route){
   });
 }
 
+/* The signed family, handed to the family server as well: the whole of
+   it (so the server knows who is in the family and who may see whom),
+   and each person's own copy (so their phone gets it the moment it
+   connects, even when this phone is off). Only a phone holding the
+   admin key can make it, and the server checks the signature. */
+var pubPending = null, pubWarned = false;
+function publishFamily(){
+  if (!canSign() || !useFS()) return Promise.resolve();
+  /* Several changes in a row go out as one. */
+  if (pubPending) return pubPending;
+  pubPending = new Promise(function(res){ setTimeout(res, 250); }).then(function(){
+    pubPending = null;
+    return doPublish();
+  });
+  return pubPending;
+}
+function doPublish(){
+    var whole = state.members.map(function(m){ return cloneMember(m, true); });
+    var ids = state.members.map(function(m){ return m.id; })
+                           .filter(function(id){ return id !== state.me; });
+    return Promise.all([signFamily(whole)].concat(ids.map(function(id){
+      return signFamily(viewFor(id));
+    }))).then(function(all){
+      if (!all[0]) return;
+      var views = {};
+      ids.forEach(function(id, i){ if (all[i + 1]) views[id] = all[i + 1]; });
+      var frame = { k: "pub", fam: all[0].fam, sig: all[0].sig, views: views };
+      if (state.rekey) frame.reset = true;
+      /* A big family can outgrow one live-connection message; plain
+         HTTP carries any size. */
+      var big = JSON.stringify(frame).length > 48000;
+      return fsRequest(frame, 15000, false, big).then(function(r){
+        if (r && r.ok) {
+          if (state.rekey) { delete state.rekey; save(); }
+          return;
+        }
+        if (r && r.status === "rekey" && !pubWarned) {
+          pubWarned = true;
+          toast("The family server still follows the old admin key. It switches to " +
+                "this phone within a day — until then new people can't be approved.");
+        }
+      });
+    }).catch(function(){});
+}
+
 /* ------------------------------------------- a member adds somebody
  *
- * A member can't sign the family, so they can't change it - but they
- * can ask. The new person is made on their phone (so a link can be sent
- * straight away), and the request goes to the admin's phone, which adds
- * them in touch with the member who asked, and with the admin. Nothing
- * else a member sends can touch the admin's settings. */
+ * A member can't change the family, but can invite somebody. The new
+ * person gets a link straight away; the request goes to the family
+ * server, which tells the admin's phone at once - a card on the home
+ * screen when the app is open, and a notification with Approve and
+ * Reject when it is not. Approving adds them in touch with the member
+ * who invited them and with the admin, and nobody else. */
 function addPersonAsMember(){
   if (!managedByOther()) return;
   var inp = $("newPersonName"), name = inp.value.trim().slice(0, 40);
@@ -4801,26 +5287,31 @@ function addPersonAsMember(){
   save();
   sendAddRequest(state.pending[state.pending.length - 1]);
   paintPending();
-  var url = linkFor(m.id);
-  if (navigator.share)
-    navigator.share({ title: "Family Notifier — " + m.name, url: url }).catch(function(){});
-  else copy(url, "Link for " + m.name + " copied — send it to them");
+  sendLink(m);
 }
 
 function sendAddRequest(p){
   if (!state.admin) return;
   p.sentAt = Date.now(); save();
-  sendSig(state.admin.id, { t:"addreq", from: state.me, member: p.member })
-    .catch(function(){});
+  fsRequest({ k: "join", id: p.member.id, name: p.member.name, colour: p.member.colour }, 10000)
+    .then(function(r){
+      if (r && r.member) { p.done = true; save(); paintPending(); return; }
+      if (r && r.ok) return;
+      /* A family server from before join requests, or one the admin's
+         phone has not updated yet: straight to the admin's phone. */
+      sendSig(state.admin.id, { t: "addreq", from: state.me, member: p.member })
+        .catch(function(){});
+    });
 }
 
-/* Requests the admin has not answered are sent again, at most hourly,
-   in case the admin's phone was off for longer than the server keeps
-   messages. */
+/* Requests not answered are sent again, at most hourly. */
 function resendPending(){
-  if (!state || !state.pending || !managedByOther()) return;
+  if (!state) return;
+  if (state.joining && Date.now() - (state.joining.sentAt || 0) > 3600000) sendJoin();
+  if (state.renameReq && Date.now() - (state.renameReq.at || 0) > 3600000) sendRename();
+  if (!state.pending || !managedByOther()) return;
   state.pending.forEach(function(p){
-    if (!memberById(p.member.id) && Date.now() - (p.sentAt || 0) > 3600000)
+    if (!memberById(p.member.id) && !p.rejected && Date.now() - (p.sentAt || 0) > 3600000)
       sendAddRequest(p);
   });
 }
@@ -4830,7 +5321,7 @@ function paintPending(){
   if (!box || !state) return;
   box.innerHTML = "";
   (state.pending || []).forEach(function(p, i){
-    var m = p.member, done = !!memberById(m.id);
+    var m = p.member, done = !!memberById(m.id) || p.done;
     var row = document.createElement("div"); row.className = "invrow";
     var dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = m.colour; dot.textContent = initials(m.name);
@@ -4838,16 +5329,18 @@ function paintPending(){
     nm.textContent = m.name;
     var st = document.createElement("span");
     st.style.cssText = "display:block;font-size:12px;color:var(--mist)";
-    st.textContent = done ? "Added" : "Waiting for " + nameOf(state.admin.id) + "'s phone";
+    st.textContent = done ? "Joined"
+      : p.rejected ? "Not approved"
+      : "Waiting for " + (state.admin ? nameOf(state.admin.id) : "the admin") + " to approve";
     nm.appendChild(st);
-    var send = document.createElement("button");
-    send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
-    send.onclick = function(){ sendLink(m); };
-    var cp = document.createElement("button");
-    cp.className = "mini"; cp.innerHTML = ICON.copy + "<span>Copy</span>";
-    cp.onclick = function(){ copy(linkFor(m.id), "Link for " + m.name + " copied"); };
-    row.appendChild(dot); row.appendChild(nm); row.appendChild(send); row.appendChild(cp);
-    if (done) {
+    row.appendChild(dot); row.appendChild(nm);
+    if (!done && !p.rejected) {
+      var send = document.createElement("button");
+      send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
+      send.onclick = function(){ sendLink(m); };
+      row.appendChild(send);
+    }
+    if (done || p.rejected) {
       var ok = document.createElement("button");
       ok.className = "mini"; ok.textContent = "×";
       ok.setAttribute("aria-label", "Clear");
@@ -4858,35 +5351,242 @@ function paintPending(){
   });
 }
 
-/* On the admin's phone: a member asking to add somebody. */
-function takeAddRequest(msg){
-  if (!isAdmin() || !msg.member) return;
-  var from = memberById(msg.from);
-  if (!from || from.id === state.me) return;
-  var id = String(msg.member.id || "");
-  var name = String(msg.member.name || "").trim().slice(0, 40);
-  if (!name || !/^[a-z0-9]{4,12}$/.test(id)) return;
-  if (memberById(id)) { broadcastRoster(from.id); broadcastRoster(id); return; }
-  var colour = COLOURS.indexOf(msg.member.colour) !== -1 ? msg.member.colour : COLOURS[0];
-  var added = { id: id, name: name, colour: colour, c: [from.id, state.me], by: from.id };
+/* ---------------------------------------------- the admin approves
+ *
+ * Every request to join lands here, whichever way it came: from the
+ * family server (the new way), from an older phone's "add request", or
+ * from the Approve button on the notification. Nothing joins until the
+ * admin says so. */
+var joinReqs = {};           /* id -> { id, name, colour, by, at } */
+var approveIntent = null;    /* opened from the notification's Approve */
+
+function takeJoinReq(req){
+  if (!isAdmin() || !req || !/^[A-Za-z0-9]{3,16}$/.test(String(req.id || ""))) return;
+  var name = String(req.name || "").trim().slice(0, 40);
+  if (!name) return;
+  if (memberById(req.id)) {
+    /* In the family already (added in Settings while the server had an
+       older copy): bringing the server up to date lets them in. */
+    publishFamily(); return;
+  }
+  var isNew = !joinReqs[req.id];
+  joinReqs[req.id] = { id: req.id, name: name, colour: req.colour || null,
+                       by: req.by || null, at: req.at || Date.now(), legacy: !!req.legacy };
+  if (approveIntent === req.id) { approveIntent = null; approveJoin(req.id); return; }
+  paintMain();
+  if (isNew) toast(name + " wants to join — Approve or Reject at the top");
+}
+
+function approveJoin(id){
+  var req = joinReqs[id];
+  if (!req || !isAdmin()) return;
+  delete joinReqs[id];
+  if (memberById(id)) { publishFamily(); paintMain(); return; }
+  var by = req.by ? memberById(req.by) : null;
+  /* In touch with you, and with whoever invited them - nobody else
+     until you choose (Settings → the person → who they see). */
+  var added = { id: id, name: req.name,
+                colour: COLOURS.indexOf(req.colour) !== -1 ? req.colour
+                        : COLOURS[Math.floor(Math.random() * COLOURS.length)],
+                c: [state.me] };
+  if (by && by.id !== state.me) { added.c.push(by.id); added.by = by.id; }
   state.members.push(added);
-  if (from.c && from.c.indexOf(id) === -1) from.c.push(id);
-  /* Settings open on this phone right now: its copy must learn of them
-     too, or pressing Save there would remove the person just added. */
+  if (by && by.c && by.c.indexOf(id) === -1) by.c.push(id);
   if (draft && draft !== state && draft.members && $("setupSheet").classList.contains("on")) {
     draft.members.push(JSON.parse(JSON.stringify(added)));
-    var df = null;
-    draft.members.forEach(function(d){ if (d.id === from.id) df = d; });
-    if (df && df.c && df.c.indexOf(id) === -1) df.c.push(id);
+    draft.members.forEach(function(d){
+      if (by && d.id === by.id && d.c && d.c.indexOf(id) === -1) d.c.push(id);
+    });
     paintMembers();
   }
   bumpRev(); save();
   broadcastRoster();
-  paintMain(); openStreams();
-  toast(from.name + " added " + name);
+  paintMain();
+  if ($("setupSheet").classList.contains("on")) paintInvites();
+  toast(req.name + " added" + (by ? " — they can reach you and " + by.name : " — they can reach you"));
 }
 
+function rejectJoin(id){
+  var req = joinReqs[id];
+  if (!req) return;
+  delete joinReqs[id];
+  fsRequest({ k: "jdecide", id: id, ok: false }, 10000).catch(function(){});
+  /* An older phone's request never reached the server; tell it directly. */
+  if (req.legacy && req.by) sendSig(req.by, { t: "joinno", id: id, name: req.name }).catch(function(){});
+  paintMain();
+  toast(req.name + " was not added");
+}
 
+/* The request card on the admin's home screen. */
+function paintJoinReqs(main){
+  var ids = Object.keys(joinReqs);
+  if (!ids.length || !isAdmin()) return;
+  ids.sort(function(a, b){ return joinReqs[a].at - joinReqs[b].at; });
+  ids.forEach(function(id){
+    var r = joinReqs[id];
+    var by = r.by ? memberById(r.by) : null;
+    var box = document.createElement("div"); box.className = "req";
+    box.setAttribute("role", "group");
+    box.setAttribute("aria-label", r.name + " wants to join");
+    var top = document.createElement("div"); top.className = "top";
+    var dot = document.createElement("span"); dot.className = "dot";
+    dot.style.background = COLOURS.indexOf(r.colour) !== -1 ? r.colour : "#9CB0C4";
+    dot.textContent = initials(r.name);
+    var tx = document.createElement("div"); tx.className = "tx";
+    var b = document.createElement("b"); b.textContent = r.name + " wants to join";
+    var sm = document.createElement("small");
+    sm.textContent = (by ? "Invited by " + by.name + ". " : "") +
+      "If you approve, they'll see you" + (by ? " and " + by.name : "") + " only.";
+    tx.appendChild(b); tx.appendChild(sm);
+    top.appendChild(dot); top.appendChild(tx);
+    var row = document.createElement("div"); row.className = "row";
+    var yes = document.createElement("button"); yes.className = "btn green"; yes.textContent = "Approve";
+    yes.onclick = function(){ approveJoin(id); };
+    var no = document.createElement("button"); no.className = "btn ghost"; no.textContent = "Reject";
+    no.onclick = function(){ rejectJoin(id); };
+    row.appendChild(yes); row.appendChild(no);
+    box.appendChild(top); box.appendChild(row);
+    main.appendChild(box);
+  });
+}
+
+/* An older phone's way of asking: into the same list, never added
+   without the admin's say-so. */
+function takeAddRequest(msg){
+  if (!isAdmin() || !msg.member) return;
+  var from = memberById(msg.from);
+  var self = msg.from === msg.member.id;
+  if ((!from && !self) || msg.from === state.me) return;
+  takeJoinReq({ id: String(msg.member.id || ""), name: msg.member.name,
+                colour: msg.member.colour, by: self ? null : from.id, legacy: true });
+}
+
+/* ----------------------------------------------- the newcomer's side */
+
+function sendJoin(){
+  if (!state || !state.me || !state.joining) return;
+  var mine = memberById(state.me);
+  state.joining.sentAt = Date.now(); save();
+  fsRequest({ k: "join", name: state.joining.name || (mine && mine.name) || "",
+              colour: mine ? mine.colour : null, by: state.joining.by || null }, 10000)
+    .then(function(r){
+      if (r && r.member) { delete state.joining; save(); paintMain(); return; }
+      if (r && r.status === "noadmin" && state.admin && state.joining.by) {
+        /* The admin's phone hasn't brought the server up to date yet:
+           ask through the person who invited us. */
+        sendSig(state.admin.id, { t: "addreq", from: state.me,
+          member: { id: state.me, name: state.joining.name, colour: mine && mine.colour } })
+          .catch(function(){});
+      }
+    });
+}
+
+/* The family server says this phone's person is not in the family. */
+function takeGuest(f){
+  if (!state || !state.me || isAdmin()) return;
+  if (state.joining) {
+    if (!f.pending) sendJoin();
+    return;
+  }
+  if (state.inFam) {
+    /* Was in, and isn't any more. */
+    if (!state.removed) { state.removed = true; save(); paintMain(); }
+    return;
+  }
+  /* Opened a link for a person the admin's phone has not confirmed yet:
+     this is joining, whatever the link said. */
+  state.joining = { name: nameOf(state.me), by: null, at: Date.now() };
+  save(); paintMain();
+  if (!f.pending) sendJoin();
+}
+
+function takeJoinOk(f){
+  if (!state) return;
+  if (f.id === state.me) {
+    /* The family itself follows in a moment; this only says so sooner. */
+    if (state.joining) { state.joining.approved = true; paintMain(); }
+    return;
+  }
+  (state.pending || []).forEach(function(p){ if (p.member.id === f.id) p.done = true; });
+  save(); paintPending();
+  toast((f.name || "They") + " has joined");
+}
+
+function takeJoinNo(f){
+  if (!state) return;
+  if (f.id === state.me || (!f.id && state.joining)) {
+    if (state.joining) { state.joining.rejected = true; save(); paintMain(); }
+    return;
+  }
+  var hit = false;
+  (state.pending || []).forEach(function(p){ if (p.member.id === f.id) { p.rejected = true; hit = true; } });
+  if (hit) { save(); paintPending(); toast((f.name || "They") + " wasn't added"); }
+}
+
+/* ------------------------------------------ a member's own details
+ *
+ * Name and colour are the one part of the family a member changes
+ * themselves. The change shows on their phone at once and is sent to
+ * the admin's phone, which puts it into the family and passes it on -
+ * no approval needed for your own name. Sent again (at most hourly)
+ * until it has gone through, in case the admin's phone was off. */
+var meColour = null;
+function paintMeSwatches(){
+  var box = $("meSwatches"); if (!box) return;
+  box.innerHTML = "";
+  COLOURS.forEach(function(c){
+    var sw = document.createElement("button");
+    sw.type = "button";
+    sw.className = "swatch" + (c === meColour ? " sel" : "");
+    sw.style.background = c;
+    sw.setAttribute("aria-label", "Colour " + c);
+    sw.onclick = function(){ meColour = c; paintMeSwatches(); };
+    box.appendChild(sw);
+  });
+}
+function saveMyDetails(){
+  if (!state || !state.me) return;
+  var name = $("meName").value.trim().slice(0, 40);
+  if (!name) { toast("Type your name first"); return; }
+  var mine = memberById(state.me);
+  var colour = meColour || (mine && mine.colour) || COLOURS[0];
+  if (mine && mine.name === name && mine.colour === colour && !state.renameReq) {
+    toast("Saved"); return;
+  }
+  if (mine) { mine.name = name; mine.colour = colour; }
+  if (state.joining) {
+    /* Not in yet: the request to join carries the new name. */
+    state.joining.name = name; save(); sendJoin(); paintMain();
+    toast("Saved"); return;
+  }
+  state.renameReq = { name: name, colour: colour, at: 0 };
+  save(); sendRename(); paintMain();
+  toast("Saved — " + (state.admin ? nameOf(state.admin.id) + "'s phone passes it on to the family"
+                                  : "sent to the family"));
+}
+function sendRename(){
+  if (!state || !state.renameReq || !state.admin || isAdmin()) return;
+  state.renameReq.at = Date.now(); save();
+  sendSig(state.admin.id, { t: "rename", from: state.me, name: state.renameReq.name,
+                            colour: state.renameReq.colour }).catch(function(){});
+}
+/* On the admin's phone. */
+function takeRename(msg){
+  if (!isAdmin() || !msg.from || msg.from === state.me) return;
+  var m = memberById(msg.from);
+  if (!m) return;
+  var name = String(msg.name || "").trim().slice(0, 40);
+  var colour = COLOURS.indexOf(msg.colour) !== -1 ? msg.colour : m.colour;
+  if (!name || (name === m.name && colour === m.colour)) { broadcastRoster(m.id); return; }
+  var was = m.name;
+  m.name = name; m.colour = colour;
+  if (draft && draft !== state && draft.members) draft.members.forEach(function(d){
+    if (d.id === m.id) { d.name = name; d.colour = colour; }
+  });
+  bumpRev(); save(); broadcastRoster(); paintMain();
+  if ($("setupSheet").classList.contains("on")) paintMembers();
+  if (was !== name) toast(was + " is now called " + name);
+}
 
 function takeRoster(msg){
   if (!state) return;
@@ -4965,7 +5665,17 @@ function readIntent(){
     autoAnswerUntil = Date.now() + 60000;
     if (call && call.state === "incoming") { autoAnswerUntil = 0; answer(); }
   }
-  if ((openedFromNote || autoAnswerUntil || cb || gr) && !/[#&]j=/.test(h))
+  /* Approve on the admin's "wants to join" notification: added as soon
+     as the request arrives over the connection (or at once, if it is
+     here already). A tap on the notification itself only opens the
+     app, where the request is waiting at the top. */
+  var ap = h.match(/[#&]approve=([A-Za-z0-9]{3,16})(&|$)/);
+  var jr = h.match(/[#&]jr=([A-Za-z0-9]{3,16})(&|$)/);
+  if (ap) {
+    if (joinReqs[ap[1]]) approveJoin(ap[1]);
+    else approveIntent = ap[1];
+  }
+  if ((openedFromNote || autoAnswerUntil || cb || gr || ap || jr) && !/[#&]j=/.test(h))
     history.replaceState(null, "", location.pathname);
 }
 
@@ -4978,6 +5688,8 @@ function tryJoin(){
      personal link was lost and the phone asked "Which one are you?". */
   var named = location.hash.match(/[#&]m=([A-Za-z0-9\-_]+)/);
   var akey  = location.hash.match(/[#&]ak=([A-Za-z0-9\-_]+)/);
+  var newcomer = /[#&]p=1(&|$)/.test(location.hash);
+  var byM   = location.hash.match(/[#&]by=([A-Za-z0-9]{3,16})(&|$)/);
   history.replaceState(null, "", location.pathname);
   if (!cfg) { toast("That invite link looks damaged"); return false; }
 
@@ -5038,12 +5750,33 @@ function tryJoin(){
   if (state.adminKey === undefined) delete state.adminKey;
   if (akey && (!named || named[1] === state.me)) takeAdminKey(akey[1]);
 
+  /* Somebody new, invited by a member: nothing is theirs yet. They say
+     their name (already filled in) and the admin is asked. Opening the
+     same link again later, once they are in, goes straight in. */
+  if (mine && newcomer && state.admin && !(same && prev.inFam)) {
+    joinForm = { id: mine, name: nameOf(mine), by: byM ? byM[1] : null };
+    state.me = null;
+    paintMain();
+    return true;
+  }
+
   if (mine) {
     save();
     paintMain(); openStreams(); sayHello();
+    fsCheckPush().then(paintPushWarn);
     /* Not when a call brought you here - a greeting on top of a ringing
        screen reads like something went wrong. */
-    if (!openedFromNote) toast("Welcome back, " + nameOf(mine));
+    if (!openedFromNote) toast((same && prev.me === mine ? "Welcome back, " : "Welcome, ") +
+                               nameOf(mine));
+    return true;
+  }
+
+  /* A family link that doesn't name anyone. In a managed family it
+     shows nobody's name - a stranger holding it learns nothing - and
+     simply asks who you are. */
+  if (state.admin) {
+    joinForm = { id: null, name: "", by: byM ? byM[1] : null };
+    paintMain();
     return true;
   }
 
@@ -5052,6 +5785,10 @@ function tryJoin(){
   p.className = "hint";
   p.textContent = "You have been invited. Which one are you?";
   main.appendChild(p);
+  var fresh = document.createElement("button");
+  fresh.className = "btn ghost"; fresh.textContent = "I'm not on this list";
+  fresh.style.margin = "0 0 14px";
+  fresh.onclick = function(){ joinForm = { id: null, name: "", by: null }; paintMain(); };
 
   state.members.filter(shown).forEach(function(mem){
     var b = document.createElement("button"); b.className = "person";
@@ -5063,12 +5800,171 @@ function tryJoin(){
     b.onclick = function(){
       state.me = mem.id; save();
       paintMain(); openStreams(); sayHello();
+      fsCheckPush().then(paintPushWarn);
       toast("Welcome, " + mem.name);
-      openSetup();
     };
     main.appendChild(b);
   });
+  main.appendChild(fresh);
   return true;
+}
+
+/* ------------------------------------------------------ joining
+ *
+ * What a new person sees: their name, one button. Pressing it asks the
+ * admin to let them in and, in the same tap, turns on calls for this
+ * phone (the only moment the phone allows asking). The family server,
+ * the relay and every other setting came inside the link. */
+var joinForm = null;
+
+function paintJoinForm(main){
+  var f = joinForm;
+  var inviter = f.by && memberById(f.by) ? nameOf(f.by)
+              : state.admin ? nameOf(state.admin.id) : null;
+  var hello = document.createElement("p");
+  hello.className = "greet"; hello.textContent = "You're invited";
+  main.appendChild(hello);
+  var card = document.createElement("div"); card.className = "onb joinform";
+  var p = document.createElement("p");
+  p.textContent = (inviter ? inviter + " invited you to their family on Family Notifier. "
+                           : "You've been invited to a family on Family Notifier. ") +
+    "Check your name and tap Join. Everything else sets itself up.";
+  card.appendChild(p);
+  var lb = document.createElement("label"); lb.htmlFor = "joinName"; lb.textContent = "Your name";
+  var inp = document.createElement("input");
+  inp.type = "text"; inp.id = "joinName"; inp.maxLength = 40; inp.autocomplete = "name";
+  inp.placeholder = "Your name"; inp.value = f.name || "";
+  var go = document.createElement("button"); go.className = "btn"; go.textContent = "Join";
+  go.onclick = function(){ joinNow(inp.value); };
+  inp.onkeydown = function(e){ if (e.key === "Enter") joinNow(inp.value); };
+  card.appendChild(lb); card.appendChild(inp); card.appendChild(go);
+  main.appendChild(card);
+  if (!f.name) setTimeout(function(){ try { inp.focus(); } catch (e) {} }, 50);
+}
+
+function joinNow(raw){
+  var name = String(raw || "").trim().slice(0, 40);
+  if (!name) { toast("Type your name first"); return; }
+  var f = joinForm; if (!f || !state) return;
+  var m = f.id ? memberById(f.id) : null;
+  if (!m) { m = newMember(name); if (f.id) m.id = f.id; state.members.push(m); }
+  m.name = name;
+  state.me = m.id;
+  joinForm = null;
+  if (state.admin) {
+    state.joining = { name: name, by: f.by || null, at: Date.now() };
+    save();
+  } else {
+    /* A family nobody manages: anyone with the link may join, as before. */
+    bumpRev(); save(); broadcastRoster();
+  }
+  paintMain(); openStreams();
+  if (state.joining) sendJoin();
+  /* Still inside the tap - the one moment a phone lets a page ask. */
+  enableCalls();
+}
+
+function paintJoining(main){
+  var j = state.joining, adminName = state.admin ? nameOf(state.admin.id) : "The admin";
+  var hello = document.createElement("p"); hello.className = "greet";
+  hello.textContent = j.rejected ? "Not added" : "Almost there, " + String(j.name || nameOf(state.me)).split(/\s+/)[0];
+  main.appendChild(hello);
+  var card = document.createElement("div"); card.className = "onb";
+  var h = document.createElement("h3"), p = document.createElement("p");
+  if (j.rejected) {
+    h.textContent = adminName + " didn't approve this request";
+    p.textContent = "If that was a mistake, ask them, then try again.";
+    card.appendChild(h); card.appendChild(p);
+    var again = document.createElement("button"); again.className = "btn ghost";
+    again.textContent = "Ask again";
+    again.onclick = function(){ delete j.rejected; save(); sendJoin(); paintMain(); };
+    card.appendChild(again);
+  } else if (j.approved) {
+    h.textContent = "You're in";
+    p.textContent = "Getting your family…";
+    card.appendChild(h); card.appendChild(p);
+  } else {
+    h.textContent = "Waiting for " + adminName;
+    p.textContent = adminName + " has been asked to let you in. You'll get a notification " +
+      "the moment they do — you can close the app until then.";
+    card.appendChild(h); card.appendChild(p);
+  }
+  main.appendChild(card);
+  paintSetupCard(main);
+}
+
+function paintRemoved(main){
+  var hello = document.createElement("p"); hello.className = "greet";
+  hello.textContent = "Not in this family";
+  main.appendChild(hello);
+  var card = document.createElement("div"); card.className = "onb";
+  var p = document.createElement("p");
+  p.textContent = "This phone is no longer part of the family, so it can't call or be called.";
+  var b = document.createElement("button"); b.className = "btn ghost";
+  b.textContent = "Ask " + (state.admin ? nameOf(state.admin.id) : "the admin") + " to add me again";
+  b.onclick = function(){
+    delete state.removed;
+    state.joining = { name: nameOf(state.me), by: null, at: Date.now() };
+    save(); sendJoin(); paintMain();
+  };
+  card.appendChild(p); card.appendChild(b);
+  main.appendChild(card);
+}
+
+/* "Get calls on this phone": the one thing each person must do on
+   their own phone, because only they can allow it. Shown on the home
+   screen until it is done, instead of a technical page in Settings. */
+function callsReady(){ return fsPushState === "on" || fsPushState === "unknown" ||
+                              fsPushState === "unsupported" || fsPushState === "nosw"; }
+function paintSetupCard(main){
+  var old = $("setupCard");
+  var box = old || document.createElement("div");
+  box.id = "setupCard"; box.className = "onb"; box.innerHTML = "";
+  if (!old && main) main.appendChild(box);
+  if (!state || !state.me || callsReady()) { box.style.display = "none"; return; }
+  box.style.display = "";
+  var h = document.createElement("h3"), p = document.createElement("p");
+  box.appendChild(h); box.appendChild(p);
+  if (fsPushState === "needhome") {
+    h.textContent = "One more step on iPhone";
+    p.textContent = "An iPhone only rings for calls from the Home Screen app:";
+    var ol = document.createElement("ol");
+    ["Tap Copy my link below", "Tap the Share button, then Add to Home Screen",
+     "Open Family Notifier from your Home Screen — if it asks, tap Paste my link"]
+      .forEach(function(t){ var li = document.createElement("li"); li.textContent = t; ol.appendChild(li); });
+    box.appendChild(ol);
+    var cp = document.createElement("button"); cp.className = "btn ghost";
+    cp.textContent = "Copy my link";
+    cp.onclick = function(){ copy(personalLink(), "Copied — now add the app to your Home Screen"); };
+    box.appendChild(cp);
+    return;
+  }
+  h.textContent = "Get calls on this phone";
+  p.textContent = fsPushState === "blocked"
+    ? "Notifications are blocked for this app, so calls can't ring it while it's closed. " +
+      "Allow notifications for this site in your phone's settings, then tap below."
+    : "So this phone rings when someone calls, even with the app closed.";
+  var b = document.createElement("button"); b.className = "btn";
+  b.textContent = "Turn on calls";
+  b.onclick = enableCalls;
+  box.appendChild(b);
+}
+
+/* Notifications first (a phone only lets a page ask inside a tap), then
+   the microphone, so the first call doesn't stop to ask. */
+function enableCalls(){
+  primeRinger();
+  Promise.resolve(fsEnablePush()).then(function(){
+    return micPermission().then(function(st){
+      if (st === "granted" || st === "denied") return;
+      return micStream().then(stopStream).catch(function(){});
+    });
+  }).catch(function(){}).then(function(){
+    /* Whatever happened, re-read the real state, so the card offers a
+       retry if notifications still aren't on. */
+    return fsCheckPush();
+  }).then(function(){ paintPushWarn(); try { paintMicState(); } catch (e) {} })
+    .catch(function(){});
 }
 
 /* -------------------------------------------------------------- wire */
@@ -5086,7 +5982,11 @@ each(document.querySelectorAll(".sheet"), function(s){
 $("settingsBtn").onclick = openSetup;
 $("addMember").onclick = function(){
   if (managedByOther()) return;
-  draft.members.push(newMember("")); paintMembers();
+  var m = newMember("");
+  /* Private by default: somebody new sees only you (the admin) until
+     you tick who else - the "Sees" button next to their name. */
+  if (isAdmin() || !state) m.c = state ? [state.me] : [];
+  draft.members.push(m); paintMembers();
 };
 $("saveSetup").onclick = saveSetup;
 
@@ -5181,7 +6081,7 @@ Array.prototype.forEach.call(document.querySelectorAll(".routeopt"), function(b)
     if (!state) { toast("Save your family first"); return; }
     if (managedByOther()) { toast("Only " + nameOf(state.admin.id) + " can change this"); return; }
     var mode = b.getAttribute("data-route");
-    if (mode === "cloudflare" && !(state.turn2 && state.turn2.api)) {
+    if (mode === "cloudflare" && !cfLink()) {
       toast("Set up the Cloudflare relay above first");
       return;
     }
@@ -5790,6 +6690,7 @@ function sayHello(){
 }
 
 $("newPersonAdd").onclick = addPersonAsMember;
+$("meSave").onclick = saveMyDetails;
 
 /* "Away" goes out the moment the app leaves the screen. It briefly
    waited 20 seconds to save a message on quick glances - but phones
@@ -6125,7 +7026,7 @@ function groupRoomFrame(f){
   group.room = r; group.by = by; group.invAt = r.inv[me].at;
   showGroupScreen();
   paintGroup();
-  tone();
+  tone({ incoming: true, group: true, tag: r.id, title: gName(r, by) + " is calling you" });
   group.ringTimer = setTimeout(function(){
     if (group && group.id === r.id && group.state === "incoming") groupEnd("missed");
   }, Math.max(3000, 46000 - age));
