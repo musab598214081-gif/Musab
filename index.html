@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="Musab B.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -317,6 +318,41 @@
   details.adv[open] > summary::after{transform:rotate(-135deg);margin-bottom:-4px}
   details.adv[open]{padding-bottom:14px}
   details.adv .sectiontitle:first-of-type{margin-top:8px}
+  /* The family list. */
+  .memberwrap{border:1px solid transparent;border-radius:16px;margin:0 -8px 6px;padding:4px 8px 6px}
+  .memberwrap.open{border-color:var(--seam);background:rgba(255,255,255,.02)}
+  .memberwrap .memberrow{margin-bottom:0}
+  .youtag{flex:0 0 auto;font-size:12px;color:var(--brass);border:1px solid var(--seam);
+    border-radius:999px;padding:6px 10px;white-space:nowrap}
+  .seesline{display:flex;align-items:center;gap:8px;width:100%;margin:6px 0 2px;padding:4px 0 4px 52px;
+    background:none;border:0;color:var(--mist);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+  .seesline.static{cursor:default}
+  .seesline .seestxt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .seesline.all .seestxt{color:var(--amber)}
+  .seesline .seesch{color:var(--mist);font-size:16px;line-height:1}
+  .seesline:hover .seestxt{color:var(--paper)}
+  .minis{display:flex;flex:0 0 auto}
+  .minis .mini{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:9px;font-weight:700;letter-spacing:-.2px;color:#0F1B2A;box-shadow:0 0 0 2px var(--hearth);margin-right:-5px}
+  .minis .mini:last-child{margin-right:0}
+  .memberwrap .contacts{margin-top:6px}
+  .donebtn{margin-top:12px}
+  .autonote{font-size:13px;color:var(--mist);margin:10px 2px 0;display:flex;gap:6px;align-items:center}
+  .autonote::before{content:"\2713";color:var(--go);font-weight:700}
+  /* Version and credit. */
+  .setfoot .ver{line-height:1.5}
+  .setfoot .ver b{color:var(--paper);font-weight:500}
+  .setfoot .ver small{display:block;font-size:11px;color:var(--mist);opacity:.7}
+  .credit{text-align:center;font-size:12px;color:var(--mist);opacity:.8;margin:28px 0 8px}
+  /* Removing a phone. */
+  .resetlist{margin:6px 0 14px;padding-left:20px;color:var(--paper);font-size:14px;line-height:1.55}
+  .resetlist li{margin:4px 0}
+  label.chk{display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;font-size:14px;
+    color:var(--mist);cursor:pointer;line-height:1.4}
+  label.chk input{margin-top:3px;width:18px;height:18px;flex:0 0 auto}
+  .btn.danger.strong{background:var(--stop);color:#fff;border-color:var(--stop)}
+  .btn.danger.strong:disabled{background:transparent;color:var(--mist);border-color:var(--seam);opacity:.7;cursor:not-allowed}
+  .onb.undo{border:1px solid var(--brass)}
   /* Their local time. */
   .acttime{margin:-6px 0 14px;font-size:14px;color:var(--mist)}
   .person .pres .lt{color:var(--mist)} .person .pres .lt.night{color:#B9C4FF}
@@ -515,6 +551,9 @@
   /* Choosing who to call. Above the call screens, since Add opens it
      from the middle of a call; below the toast, which must stay readable. */
   #grpSheet{z-index:78}
+  /* Questions asked on top of another sheet (Settings, a person's card)
+     must be above it, wherever they sit in the page. */
+  #resetSheet,#nightSheet{z-index:79}
   /* Choosing who to call */
   .pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 12px;
     margin-bottom:8px;background:var(--night);border:1px solid var(--seam);border-radius:16px;
@@ -641,6 +680,21 @@
   </div>
 </div>
 
+<div class="sheet" id="resetSheet">
+  <div class="sheetbody">
+    <h2 id="resetTitle">Remove this phone?</h2>
+    <ul class="resetlist" id="resetList"></ul>
+    <div id="resetAdmin" class="notice" style="display:none"></div>
+    <button class="btn ghost" id="resetCopy">Copy my link</button>
+    <label for="resetType" id="resetTypeLabel">Type your name to confirm</label>
+    <input type="text" id="resetType" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label class="chk"><input type="checkbox" id="resetNoUndo">
+      <span>Erase everything, no undo — I'm giving this phone away</span></label>
+    <button class="btn danger strong" id="resetGo" disabled>Remove this phone</button>
+    <button class="btn ghost" data-close="resetSheet">Cancel</button>
+  </div>
+</div>
+
 <div class="sheet" id="nightSheet">
   <div class="sheetbody">
     <h2 id="nightTitle">It's night for them</h2>
@@ -701,11 +755,13 @@
 
     <div id="membersBlock" data-pages="setup family">
       <label>Everyone in the family</label>
-      <p class="sub small" id="membersHint">Tap a colour dot to change that person's colour and who they can see.</p>
+      <p class="sub small" id="membersHint">Tap someone to change their colour and who they can see.</p>
       <div id="members"></div>
       <button class="btn ghost" id="addMember">+ Add a person</button>
     </div>
-    <div id="saveBlock" data-pages="setup profile family">
+    <p class="autonote" id="autoNote" data-pages="family">Changes save by themselves and reach
+      everyone's phone straight away.</p>
+    <div id="saveBlock" data-pages="setup profile">
       <button class="btn" id="saveSetup">Save</button>
     </div>
 
@@ -736,6 +792,14 @@
         nobody; it names you.</p>
       <div class="codebox" id="mineLink"></div>
       <button class="btn ghost" id="copyMine">Copy my link</button>
+    </div>
+    <!-- The one thing that can undo everything: not on the menu, and it
+         explains itself before it does anything. -->
+    <div id="dangerBlock" data-pages="profile">
+      <div class="sectiontitle">Remove this phone</div>
+      <p class="sub">Only for a phone that is being given away or set up afresh. You'll
+        see exactly what happens first, and you can undo it for 7 days.</p>
+      <button class="btn danger" id="resetAll">Remove this phone from the family…</button>
     </div>
 
     <div id="fsPushBlock" data-pages="calls">
@@ -857,8 +921,8 @@
     </div>
 
     <div class="setfoot" data-pages="home">
-      <span class="ver">Version <b id="verTag">—</b></span>
-      <button class="linkbtn danger" id="resetAll">Start over on this phone</button>
+      <span class="ver">Family Notifier <b id="verTag">—</b> · Developed by <b class="author">—</b>
+        <small id="buildTag"></small></span>
     </div>
   </div>
 </div>
@@ -880,9 +944,18 @@
  * their own notifications through sw.js.
  * ==================================================================== */
 
-var VERSION  = "2026-10-04a";   /* shown in Settings, so you can tell at a
-                                   glance whether a phone is on the build
-                                   you think it is */
+/* The version people see, and who made it.
+ *   1.0 -> 1.1 -> 1.2   new features
+ *   1.0.1, 1.0.2        small fixes
+ *   2.0                 a major overhaul
+ * Raise it with each release you hand out. */
+var APP_VERSION = "1.0";
+var APP_AUTHOR  = "Musab B.";
+/* The exact build, underneath. Changes with every update, however small,
+   so the admin's report can tell a phone that has not updated yet even
+   while the version number stays the same - and so can the service
+   worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
+var VERSION  = "2026-10-07a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -2080,6 +2153,9 @@ function becomeAdmin(quiet){
       bumpRev(); save(); broadcastRoster();
       if (!quiet) toast("You now manage this family — sent to everyone");
       paintAdmin();
+      /* The admin's controls (who sees whom) appear in the list now,
+         not only the next time Settings opens. */
+      if ($("setupSheet").classList.contains("on")) { try { applyLock(); paintMembers(); } catch (e) {} }
       return true;
     })
     .catch(function(){
@@ -5304,6 +5380,22 @@ function recentRow(r, withDate, run){
 
 function paintWelcome(main){
   $("whoami").textContent = "not set up yet";
+  var u = undoInfo();
+  if (u) {
+    var uc = document.createElement("div"); uc.className = "onb undo";
+    var uh = document.createElement("h3");
+    var who = (u.state.members || []).filter(function(m){ return m.id === u.state.me; })[0];
+    uh.textContent = "Removed " + ago(u.at);
+    var up = document.createElement("p");
+    up.textContent = (who ? who.name : "You") + " was removed from this phone. Changed your mind? " +
+      "Everything comes back as it was — for " + (function(d){ return d + " more day" + (d === 1 ? "" : "s"); })(
+      Math.max(1, Math.ceil((UNDO_MS - (Date.now() - u.at)) / 86400000))) + ".";
+    var ub = document.createElement("button"); ub.className = "btn"; ub.id = "undoBtn";
+    ub.textContent = "Undo — bring " + (who ? who.name : "it") + " back";
+    ub.onclick = undoRemove;
+    uc.appendChild(uh); uc.appendChild(up); uc.appendChild(ub);
+    main.appendChild(uc);
+  }
   var hello = document.createElement("p");
   hello.className = "greet"; hello.textContent = "Welcome";
   main.appendChild(hello);
@@ -5340,6 +5432,13 @@ function paintWelcome(main){
   make.className = "more"; make.textContent = "Start a new family instead";
   make.onclick = openSetup;
   main.appendChild(make);
+  main.appendChild(creditLine());
+}
+
+function creditLine(){
+  var c = document.createElement("p"); c.className = "credit";
+  c.textContent = "Family Notifier " + APP_VERSION + " · Developed by " + APP_AUTHOR;
+  return c;
 }
 
 /* Any text holding an invite link: the part after # is what matters. */
@@ -5421,7 +5520,9 @@ function openSetup(){
   chosenColour = (state && memberById(state.me))
     ? memberById(state.me).colour : COLOURS[0];
 
-  $("verTag").textContent = VERSION;
+  $("verTag").textContent = APP_VERSION;
+  $("buildTag").textContent = "build " + VERSION;
+  Array.prototype.forEach.call(document.querySelectorAll(".author"), function(el){ el.textContent = APP_AUTHOR; });
   try { paintMicState(); } catch (e) { console.error(e); }
   $("connState").textContent = "Tap check to see whether this network "
     + "allows the notification server.";
@@ -5467,7 +5568,19 @@ function setPage(name){
      open straight away on their own page. */
   var adv = $("advBlock"); if (adv) adv.open = name === "connection";
   if (name === "home") paintSetNav();
-  if (name === "usage") { try { paintFamUsage(); } catch (e) {} }
+  /* Always drawn fresh: the family may have changed since (a person
+     approved, the admin role just arrived). */
+  if (name === "family" && draft && state) {
+    /* Nothing here waits for a Save any more, so the list can start from
+       the family as it is now - unless a change is still on its way out. */
+    if (!contactsTimer && state.me && !managedByOther()) draft = JSON.parse(JSON.stringify(state));
+    try { paintMembers(); } catch (e) {}
+  }
+  if (name === "usage") {
+    /* Both parts drawn fresh: a phone's report may have arrived since. */
+    try { paintOverview(); } catch (e) {}
+    try { paintFamUsage(); } catch (e) {}
+  }
   var body = $("setupBody"); if (body) body.scrollTop = 0;
 }
 $("setBack").onclick = function(){ setPage("home"); };
@@ -5556,50 +5669,140 @@ function paintSwatches(){
 
 var openContacts = null;
 
+/* The family list.
+ *
+ * You first, then everyone else. Under each name, who they can see -
+ * in words and their colour dots ("Sees you, Musab Mobile"), where a
+ * bare "Sees 2" used to make you open it to find out. Tapping that line
+ * or the colour dot opens their colour and who they see, framed with
+ * them, with its own Done; opening someone else closes it.
+ *
+ * Nothing here needs a Save: names, colours and who-sees-whom go out by
+ * themselves, and removing someone asks first and then happens at once.
+ * (Creating a new family still ends with Save.) */
+function seesSummary(m){
+  if (!m.c) return { text: "Sees everyone", ids: [] };
+  var ids = m.c.filter(function(id){
+    return id !== m.id && draft.members.some(function(d){ return d.id === id; });
+  });
+  ids.sort(function(a, b){ return (b === state.me) - (a === state.me); });
+  if (!ids.length) return { text: "Sees nobody yet", ids: [] };
+  if (ids.length === 1 && ids[0] === state.me) return { text: "Sees only you", ids: ids };
+  var names = ids.map(function(id){
+    if (id === state.me) return "you";
+    var d = draft.members.filter(function(x){ return x.id === id; })[0];
+    return d ? d.name : "";
+  });
+  var text = "Sees " + names.slice(0, 2).join(", ") + (names.length > 2 ? " +" + (names.length - 2) : "");
+  return { text: text, ids: ids };
+}
+
 function paintMembers(){
   var box = $("members"); box.innerHTML = "";
+  var live = !!(state && state.me);
   /* Choosing who sees whom needs someone to enforce it - the admin. */
-  var privacy = !!(state && isAdmin());
-  draft.members.forEach(function(m, i){
+  var privacy = !!(live && isAdmin());
+  var list = draft.members.slice();
+  if (live) list.sort(function(a, b){ return (b.id === state.me) - (a.id === state.me); });
+  list.forEach(function(m){
+    var isMe = live && m.id === state.me;
+    var open = openContacts === m.id;
+    var wrap = document.createElement("div");
+    wrap.className = "memberwrap" + (open ? " open" : "") + (isMe ? " me" : "");
     var row = document.createElement("div"); row.className = "memberrow";
-    /* Their colour, visible at a glance - and the way into their colour
-       and who they can see. */
-    var isMe = state && m.id === state.me;
     var md = document.createElement("button");
-    md.className = "mdot" + (openContacts === m.id ? " open" : "");
+    md.className = "mdot" + (open ? " open" : "");
     md.style.background = isMe ? chosenColour : m.colour;
     md.textContent = initials(m.name || "?");
     md.setAttribute("aria-label", "Colour" + (privacy && !isMe ? " and who they see" : "") + " for " + (m.name || "this person"));
-    md.setAttribute("aria-expanded", openContacts === m.id ? "true" : "false");
-    md.onclick = function(){ openContacts = openContacts === m.id ? null : m.id; paintMembers(); };
+    md.setAttribute("aria-expanded", open ? "true" : "false");
+    md.onclick = function(){ openContacts = open ? null : m.id; paintMembers(); };
     row.appendChild(md);
     var inp = document.createElement("input");
     inp.type = "text"; inp.value = m.name;
     inp.placeholder = "Name"; inp.autocomplete = "off";
-    inp.oninput = function(){ draft.members[i].name = inp.value; md.textContent = initials(inp.value || "?"); };
+    inp.setAttribute("aria-label", isMe ? "Your name" : "Name");
+    inp.oninput = function(){
+      m.name = inp.value; md.textContent = initials(inp.value || "?");
+      if (isMe) { $("myName").value = inp.value; paintProfAv(); }
+    };
     inp.onchange = function(){ contactsChanged(); };
     row.appendChild(inp);
-    if (privacy && m.id !== state.me) {
-      var cb = document.createElement("button");
-      cb.className = "cbtn";
-      var seesN = m.c ? m.c.filter(function(id){
-        return draft.members.some(function(d){ return d.id === id && d.id !== m.id; });
-      }) : null;
-      cb.textContent = !seesN ? "Sees all"
-        : (seesN.length === 1 && seesN[0] === state.me) ? "Only you"
-        : "Sees " + seesN.length;
-      cb.setAttribute("aria-label", "Who " + (m.name || "this person") + " can see");
-      cb.onclick = function(){
-        openContacts = openContacts === m.id ? null : m.id; paintMembers();
-      };
-      row.appendChild(cb);
+    if (isMe) {
+      var you = document.createElement("span"); you.className = "youtag";
+      you.textContent = privacy ? "You · admin" : "You";
+      row.appendChild(you);
+    } else {
+      var del = document.createElement("button");
+      del.className = "mdel"; del.textContent = "×";
+      del.setAttribute("aria-label", "Remove " + (m.name || "this person"));
+      del.onclick = function(){ removeMember(m); };
+      row.appendChild(del);
     }
-    var del = document.createElement("button");
-    del.textContent = "×";
-    del.onclick = function(){ draft.members.splice(i,1); paintMembers(); };
-    row.appendChild(del); box.appendChild(row);
-    if (openContacts === m.id) box.appendChild(contactsPanel(m, privacy && !isMe));
+    wrap.appendChild(row);
+    /* Who they can see, in words - and the way in. */
+    if (privacy && !isMe) {
+      var sum = seesSummary(m);
+      var sl = document.createElement("button");
+      sl.className = "seesline" + (m.c ? "" : " all");
+      sl.setAttribute("aria-expanded", open ? "true" : "false");
+      var dots = document.createElement("span"); dots.className = "minis";
+      sum.ids.slice(0, 3).forEach(function(id){
+        var d = draft.members.filter(function(x){ return x.id === id; })[0];
+        if (!d) return;
+        var mi = document.createElement("span"); mi.className = "mini";
+        mi.style.background = id === state.me ? chosenColour : d.colour;
+        mi.textContent = initials(d.name || "?");
+        dots.appendChild(mi);
+      });
+      if (sum.ids.length) sl.appendChild(dots);
+      var st = document.createElement("span"); st.className = "seestxt"; st.textContent = sum.text;
+      sl.appendChild(st);
+      var ch = document.createElement("span"); ch.className = "seesch"; ch.setAttribute("aria-hidden", "true");
+      ch.textContent = open ? "\u2303" : "\u203A";
+      sl.appendChild(ch);
+      sl.onclick = function(){ openContacts = open ? null : m.id; paintMembers(); };
+      wrap.appendChild(sl);
+    } else if (isMe && privacy) {
+      var mine = document.createElement("div"); mine.className = "seesline static";
+      mine.textContent = "You see everyone";
+      wrap.appendChild(mine);
+    }
+    if (open) {
+      var panel = contactsPanel(m, privacy && !isMe);
+      var done = document.createElement("button");
+      done.className = "btn ghost donebtn"; done.textContent = "Done";
+      done.onclick = function(){ openContacts = null; paintMembers(); };
+      panel.appendChild(done);
+      wrap.appendChild(panel);
+    }
+    box.appendChild(wrap);
   });
+  $("autoNote").style.display = live ? "" : "none";
+}
+
+/* Removing someone: asks, then does it - no Save to forget. Their phone
+   is told at once (the server stops treating it as family). */
+function removeMember(d){
+  var live = !!(state && state.me);
+  var id = d.id, name = (d.name || "").trim() || "this person";
+  if (!live || !memberById(id)) {
+    draft.members = draft.members.filter(function(x){ return x !== d; });
+    if (openContacts === id) openContacts = null;
+    paintMembers();
+    return;
+  }
+  if (!confirm("Remove " + name + " from the family?\n\nTheir phone stops getting calls and " +
+               "the family straight away. You can invite them again later.")) return;
+  draft.members = draft.members.filter(function(x){ return x.id !== id; });
+  state.members = state.members.filter(function(x){ return x.id !== id; });
+  [state.members, draft.members].forEach(function(list){
+    list.forEach(function(x){ if (x.c) x.c = x.c.filter(function(y){ return y !== id; }); });
+  });
+  if (openContacts === id) openContacts = null;
+  bumpRev(); save(); broadcastRoster();
+  paintMembers(); paintMain(); paintInvites();
+  toast(name + " removed from the family");
 }
 
 /* In touch goes both ways: ticking Grandma for Sam lets Sam see Grandma
@@ -5643,9 +5846,12 @@ function contactsChanged(){
       var m = memberById(d.id);
       if (!m) return;
       var name = String(d.name || "").trim().slice(0, 40);
-      if (name && name !== m.name && m.id !== state.me) { m.name = name; renamed = true; }
-      if (d.colour && d.colour !== m.colour && m.id !== state.me &&
-          COLOURS.indexOf(d.colour) !== -1) { m.colour = d.colour; recoloured = true; }
+      if (name && name !== m.name) {
+        m.name = name; renamed = true;
+        if (m.id === state.me) $("myName").value = name;
+      }
+      var col = m.id === state.me ? chosenColour : d.colour;
+      if (col && col !== m.colour && COLOURS.indexOf(col) !== -1) { m.colour = col; recoloured = true; }
       var want = d.c ? d.c.filter(function(id){ return id !== d.id && !!memberById(id); })
                      : null;
       var have = m.c || null;
@@ -5704,7 +5910,9 @@ function contactsPanel(m, withContacts){
   some.onclick = function(){ if (!m.c) m.c = [state.me]; paintMembers(); contactsChanged(); };
   seg.appendChild(all); seg.appendChild(some); p.appendChild(seg);
   if (m.c) {
-    draft.members.forEach(function(o){
+    /* You first here too, as in the list. */
+    draft.members.slice().sort(function(a, b){ return (b.id === state.me) - (a.id === state.me); })
+      .forEach(function(o){
       if (o.id === m.id || !o.name.trim()) return;
       var lb = document.createElement("label"); lb.className = "ck";
       var ck = document.createElement("input"); ck.type = "checkbox";
@@ -5953,6 +6161,7 @@ function saveSetup(){
 
   draft.me = mine.id;
   draft.recent = (state && state.recent) || [];
+  try { localStorage.removeItem(UNDO_KEY); } catch (e) {}
   /* A new family starts private: each person sees only you, the admin,
      until you choose otherwise (Settings → "Sees" next to their name). */
   if (creating) draft.members.forEach(function(m){
@@ -6729,6 +6938,7 @@ function paintJoinForm(main){
   inp.onkeydown = function(e){ if (e.key === "Enter") joinNow(inp.value); };
   card.appendChild(lb); card.appendChild(inp); card.appendChild(go);
   main.appendChild(card);
+  main.appendChild(creditLine());
   if (!f.name) setTimeout(function(){ try { inp.focus(); } catch (e) {} }, 50);
 }
 
@@ -7109,13 +7319,137 @@ $("testTurn").onclick = function(){
 
 $("micAllow").onclick = micAllowNow;
 
-$("resetAll").onclick = function(){
-  if (!confirm("Forget the family and start over on this phone? Call usage records are kept.")) return;
-  wipeStorage();
-  closeStreams();
-  state = null;
-  closeSheet("setupSheet"); paintMain();
+/* ------------------------------------------------ removing a phone
+ *
+ * "Start over" used to be one tap from the Settings menu and one "OK":
+ * then the family, this person's sign-in key and - on the admin's phone
+ * - the admin key were gone. It also left the phone registered for the
+ * person's calls, so a "reset" phone kept ringing for them.
+ *
+ * Now it lives at the bottom of the You page, says what will happen for
+ * this person, asks for their name to be typed, and on the admin's phone
+ * will not go ahead until the recovery link has been copied. It takes
+ * the phone off the person's calls properly. And it can be undone for a
+ * week - unless "giving this phone away" is ticked, which erases it all. */
+var UNDO_KEY = "fmn-undo", UNDO_MS = 7 * 86400000;
+var resetCopied = false;
+
+$("resetAll").onclick = function(){ if (state && state.me) openReset(); };
+
+function openReset(){
+  var me = nameOf(state.me), first = String(me).trim();
+  var admin = isAdmin();
+  resetCopied = false;
+  $("resetTitle").textContent = "Remove " + me + " from this phone?";
+  var list = $("resetList"); list.innerHTML = "";
+  [ "Calls and buzzes for " + me + " stop ringing on this phone.",
+    "The family, " + me + "'s history and settings are removed from this phone.",
+    admin ? "You stay the family's admin only if you keep your recovery link — it holds the admin key."
+          : me + " stays in the family: nothing changes for anyone else.",
+    "To come back here later you'll need " + (admin ? "your recovery link" : "your own link") +
+      " — copy it below." ].forEach(function(t){
+    var li = document.createElement("li"); li.textContent = t; list.appendChild(li);
+  });
+  var adm = $("resetAdmin");
+  adm.style.display = admin ? "" : "none";
+  if (admin) adm.innerHTML = "<b>You're the admin.</b> The admin key lives on this phone. " +
+    "Without your recovery link nobody could approve new people or change the family again. " +
+    "Copy it first — or hand the family over to someone else (Settings → Family admin).";
+  $("resetCopy").textContent = admin ? "Copy my recovery link (needed)" : "Copy my own link";
+  $("resetTypeLabel").textContent = "Type \u201c" + first + "\u201d to confirm";
+  $("resetType").value = "";
+  $("resetNoUndo").checked = false;
+  resetReady();
+  openSheet("resetSheet");
+}
+function resetReady(){
+  if (!state) return;
+  var typed = $("resetType").value.trim().toLowerCase() === String(nameOf(state.me)).trim().toLowerCase();
+  var ok = typed && (!isAdmin() || resetCopied);
+  $("resetGo").disabled = !ok;
+  $("resetGo").textContent = $("resetNoUndo").checked ? "Erase this phone" : "Remove this phone";
+}
+$("resetType").oninput = resetReady;
+$("resetNoUndo").onchange = resetReady;
+$("resetCopy").onclick = function(){
+  if (!state) return;
+  if (isAdmin()) { copy(adminLink(), "Recovery link copied — keep it somewhere safe"); resetCopied = true; }
+  else copy(personalLink(), "Your link copied — keep it to come back later");
+  resetReady();
 };
+$("resetGo").onclick = function(){
+  if ($("resetGo").disabled || !state) return;
+  var noUndo = $("resetNoUndo").checked;
+  $("resetGo").disabled = true;
+  closeSheet("resetSheet");
+  removeThisPhone(noUndo);
+};
+
+/* Takes this phone off the person's calls: the family server forgets
+   its notification registration, the browser drops it, and the
+   notification helper forgets who it was acting for (it would otherwise
+   quietly register the phone again when the browser renews it). */
+function pushOff(){
+  var jobs = [];
+  try {
+    if ("serviceWorker" in navigator) jobs.push(navigator.serviceWorker.getRegistration().then(function(reg){
+      if (!reg) return;
+      var w = reg.active; if (w) w.postMessage({ t: "forget" });
+      if (!reg.pushManager) return;
+      return reg.pushManager.getSubscription().then(function(sub){
+        if (!sub) return;
+        return fsRequest({ k: "unsub", endpoint: sub.endpoint }, 4000, false, true)
+          .catch(function(){}).then(function(){ return sub.unsubscribe(); });
+      });
+    }).catch(function(){}));
+  } catch (e) {}
+  return Promise.all(jobs);
+}
+
+function removeThisPhone(noUndo){
+  var who = nameOf(state.me);
+  var snap = JSON.parse(JSON.stringify(state));
+  var done = false;
+  function finish(){
+    if (done) return; done = true;
+    try {
+      if (noUndo) localStorage.removeItem(UNDO_KEY);
+      else localStorage.setItem(UNDO_KEY, JSON.stringify({ at: Date.now(), state: snap }));
+    } catch (e) {}
+    wipeStorage();
+    closeStreams();
+    state = null;
+    closeSheet("setupSheet"); paintMain();
+    toast(noUndo ? "This phone has been erased" : who + " removed from this phone — you can undo this for 7 days");
+  }
+  /* The server is told first (it needs this phone's key to believe it),
+     but never for more than a few seconds. */
+  Promise.race([pushOff(), new Promise(function(r){ setTimeout(r, 5000); })]).then(finish, finish);
+}
+
+/* The undo, offered on the welcome screen for a week. */
+function undoInfo(){
+  try {
+    var u = JSON.parse(localStorage.getItem(UNDO_KEY) || "null");
+    if (!u || !u.state || !u.state.house) return null;
+    if (Date.now() - u.at > UNDO_MS) { localStorage.removeItem(UNDO_KEY); return null; }
+    return u;
+  } catch (e) { return null; }
+}
+function undoRemove(){
+  var u = undoInfo();
+  if (!u) return;
+  state = u.state;
+  delete state.authBad;
+  save();
+  try { localStorage.removeItem(UNDO_KEY); } catch (e) {}
+  paintMain(); openStreams(); sayHello();
+  /* Calls ring here again: registered afresh (the permission is still
+     granted, and this tap lets the browser ask if it must). */
+  try { fsEnablePush(); } catch (e) {}
+  toast("Welcome back, " + nameOf(state.me));
+}
+
 
 /* Copying has three ways in, tried in order, and always ends with the
    text in your hands: the modern clipboard (refused by some browsers
@@ -7257,7 +7591,7 @@ function reportUsage(force){
 function deviceInfo(){
   var perm = null;
   try { perm = ("Notification" in window) ? Notification.permission : null; } catch (e) {}
-  return { v: VERSION, notif: perm,
+  return { v: VERSION, av: APP_VERSION, notif: perm,
            push: fsPushState === "on",
            ios: isIOS(), home: !!(window.navigator.standalone ||
              (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) };
@@ -7309,7 +7643,9 @@ function takeUsage(msg){
   });
   var info = null;
   if (msg.info && typeof msg.info === "object") {
-    info = { v: String(msg.info.v || "").slice(0, 20), push: !!msg.info.push,
+    info = { v: String(msg.info.v || "").slice(0, 20),
+             av: /^\d{1,3}(\.\d{1,3}){0,2}$/.test(String(msg.info.av || "")) ? String(msg.info.av) : null,
+             push: !!msg.info.push,
              ios: !!msg.info.ios, home: !!msg.info.home,
              notif: ["granted", "denied", "default"].indexOf(msg.info.notif) !== -1 ? msg.info.notif : null };
   }
@@ -7399,7 +7735,8 @@ function paintOverview(){
     function chip(text, cls){ var c = document.createElement("span");
       c.className = "chip " + (cls || ""); c.textContent = text; chips.appendChild(c); }
     if (info) {
-      chip(info.v === VERSION ? "Up to date" : "Old version " + (info.v || "?"),
+      chip(info.v === VERSION ? "Up to date · " + APP_VERSION
+           : "Needs updating — has " + (info.av ? info.av : "an older version"),
            info.v === VERSION ? "ok" : "warn");
       chip(info.push ? "Notifications on" : "Notifications off", info.push ? "ok" : "bad");
       if (info.notif === "denied") chip("Page alerts blocked", "warn");

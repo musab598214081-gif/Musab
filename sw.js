@@ -17,7 +17,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-09-27a";
+var SW_VERSION = "2026-10-07a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var CALL_KINDS = { call: 1, group: 1 };
@@ -237,8 +237,11 @@ self.addEventListener("notificationclick", function (e) {
 self.addEventListener("message", function (e) {
   var m = e.data || {};
   if (m.t === "cfg" && m.send && m.me && m.key) {
+    /* sec: this person's key, so a renewed registration is accepted
+       (the family server only believes a phone that holds it). */
     e.waitUntil(caches.open(CFG).then(function (c) {
-      return c.put("cfg", new Response(JSON.stringify({ send: m.send, me: m.me, key: m.key })));
+      return c.put("cfg", new Response(JSON.stringify({ send: m.send, me: m.me, key: m.key,
+                                                        sec: m.sec || null })));
     }));
   } else if (m.t === "silence" && m.tag) {
     /* The app answered, declined or ended this call itself. */
@@ -246,6 +249,9 @@ self.addEventListener("message", function (e) {
     e.waitUntil(self.registration.getNotifications({ tag: m.tag }).then(function (ns) {
       ns.forEach(function (n) { n.close(); });
     }));
+  } else if (m.t === "forget") {
+    /* This phone was removed from the family: stop acting for anyone. */
+    e.waitUntil(caches.delete(CFG));
   } else if (m.t === "audible" && m.tag) {
     if (m.on) audible[m.tag] = 1; else delete audible[m.tag];
   } else if (m.t === "version" && e.source) {
@@ -262,7 +268,7 @@ self.addEventListener("pushsubscriptionchange", function (e) {
         userVisibleOnly: true, applicationServerKey: fromB64u(cfg.key)
       }).then(function (sub) {
         return fetch(cfg.send, { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ me: cfg.me, k: "sub", sub: sub.toJSON() }) });
+          body: JSON.stringify({ me: cfg.me, sec: cfg.sec || undefined, k: "sub", sub: sub.toJSON() }) });
       });
     }).catch(function () {}));
 });
