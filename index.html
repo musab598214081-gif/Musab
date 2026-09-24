@@ -350,6 +350,16 @@
   .donebtn{margin-top:12px}
   .autonote{font-size:13px;color:var(--mist);margin:10px 2px 0;display:flex;gap:6px;align-items:center}
   .autonote::before{content:"\2713";color:var(--go);font-weight:700}
+  /* Co-admins. */
+  .colist{margin:8px 0 6px}
+  .corow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--seam)}
+  .corow .dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;color:#0F1B2A;flex:0 0 auto}
+  .corow .tx{flex:1;min-width:0}
+  .corow .tx b{display:block;font-weight:500}
+  .corow .tx small{display:block;font-size:12px;color:var(--go)}
+  .corow .tx small.wait{color:var(--amber)}
+  #coPick{width:100%;margin-top:6px}
   /* Version and credit. */
   .setfoot .ver{line-height:1.5}
   .setfoot .ver b{color:var(--paper);font-weight:500}
@@ -960,13 +970,13 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.1";
+var APP_VERSION = "1.2";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-08a";
+var VERSION  = "2026-10-09a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1051,7 +1061,7 @@ function snapshot(){
            tone: state.tone || "classic",
            pending: state.pending || [], presOff: !!state.presOff, tzOff: !!state.tzOff,
            missedIds: state.missedIds || [], grpSeen: state.grpSeen || {},
-           admin: state.admin || null,
+           admin: state.admin || null, admins: state.admins || [],
            joining: state.joining || null, inFam: !!state.inFam,
            renameReq: state.renameReq || null };
 }
@@ -1224,6 +1234,9 @@ function others(){
 }
 function cloneMember(m, keepContacts){
   var o = { id: m.id, name: m.name, colour: m.colour };
+  /* When a sign-in was last reset - not secret; lets the admins' phones
+     tell whose invite key they hold is out of date. */
+  if (keepContacts && m.rk) o.rk = m.rk;
   if (keepContacts && m.c) o.c = m.c.slice();
   if (keepContacts && m.by) o.by = m.by;
   return o;
@@ -1232,7 +1245,7 @@ function cloneMember(m, keepContacts){
    admin's phone (or an unmanaged family), which holds the whole list. */
 function viewFor(viewer){
   var aid = adminId();
-  if (!aid || viewer === aid) {
+  if (!aid || isAdminId(viewer)) {
     return state.members.map(function(m){ return cloneMember(m, true); });
   }
   var v = memberById(viewer);
@@ -1424,6 +1437,7 @@ function fsConnect(){
     fsSendSub();
     swConfig();
     lookEdge();
+    setTimeout(coRequest, 1500);
     fsPingTimer = setInterval(function(){
       try { ws.send("ping"); } catch (e) {}
       /* No answer for a long while: the connection died without saying. */
@@ -1450,9 +1464,13 @@ function fsConnect(){
 }
 /* Kinds worth acting on after the fact. A call offer from an hour ago
    is not; a family update or an admin request is. */
-var FS_LASTING = ["roster", "addreq", "usage", "hello", "rename", "joinno"];
+var FS_LASTING = ["roster", "addreq", "usage", "hello", "rename", "joinno", "rot"];
 function fsFrame(f){
   if (f.k === "msg") {
+    /* Co-admin key messages: handled with the sender the server checked
+       (f.from), never with a name written inside the message. */
+    var co = null; try { co = JSON.parse(f.body); } catch (e) {}
+    if (co && /^co-/.test(String(co.t))) { fsSetSince(f.time); takeCo(co, f.from); return; }
     fsSetSince(f.time);
     if (Date.now() - f.time > 120000) {
       var inner; try { inner = JSON.parse(f.body); } catch (e) { return; }
@@ -1480,6 +1498,8 @@ function fsFrame(f){
   } else if (f.k === "famrev") {
     /* The server's copy is older than the admin's: bring it up to date. */
     if (canSign() && (f.rev || 0) < (state.rev || 0)) publishFamily();
+  } else if (f.k === "rot") {
+    takeRot(f.text, f.sig);
   } else if (f.k === "auth" && f.ok === false) {
     takeAuthFail();
   } else if (f.k === "caps") {
@@ -2090,8 +2110,19 @@ function hasRelay(){
 var SIGN_ALG = { name: "ECDSA", namedCurve: "P-256" };
 var SIGN_USE = { name: "ECDSA", hash: "SHA-256" };
 
-function isAdmin(){ return !!(state && state.admin && state.adminKey &&
-                              state.admin.id === state.me); }
+/* The family's admins: the one who made it (state.admin.id - phones on
+   older versions know only this one) and any co-admins (state.admins).
+   They share one family key; a co-admin's phone gets it encrypted for
+   that phone alone. A key that no longer fits the family's public key
+   (it was replaced when a co-admin was removed) signs nothing. */
+function adminIds(){ return state && state.admin ? [state.admin.id].concat(state.admins || []) : []; }
+function isAdminId(id){ return adminIds().indexOf(id) !== -1; }
+function isCoAdmin(id){ return !!(state && state.admins && state.admins.indexOf(id) !== -1); }
+function keyFits(){
+  var k = state && state.adminKey, p = state && state.admin && state.admin.pub;
+  return !!(k && p && k.x === p.x && k.y === p.y);
+}
+function isAdmin(){ return !!(state && state.admin && keyFits() && isAdminId(state.me)); }
 function managedByOther(){ return !!(state && state.admin && !isAdmin()); }
 
 function bytesToB64u(buf){
@@ -2111,12 +2142,13 @@ function b64uToBytes(str){
 function familyString(f){
   return JSON.stringify([f.house, f.members, f.turn || null, f.turn2 || null,
                          f.route || null, f.server || null, f.token || null,
-                         f.rev || 0, f.admin || null, f.fs || null]);
+                         f.rev || 0, f.admin || null, f.fs || null,
+                         (f.admins && f.admins.length) ? f.admins : null]);
 }
 
 /* Signing needs the key, not the title: a phone handing the family over
    must still sign the update that announces the new admin. */
-function canSign(){ return !!(state && state.admin && state.adminKey); }
+function canSign(){ return !!(state && state.admin && keyFits()); }
 
 function signFamily(members){
   if (!canSign() || !window.crypto || !crypto.subtle) return Promise.resolve(null);
@@ -2288,8 +2320,13 @@ function paintAdmin(){
   }
 
   if (isAdmin()) {
-    para("You manage this family. The other phones can set up their own " +
-         "ringing and ringtone; everything shared is changed only here.");
+    var primary = state.admin.id === state.me;
+    para(primary
+      ? "You manage this family. The other phones can set up their own " +
+        "ringing and ringtone; everything shared is changed only by its admins."
+      : "You're a co-admin: you can approve newcomers, change who sees whom and reset " +
+        "sign-ins. " + nameOf(state.admin.id) + " made the family and stays its admin.");
+    paintCoAdmins(box, para, button, primary);
     var h2 = document.createElement("label"); h2.textContent = "Admin recovery link";
     box.appendChild(h2);
     para("Save this somewhere private, like a password manager. Opening it on a " +
@@ -2300,7 +2337,7 @@ function paintAdmin(){
     button("Copy recovery link", "ghost", function(){ copy(adminLink(), "Recovery link copied — keep it private"); });
 
     var others = state.members.filter(function(m){ return m.id !== state.me; });
-    if (others.length) {
+    if (others.length && primary) {
       var h3 = document.createElement("label"); h3.textContent = "Hand over to someone else";
       box.appendChild(h3);
       var sel = document.createElement("select");
@@ -2371,8 +2408,17 @@ function paintAdmin(){
 function takeSignedFamily(fam){
   if ((fam.rev || 0) <= (state.rev || 0) && state.admin) return;
   var wasAdmin = isAdmin();
+  /* On an admin's phone, the people's invite keys (sk) stay: another
+     admin's update never carries them - unless that admin reset the
+     person since (a newer rk), which makes ours useless. */
+  var oldMembers = state.members || [];
   state.rev = fam.rev || 0;
   state.members = fam.members;
+  if (state.adminKey) state.members.forEach(function(m){
+    var om = oldMembers.filter(function(x){ return x.id === m.id; })[0];
+    if (om && om.sk && !((m.rk || 0) > (om.rk || 0))) { m.sk = om.sk; if (om.rk) m.rk = om.rk; }
+  });
+  state.admins = fam.admins || [];
   state.turn = fam.turn || null;
   state.turn2 = fam.turn2 || null;
   state.route = fam.route || null;
@@ -2384,10 +2430,15 @@ function takeSignedFamily(fam){
   /* A signed update that names someone else as admin, arriving from
      another phone, can only have been signed by a phone holding the
      key - so the new admin has taken over, and this copy can go. */
-  if (state.adminKey && state.admin.id !== state.me) {
+  if (state.adminKey && !isAdminId(state.me) && !pendingHandover) {
+    delete state.adminKey;
+  } else if (state.adminKey && state.admin.id !== state.me && !isCoAdmin(state.me)) {
     delete state.adminKey;
     pendingHandover = null;
   }
+  /* A co-admin whose key doesn't fit (new, or the key was replaced):
+     ask the other admins' phones for it. */
+  if (isAdminId(state.me) && !keyFits()) setTimeout(coRequest, 800);
   var still = state.members.some(function(m){ return m.id === state.me; });
   if (!still) state.me = null;
   var welcomed = false;
@@ -3399,6 +3450,7 @@ function onSignal(msg){
   if (msg.t === "roster") { takeRoster(msg); return; }
   if (msg.t === "addreq") { takeAddRequest(msg); return; }
   if (msg.t === "rename") { takeRename(msg); return; }
+  if (msg.t === "rot") { takeRot(msg.text, msg.sig); return; }
   if (msg.t === "joinno") { takeJoinNo(msg); return; }
   if (msg.t === "usage") { takeUsage(msg); return; }
   /* A phone that has just joined asks the admin for its copy. */
@@ -5685,7 +5737,7 @@ function paintSetNav(){
     b.onclick = function(){ setPage(page); };
     box.appendChild(b);
   }
-  row("profile", mine.name || "Your name", admin ? "Family admin · name, colour, your link"
+  row("profile", mine.name || "Your name", admin ? (isCoAdmin(state.me) ? "Co-admin" : "Family admin") + " · name, colour, your link"
       : "Your name, colour and your own link", { avatar: mine.colour });
   if (!locked) row("family", "Family", (state.members.length) + " people · add, invite, who sees whom", { icon: ICON.group });
   else if (!handing) {
@@ -5698,7 +5750,7 @@ function paintSetNav(){
   row("ringtone", "Ringtone", (TONES[toneName()] || TONES.classic).name, { icon: ICON.bell });
   row("status", "Your status", state.presOff ? "Hidden" : "Shown to the people you're in touch with", { icon: ICON.eye || ICON.group });
   if (admin || !state.admin || handing)
-    row("admin", "Family admin", admin ? "Recovery link, hand over" : handing ? "Finish taking over" : "Nobody manages this family yet", { icon: ICON.key || ICON.share });
+    row("admin", "Family admin", admin ? ((state.admins || []).length ? "Co-admins: " + state.admins.map(function(id){ return String(nameOf(id)).split(/\s+/)[0]; }).join(", ") + " · recovery link" : "Add a co-admin · recovery link") : handing ? "Finish taking over" : "Nobody manages this family yet", { icon: ICON.key || ICON.share });
   if (admin) row("usage", "Usage and call quality", "Calls, data and quality per person", { icon: ICON.chart || ICON.phone });
   if (!locked) row("connection", "Connection and relay", "Works by itself — for troubleshooting", { icon: ICON.plug || ICON.share });
 }
@@ -5801,8 +5853,12 @@ function paintMembers(){
     row.appendChild(inp);
     if (isMe) {
       var you = document.createElement("span"); you.className = "youtag";
-      you.textContent = privacy ? "You · admin" : "You";
+      you.textContent = privacy ? (isCoAdmin(state.me) ? "You · co-admin" : "You · admin") : "You";
       row.appendChild(you);
+    } else if (live && state.admin && m.id === state.admin.id) {
+      /* The family's own admin: marked, and not removable from here. */
+      var adm = document.createElement("span"); adm.className = "youtag"; adm.textContent = "Admin";
+      row.appendChild(adm);
     } else {
       var del = document.createElement("button");
       del.className = "mdel"; del.textContent = "×";
@@ -5811,8 +5867,12 @@ function paintMembers(){
       row.appendChild(del);
     }
     wrap.appendChild(row);
-    /* Who they can see, in words - and the way in. */
-    if (privacy && !isMe) {
+    /* Who they can see, in words - and the way in. An admin sees everyone. */
+    if (privacy && !isMe && isAdminId(m.id)) {
+      var al = document.createElement("div"); al.className = "seesline static";
+      al.textContent = (m.id === state.admin.id ? "Admin" : "Co-admin") + " · sees everyone";
+      wrap.appendChild(al);
+    } else if (privacy && !isMe) {
       var sum = seesSummary(m);
       var sl = document.createElement("button");
       sl.className = "seesline" + (m.c ? "" : " all");
@@ -5864,14 +5924,18 @@ function removeMember(d){
     return;
   }
   if (!confirm("Remove " + name + " from the family?\n\nTheir phone stops getting calls and " +
-               "the family straight away. You can invite them again later.")) return;
+               "the family straight away. You can invite them again later." +
+               (isCoAdmin(id) ? "\n\nThey're a co-admin: the family key will be replaced too." : ""))) return;
+  var wasCo = isCoAdmin(id);
+  if (wasCo) state.admins = state.admins.filter(function(x){ return x !== id; });
   draft.members = draft.members.filter(function(x){ return x.id !== id; });
   state.members = state.members.filter(function(x){ return x.id !== id; });
   [state.members, draft.members].forEach(function(list){
     list.forEach(function(x){ if (x.c) x.c = x.c.filter(function(y){ return y !== id; }); });
   });
   if (openContacts === id) openContacts = null;
-  bumpRev(); save(); broadcastRoster();
+  if (wasCo) replaceFamilyKey();
+  else { bumpRev(); save(); broadcastRoster(); }
   paintMembers(); paintMain(); paintInvites();
   toast(name + " removed from the family");
 }
@@ -6025,6 +6089,230 @@ function contactsPanel(m, withContacts){
     p.appendChild(rs);
   }
   return p;
+}
+
+/* ---------------------------------------------------- co-admins
+ *
+ * A second admin, for when the first isn't available. Same powers day
+ * to day - approving newcomers, who sees whom, resets - but a co-admin
+ * can't remove the admin who made the family.
+ *
+ * The family key reaches a co-admin's phone without any link: that phone
+ * makes a "box" key pair and sends its public half; an admin's phone
+ * locks the family key into a message only that box can open (ECDH +
+ * AES-GCM) and sends it. The server carries it and can't read it.
+ *
+ * Removing a co-admin replaces the family key - otherwise they would
+ * still hold it. The old key signs a short statement naming the new
+ * one; every phone and the server check it with the key they already
+ * trust, and then trust the new one. The co-admins who remain fetch the
+ * new key the same way as before. */
+var BOX_ALG = { name: "ECDH", namedCurve: "P-256" };
+
+function boxKey(){
+  if (state.box && state.box.priv && state.box.pub) return Promise.resolve(state.box);
+  return crypto.subtle.generateKey(BOX_ALG, true, ["deriveBits"]).then(function(pair){
+    return Promise.all([crypto.subtle.exportKey("jwk", pair.privateKey),
+                        crypto.subtle.exportKey("jwk", pair.publicKey)]);
+  }).then(function(k){
+    state.box = { priv: k[0], pub: { kty: "EC", crv: "P-256", x: k[1].x, y: k[1].y } };
+    save();
+    return state.box;
+  });
+}
+function boxSecret(privJwk, pubJwk){
+  return Promise.all([
+    crypto.subtle.importKey("jwk", privJwk, BOX_ALG, false, ["deriveBits"]),
+    crypto.subtle.importKey("jwk", pubJwk, BOX_ALG, false, [])
+  ]).then(function(k){
+    return crypto.subtle.deriveBits({ name: "ECDH", public: k[1] }, k[0], 256);
+  }).then(function(bits){
+    return crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
+  }).then(function(h){
+    return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(16),
+      info: new TextEncoder().encode("fmn-coadmin-" + state.house) },
+      h, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  });
+}
+
+/* A co-admin's phone asks every admin for the key it lacks. */
+var coAskedAt = 0;
+function coRequest(){
+  if (!state || !state.me || !isAdminId(state.me) || keyFits()) return;
+  if (Date.now() - coAskedAt < 60000) return;
+  coAskedAt = Date.now();
+  boxKey().then(function(box){
+    adminIds().forEach(function(id){
+      if (id !== state.me) sendSig(id, { t: "co-box", pub: box.pub }).catch(function(){});
+    });
+  }).catch(function(){});
+}
+
+function takeCo(msg, from){
+  if (!state || !state.me || !from || from === state.me) return;
+  /* An admin's phone: a co-admin asks for the key. Only for someone the
+     family names as an admin, and only with a key that fits. */
+  if (msg.t === "co-box") {
+    if (!canSign() || !isAdminId(state.me) || !isAdminId(from) || !msg.pub) return;
+    var eph;
+    crypto.subtle.generateKey(BOX_ALG, true, ["deriveBits"]).then(function(pair){
+      eph = pair;
+      return Promise.all([crypto.subtle.exportKey("jwk", pair.privateKey),
+                          crypto.subtle.exportKey("jwk", pair.publicKey)]);
+    }).then(function(k){
+      return boxSecret(k[0], { kty: "EC", crv: "P-256", x: msg.pub.x, y: msg.pub.y }).then(function(aes){
+        var iv = crypto.getRandomValues(new Uint8Array(12));
+        var body = JSON.stringify({ house: state.house, key: state.adminKey, pub: state.admin.pub });
+        return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, aes, new TextEncoder().encode(body))
+          .then(function(ct){
+            return sendSig(from, { t: "co-key", epk: { kty: "EC", crv: "P-256", x: k[1].x, y: k[1].y },
+                                   iv: bytesB64u(iv), ct: bytesB64u(new Uint8Array(ct)) });
+          });
+      });
+    }).catch(function(){});
+    return;
+  }
+  /* A co-admin's phone: the key, sealed for this phone's box. */
+  if (msg.t === "co-key") {
+    if (!isAdminId(state.me) || keyFits() || !isAdminId(from) || !state.box || !msg.epk) return;
+    boxSecret(state.box.priv, msg.epk).then(function(aes){
+      return crypto.subtle.decrypt({ name: "AES-GCM", iv: b64uToBytes(msg.iv) }, aes, b64uToBytes(msg.ct));
+    }).then(function(plain){
+      var d = JSON.parse(new TextDecoder().decode(plain));
+      if (!d || d.house !== state.house || !d.key || !d.pub) return;
+      /* Only a key that belongs to the family's current public key. */
+      if (d.key.x !== state.admin.pub.x || d.key.y !== state.admin.pub.y) return;
+      state.adminKey = d.key; save();
+      sendSig(from, { t: "co-ok" }).catch(function(){});
+      paintMain();
+      if ($("setupSheet").classList.contains("on")) { try { applyLock(); paintAdmin(); } catch (e) {} }
+      toast("You're now a co-admin of the family");
+    }).catch(function(){});
+    return;
+  }
+  if (msg.t === "co-ok") {
+    if (!isAdmin()) return;
+    state.coReady = state.coReady || {};
+    state.coReady[from] = state.admin.pub.x;
+    save();
+    if ($("setupSheet").classList.contains("on")) { try { paintAdmin(); } catch (e) {} }
+    toast(nameOf(from) + " is now a co-admin");
+  }
+}
+
+function makeCoAdmin(id){
+  if (!isAdmin() || isAdminId(id) || !memberById(id)) return;
+  state.admins = (state.admins || []).concat([id]);
+  bumpRev(); save(); broadcastRoster();
+  paintAdmin();
+  toast(nameOf(id) + " will become a co-admin as soon as their phone is online");
+}
+
+/* Taking someone's co-admin role away: out of the list, and a new
+   family key, so the one they hold is worth nothing. */
+function removeCoAdmin(id){
+  if (!isAdmin() || !isCoAdmin(id)) return Promise.resolve();
+  state.admins = state.admins.filter(function(x){ return x !== id; });
+  if (state.coReady) delete state.coReady[id];
+  return replaceFamilyKey().then(function(){
+    paintAdmin();
+    toast(nameOf(id) + " is no longer a co-admin — the family key was replaced");
+  });
+}
+
+function replaceFamilyKey(){
+  var oldKey = state.adminKey, oldPub = state.admin.pub;
+  var next;
+  return crypto.subtle.generateKey(SIGN_ALG, true, ["sign", "verify"]).then(function(pair){
+    return Promise.all([crypto.subtle.exportKey("jwk", pair.privateKey),
+                        crypto.subtle.exportKey("jwk", pair.publicKey)]);
+  }).then(function(k){
+    next = { priv: k[0], pub: { kty: "EC", crv: "P-256", x: k[1].x, y: k[1].y } };
+    var text = JSON.stringify(["rot", state.house, oldPub.x, next.pub, Date.now()]);
+    return crypto.subtle.importKey("jwk", oldKey, SIGN_ALG, false, ["sign"]).then(function(key){
+      return crypto.subtle.sign(SIGN_USE, key, new TextEncoder().encode(text));
+    }).then(function(sig){ return { text: text, sig: bytesToB64u(sig) }; });
+  }).then(function(rot){
+    state.admin = { id: state.admin.id, pub: next.pub };
+    state.adminKey = next.priv;
+    state.rotProof = rot;
+    state.coReady = {};
+    bumpRev(); save();
+    /* Every phone gets the statement first, then the family. */
+    state.members.forEach(function(m){
+      if (m.id !== state.me) sendSig(m.id, { t: "rot", text: rot.text, sig: rot.sig }).catch(function(){});
+    });
+    broadcastRoster();
+  });
+}
+
+/* A key change, checked with the key this phone already trusts. */
+function takeRot(text, sig){
+  if (!state || !state.admin || typeof text !== "string" || typeof sig !== "string") return;
+  inOrder(function(){
+    var r; try { r = JSON.parse(text); } catch (e) { return; }
+    if (!Array.isArray(r) || r[0] !== "rot" || r[1] !== state.house || !r[3]) return;
+    if (r[2] !== state.admin.pub.x) return;              /* not the key we trust */
+    return verifyFamily(text, sig, state.admin.pub).then(function(ok){
+      if (!ok) return;
+      state.admin = { id: state.admin.id, pub: { kty: "EC", crv: "P-256", x: r[3].x, y: r[3].y } };
+      save();
+      /* A co-admin's old key no longer fits: ask for the new one. */
+      if (isAdminId(state.me) && !keyFits()) setTimeout(coRequest, 800);
+    });
+  });
+}
+
+/* The Co-admins part of the Family admin page. */
+function paintCoAdmins(box, para, button, primary){
+  var h = document.createElement("div"); h.className = "sectiontitle"; h.textContent = "Co-admins";
+  box.appendChild(h);
+  para("A co-admin can step in when " + (primary ? "you're" : nameOf(state.admin.id) + " is") +
+       " not available: approve newcomers, change who sees whom, reset a sign-in. " +
+       "They can't remove the family's admin. The key reaches their phone by itself, " +
+       "encrypted for that phone alone.");
+  var list = document.createElement("div"); list.className = "colist";
+  (state.admins || []).forEach(function(id){
+    if (!memberById(id)) return;
+    var row = document.createElement("div"); row.className = "corow";
+    var dot = document.createElement("span"); dot.className = "dot";
+    dot.style.background = (memberById(id) || {}).colour || "#9CB0C4"; dot.textContent = initials(nameOf(id));
+    var tx = document.createElement("span"); tx.className = "tx";
+    var b = document.createElement("b"); b.textContent = nameOf(id) + (id === state.me ? " (you)" : "");
+    var sm = document.createElement("small");
+    var ready = id === state.me || (state.coReady && state.coReady[id] === state.admin.pub.x);
+    sm.textContent = ready ? "Co-admin" : "Waiting for their phone to receive the key";
+    sm.className = ready ? "" : "wait";
+    tx.appendChild(b); tx.appendChild(sm);
+    row.appendChild(dot); row.appendChild(tx);
+    if (id !== state.me) {
+      var rm = document.createElement("button"); rm.className = "mini"; rm.textContent = "Remove";
+      rm.setAttribute("aria-label", "Remove " + nameOf(id) + " as co-admin");
+      rm.onclick = function(){
+        if (!confirm("Stop " + nameOf(id) + " being a co-admin?\n\nThe family key is replaced, so the " +
+                     "copy on their phone stops working. " + nameOf(id) + " stays in the family.")) return;
+        removeCoAdmin(id);
+      };
+      row.appendChild(rm);
+    }
+    list.appendChild(row);
+  });
+  if (!list.children.length) para("No co-admin yet.", "sub small");
+  else box.appendChild(list);
+  var cands = state.members.filter(function(m){ return !isAdminId(m.id) && !m.h; });
+  if (cands.length && (state.admins || []).length < 3) {
+    var sel = document.createElement("select"); sel.id = "coPick";
+    cands.forEach(function(m){
+      var o = document.createElement("option"); o.value = m.id; o.textContent = m.name; sel.appendChild(o);
+    });
+    box.appendChild(sel);
+    button("Make them a co-admin", "ghost", function(){
+      var id = sel.value;
+      if (!confirm("Make " + nameOf(id) + " a co-admin?\n\nThey'll be able to approve newcomers, see " +
+                   "everyone, change who sees whom and reset sign-ins. You can take it back at any time.")) return;
+      makeCoAdmin(id);
+    }).id = "coAdd";
+  }
 }
 
 /* ------------------------------------------------ short invite links
@@ -6471,12 +6759,14 @@ function doPublish2(whole){
       ids.forEach(function(id, i){ if (all[i + 1]) views[id] = all[i + 1]; });
       var frame = { k: "pub", fam: all[0].fam, sig: all[0].sig, views: views };
       if (state.rekey) frame.reset = true;
+      if (state.rotProof) frame.rot = state.rotProof;
       /* A big family can outgrow one live-connection message; plain
          HTTP carries any size. */
       var big = JSON.stringify(frame).length > 48000;
       return fsRequest(frame, 15000, false, big).then(function(r){
         if (r && r.ok) {
           if (state.rekey) { delete state.rekey; save(); }
+          if (state.rotProof) { delete state.rotProof; save(); }
           return;
         }
         if (r && r.status === "rekey" && !pubWarned) {
@@ -6820,8 +7110,11 @@ function saveMyDetails(){
 function sendRename(){
   if (!state || !state.renameReq || !state.admin || isAdmin()) return;
   state.renameReq.at = Date.now(); save();
-  sendSig(state.admin.id, { t: "rename", from: state.me, name: state.renameReq.name,
-                            colour: state.renameReq.colour }).catch(function(){});
+  /* To every admin: whichever is around puts it into the family. */
+  adminIds().forEach(function(id){
+    sendSig(id, { t: "rename", from: state.me, name: state.renameReq.name,
+                  colour: state.renameReq.colour }).catch(function(){});
+  });
 }
 /* On the admin's phone. */
 function takeRename(msg){
@@ -6841,20 +7134,31 @@ function takeRename(msg){
   if (was !== name) toast(was + " is now called " + name);
 }
 
+/* Signed things are checked one at a time, in the order they came: a
+   key change must be taken in before the family signed with the new key
+   is checked, or that family would look forged. */
+var sigQueue = Promise.resolve();
+function inOrder(job){ sigQueue = sigQueue.then(job, job).catch(function(){}); return sigQueue; }
+
 function takeRoster(msg){
   if (!state) return;
   if (msg.fam && msg.sig) {
     var f;
     try { f = JSON.parse(msg.fam); } catch (e) { return; }
     var fam = { house: f[0], members: f[1], turn: f[2], turn2: f[3], route: f[4],
-                server: f[5], token: f[6], rev: f[7], admin: f[8], fs: f[9] || null };
+                server: f[5], token: f[6], rev: f[7], admin: f[8], fs: f[9] || null,
+                admins: Array.isArray(f[10]) ? f[10].filter(function(x){
+                  return /^[A-Za-z0-9]{3,16}$/.test(String(x)); }) : [] };
     if (fam.house !== state.house || !fam.admin) return;
-    /* Trusted key: the one we already know, or - for a family that has
-       no admin yet - the one this first signed update introduces. */
-    var trusted = state.admin ? state.admin.pub : fam.admin.pub;
-    if (state.admin && (fam.admin.pub.x !== trusted.x || fam.admin.pub.y !== trusted.y)) return;
-    verifyFamily(msg.fam, msg.sig, trusted).then(function(ok){
-      if (ok) takeSignedFamily(fam);
+    inOrder(function(){
+      /* Trusted key: the one we already know, or - for a family that has
+         no admin yet - the one this first signed update introduces. Only
+         a family signed by the trusted key counts. */
+      var trusted = state.admin ? state.admin.pub : fam.admin.pub;
+      if (state.admin && (fam.admin.pub.x !== trusted.x || fam.admin.pub.y !== trusted.y)) return;
+      return verifyFamily(msg.fam, msg.sig, trusted).then(function(ok){
+        if (ok) takeSignedFamily(fam);
+      });
     });
     return;
   }
