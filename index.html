@@ -350,6 +350,17 @@
   .donebtn{margin-top:12px}
   .autonote{font-size:13px;color:var(--mist);margin:10px 2px 0;display:flex;gap:6px;align-items:center}
   .autonote::before{content:"\2713";color:var(--go);font-weight:700}
+  /* Sync and updates. */
+  #syncBtn.spin svg{animation:fmnspin .9s linear infinite}
+  @keyframes fmnspin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){
+    #syncBtn.spin svg{animation:fmnpulse 1.2s ease-in-out infinite}
+    @keyframes fmnpulse{50%{opacity:.35}}
+  }
+  .updbar{display:flex;align-items:center;gap:12px;margin:0 16px 10px;padding:10px 12px 10px 16px;
+    background:var(--hearth);border:1px solid var(--brass);border-radius:16px}
+  .updbar .tx{flex:1;min-width:0;font-size:14px;line-height:1.35;color:var(--paper)}
+  .updbar .btn{flex:0 0 auto;width:auto;margin:0;padding:10px 18px}
   /* Co-admins. */
   .colist{margin:8px 0 6px}
   .corow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--seam)}
@@ -619,11 +630,19 @@
     <h1>Family Notifier</h1>
     <div class="who" id="whoami">—</div>
   </div>
+  <button class="iconbtn" id="syncBtn" title="Sync and check for updates" aria-label="Sync and check for updates">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>
+  </button>
   <button class="iconbtn" id="settingsBtn" title="Settings" aria-label="Settings">
     <span class="setdot" id="setDot" style="display:none"></span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
   </button>
 </header>
+<!-- A new version is ready: one tap installs it. -->
+<div class="updbar" id="updBar" role="status" style="display:none">
+  <span class="tx" id="updText">A new version is ready</span>
+  <button class="btn" id="updGo">Update</button>
+</div>
 
 <div id="filewarn" style="display:none;background:#5C2E00;color:#FFD9A8;
   padding:12px 16px;font-size:13px;line-height:1.5;border-bottom:1px solid #7A3E00">
@@ -970,13 +989,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.2";
+var APP_VERSION = "1.3";
+/* One line on what the version brings - shown when it's offered, and
+   after it's installed. Rewrite it with each release. */
+var WHATS_NEW   = "A sync button, and updates in one tap";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-09a";
+var VERSION  = "2026-10-10a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -6090,6 +6112,126 @@ function contactsPanel(m, withContacts){
   }
   return p;
 }
+
+/* ------------------------------------------------ sync and updates
+ *
+ * The sync button (next to Settings) brings this phone fully up to date
+ * in one tap: a fresh connection to the family server - which hands over
+ * the latest family, everyone's status, any key change and any join
+ * requests - the admin's copy re-sent to the server, notifications
+ * re-checked, and a look for a new version of the app.
+ *
+ * New versions used to arrive only on the SECOND opening: the saved copy
+ * opened at once while the new one downloaded behind it. Now the app
+ * checks by itself (on opening, on coming back to the screen, and every
+ * few hours) and offers "Version 1.3 is ready — Update": one tap writes
+ * the new version into the saved copy and restarts. Never mid-call. */
+var updInfo = null, updCheckedAt = 0, syncing = false;
+var SHELL_CACHE = "fmn-shell-v1";            /* sw.js keeps the app under this name */
+
+function checkUpdate(){
+  updCheckedAt = Date.now();
+  /* The address with a changing ending, so neither this phone's cache nor
+     the web host's hands back an old copy. */
+  return fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" })
+    .then(function(r){ return r.ok ? r.text() : null; })
+    .then(function(html){
+      if (!html) return null;
+      var v = (html.match(/var VERSION\s*=\s*"([^"]+)"/) || [])[1];
+      var av = (html.match(/var APP_VERSION\s*=\s*"([^"]+)"/) || [])[1] || "";
+      var wn = (html.match(/var WHATS_NEW\s*=\s*"([^"]*)"/) || [])[1] || "";
+      /* Builds are dated, so a later one sorts after ours. */
+      if (!v || v <= VERSION) { updInfo = null; paintUpdateBar(); return { current: true }; }
+      updInfo = { v: v, av: av, wn: wn, html: html };
+      paintUpdateBar();
+      return updInfo;
+    }).catch(function(){ return null; });
+}
+
+function paintUpdateBar(){
+  var bar = $("updBar"); if (!bar) return;
+  bar.style.display = updInfo ? "" : "none";
+  if (updInfo) $("updText").textContent = (updInfo.av && updInfo.av !== APP_VERSION
+      ? "Version " + updInfo.av + " is ready" : "An update is ready") + (updInfo.wn ? " — " + updInfo.wn : "");
+}
+
+function applyUpdate(){
+  if (!updInfo) return;
+  if (call || group) { toast("Finish the call first — then Update"); return; }
+  var html = updInfo.html;
+  $("updGo").disabled = true; $("updGo").textContent = "Updating…";
+  var jobs = [];
+  /* The new version, straight into the copy the app opens from... */
+  if ("caches" in window) jobs.push(caches.open(SHELL_CACHE).then(function(c){
+    return c.put(location.origin + location.pathname,
+                 new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } }));
+  }).catch(function(){}));
+  /* ...and the notification helper (sw.js) brought up to date too. */
+  if ("serviceWorker" in navigator) jobs.push(navigator.serviceWorker.getRegistration()
+    .then(function(r){ return r && r.update(); }).catch(function(){}));
+  function go(){
+    try { localStorage.setItem("fmn-updated-from", VERSION); } catch (e) {}
+    location.reload();
+  }
+  Promise.race([Promise.all(jobs), new Promise(function(r){ setTimeout(r, 4000); })]).then(go, go);
+}
+$("updGo").onclick = applyUpdate;
+
+/* After an update: say so, once. */
+(function(){
+  var from = null;
+  try { from = localStorage.getItem("fmn-updated-from"); localStorage.removeItem("fmn-updated-from"); } catch (e) {}
+  if (from && from !== VERSION) setTimeout(function(){
+    toast("Updated to " + APP_VERSION + (WHATS_NEW ? " — " + WHATS_NEW : ""));
+  }, 900);
+})();
+
+function syncNow(){
+  if (syncing) return;
+  syncing = true;
+  var btn = $("syncBtn"); btn.classList.add("spin"); btn.setAttribute("aria-busy", "true");
+  var jobs = [checkUpdate()];
+  var live = !!(state && state.me && useFS() && !state.authBad);
+  if (live) {
+    /* A fresh connection: the server sends everything current on arrival. */
+    openStreams();
+    jobs.push(new Promise(function(res){
+      var t0 = Date.now();
+      (function poll(){
+        if (fsOpen || Date.now() - t0 > 6000) return res(fsOpen);
+        setTimeout(poll, 200);
+      })();
+    }));
+    if (canSign()) { try { publishFamily(); } catch (e) {} }
+    try { reportUsage(true); } catch (e) {}
+    try { fsCheckPush().then(paintPushWarn); } catch (e) {}
+    try { if (state.renameReq) sendRename(); } catch (e) {}
+    try { coRequest(); } catch (e) {}
+  }
+  Promise.all(jobs).then(function(r){
+    /* Long enough to see it turn, even when it's quick. */
+    setTimeout(function(){
+      syncing = false;
+      btn.classList.remove("spin"); btn.removeAttribute("aria-busy");
+      var connected = live ? r[1] : true;
+      if (state && state.authBad) toast("This copy isn't signed in — see the message on screen");
+      else if (updInfo) toast("Synced — version " + (updInfo.av || "update") + " is ready: tap Update");
+      else if (!connected) toast("Couldn't reach the family server — check the connection");
+      else if (r[0] === null) toast(live ? "Family synced · couldn't check for updates" : "Couldn't check for updates");
+      else toast("Up to date · " + APP_VERSION + (live ? " · family synced" : ""));
+      try { paintMain(); } catch (e) {}
+    }, 400);
+  });
+}
+$("syncBtn").onclick = function(){ unlockAudio(); syncNow(); };
+
+/* Quietly, now and then: a few seconds after opening, on coming back to
+   the screen after an hour or more, and every six hours. */
+setTimeout(checkUpdate, 4000);
+document.addEventListener("visibilitychange", function(){
+  if (!document.hidden && Date.now() - updCheckedAt > 3600000) checkUpdate();
+});
+setInterval(function(){ if (!document.hidden) checkUpdate(); }, 6 * 3600000);
 
 /* ---------------------------------------------------- co-admins
  *
