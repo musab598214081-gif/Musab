@@ -989,16 +989,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.3.2";
+var APP_VERSION = "1.3.3";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Co-admins keep their admin rights";
+var WHATS_NEW   = "Fixes from a full check of the app";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-12a";
+var VERSION  = "2026-10-13a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1502,6 +1502,9 @@ function fsFrame(f){
     dispatch({ event: "message", id: f.id, time: Math.floor(f.time / 1000),
                topic: sigTopic(state.me), message: f.body }, false);
   } else if (f.k === "ring") {
+    /* Marked as received, so a buzz kept for this phone while its
+       connection was down is not delivered - or logged - twice. */
+    fsSetSince(f.time);
     dispatch({ event: "message", id: f.id, time: Math.floor(f.time / 1000),
                topic: ringTopic(state.me), title: f.title, message: f.body,
                kind: f.kind || null, tag: f.tag || null }, false);
