@@ -758,6 +758,21 @@
   #cmenu button:active{background:rgba(255,255,255,.1)}
   #cmenu button.danger{color:#FF8589}
   #cmenu svg{width:19px;height:19px;flex:0 0 auto}
+  /* ---- Storage (admin) ---- */
+  .stbar{position:relative;height:14px;border-radius:7px;background:var(--night);overflow:visible;
+    border:1px solid var(--seam);margin:6px 0 10px}
+  .stbar span{position:absolute;left:0;top:0;bottom:0;border-radius:7px;background:var(--go);
+    width:0;transition:width .4s ease}
+  .stbar.mid span{background:var(--amber)} .stbar.high span{background:var(--stop)}
+  .stbar i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--paper);opacity:.7;display:none}
+  .stbig{font-size:17px;font-weight:600;margin:0 0 8px;color:var(--paper)}
+  .strows{border-radius:14px;background:var(--night);padding:4px 12px;margin-bottom:4px}
+  .strow{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--seam);
+    font-size:14px}
+  .strow:last-child{border-bottom:0}
+  .strow span{color:var(--mist)} .strow b{font-weight:600;text-align:right}
+  @media (prefers-reduced-motion:reduce){ .stbar span{transition:none} }
+
   /* ---- Blocking ---- */
   .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
@@ -1249,6 +1264,19 @@
       <p class="sub" id="relayUsage" style="margin-top:10px"></p>
     </details>
 
+    <div id="storageBlock" data-pages="usage" style="display:none">
+      <div class="sectiontitle">Photo and file storage</div>
+      <p class="sub">The Cloudflare R2 storage that holds pictures and files, against
+        Cloudflare's free allowance. Only admins see this.</p>
+      <div class="stbar" id="stBar" role="img" aria-label="Storage used">
+        <span id="stFill"></span><i id="stCap"></i>
+      </div>
+      <p class="stbig" id="stTotal">—</p>
+      <p class="notice" id="stWarn" style="display:none"></p>
+      <div class="strows" id="stRows"></div>
+      <button class="btn ghost" id="stRefresh">Count again now</button>
+    </div>
+
     <div id="overviewBlock" data-pages="usage" style="display:none">
       <div class="sectiontitle">Family overview</div>
       <p class="sub">What each phone last told you. Only you see this.</p>
@@ -1411,16 +1439,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.8.0";
+var APP_VERSION = "1.8.1";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Block someone from their chat (⋮ → Block) — no calls, buzzes or messages between you";
+var WHATS_NEW   = "Admins can see photo and file storage in Settings → Usage, plus blocking from a chat (⋮ → Block)";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-20f";
+var VERSION  = "2026-10-20g";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -8326,6 +8354,7 @@ function mediaUpload(pid, m){
       m.st = "failed";
       if (o.st === 413) m.why = "Too big to send — the limit is " + fmtSize(o.r && o.r.max || mediaLimit(a.k));
       else if (o.st === 429) m.why = "You've reached today's sending limit — try again tomorrow";
+      else if (o.st === 507) m.why = "The family's photo storage is full — old files are removed after a while; try again later";
       else if (o.st === 401 || o.st === 403) m.why = "The family server refused it";
       else if (o.st === 501) m.why = "This family server can't take pictures or files";
       chatSave(); chatChanged(pid);
@@ -9037,6 +9066,93 @@ function paintBlocked(){
   if (ub) ub.onclick = function(){ if (chatOpenId) blockSet(chatOpenId, false); };
 })();
 
+/* ------------------------------------------------ storage, for the admin
+ *
+ * How much of the Cloudflare R2 storage pictures and files are using -
+ * this family's share, and all families on this server together against
+ * Cloudflare's free allowance (10 GB). Past MEDIA_TOTAL_GB (9.5 GB unless
+ * set otherwise) the server stops taking new files, so the bill stays at
+ * nothing; old files are deleted after MEDIA_KEEP_DAYS, which frees room.
+ * R2 counts in 1,000,000,000-byte GB, so these figures do too. */
+function fmtDec(n){
+  n = Number(n) || 0;
+  if (n < 1e6) return Math.max(n ? 1 : 0, Math.round(n / 1e3)) + " KB";
+  if (n < 1e9) return (n / 1e6).toFixed(n < 1e7 ? 1 : 0).replace(/\.0$/, "") + " MB";
+  return (n / 1e9).toFixed(n < 1e10 ? 2 : 1).replace(/\.?0+$/, "") + " GB";
+}
+var stBusy = false;
+function paintStorage(fresh){
+  var block = $("storageBlock");
+  if (!block) return;
+  var on = !!(state && isAdmin());
+  block.style.display = on ? "block" : "none";
+  if (!on || stBusy) return;
+  stBusy = true;
+  $("stRefresh").disabled = true;
+  if (!$("stRows").childNodes.length) $("stTotal").textContent = "Counting…";
+  fsRequest({ k: "mstat", fresh: !!fresh }, 20000).then(function(r){
+    stBusy = false;
+    $("stRefresh").disabled = false;
+    var rows = $("stRows"), warn = $("stWarn");
+    rows.innerHTML = ""; warn.style.display = "none";
+    function row(label, value){
+      var d = document.createElement("div"); d.className = "strow";
+      var a = document.createElement("span"); a.textContent = label;
+      var b = document.createElement("b"); b.textContent = value;
+      d.appendChild(a); d.appendChild(b); rows.appendChild(d);
+    }
+    if (!r || !r.ok) {
+      $("stTotal").textContent = r && r.status === 400 ? "The family server needs updating to show this"
+                                                       : "Couldn't reach the family server — try again";
+      $("stBar").style.display = "none";
+      return;
+    }
+    if (!r.media) {
+      $("stTotal").textContent = "Pictures and files aren't set up on this family server";
+      $("stBar").style.display = "none";
+      return;
+    }
+    var all = r.all, used = all ? all.bytes : r.family.bytes, free = r.free || 10e9;
+    var pct = Math.min(100, used / free * 100);
+    var bar = $("stBar");
+    bar.style.display = "";
+    bar.className = "stbar" + (pct >= 90 ? " high" : pct >= 70 ? " mid" : "");
+    $("stFill").style.width = Math.max(pct, used ? 1 : 0).toFixed(1) + "%";
+    var cap = $("stCap");
+    if (r.total && r.total < free) { cap.style.display = "block"; cap.style.left = (r.total / free * 100).toFixed(1) + "%"; }
+    else cap.style.display = "none";
+    bar.setAttribute("aria-label", "Storage used: " + fmtDec(used) + " of " + fmtDec(free));
+    $("stTotal").textContent = fmtDec(used) + " of " + fmtDec(free) + " free allowance used (" +
+      (pct < 1 && used ? "under 1" : Math.round(pct)) + "%)";
+    if (r.total && used >= r.total) {
+      warn.textContent = "Storage has reached its limit, so new photos and files aren't being accepted. " +
+        "Room is made as old files are deleted after " + r.keep + " days — or raise MEDIA_TOTAL_GB in Cloudflare " +
+        "(anything over " + fmtDec(free) + " is charged).";
+      warn.style.display = "";
+    } else if (pct >= 80) {
+      warn.textContent = "Storage is getting full. New files stop at " + fmtDec(r.total || free) +
+        "; old ones are deleted after " + r.keep + " days.";
+      warn.style.display = "";
+    }
+    row("This family", fmtDec(r.family.bytes) + " · " + r.family.count + (r.family.count === 1 ? " file" : " files"));
+    if (all) row("All families on this server", fmtDec(all.bytes) + " · " + all.count + " files" +
+                 (all.fam > 1 ? " · " + all.fam + " families" : ""));
+    row("New files stop at", r.total ? fmtDec(r.total) + (r.total <= free ? " (stays free)" : " (over the free allowance)") : "No limit set");
+    row("Kept for", r.keep + " days, then deleted automatically");
+    if (r.family.oldest) row("Oldest file", ago(r.family.oldest));
+    row("Largest photo · file", fmtSize(r.photo) + " · " + fmtSize(r.file));
+    var sent = Object.keys(r.sent || {}).filter(function(id){ return memberById(id); });
+    row("Sent today, each person up to " + fmtSize(r.day),
+        sent.length ? sent.map(function(id){ return String(nameOf(id)).split(/\s+/)[0] + " " + fmtSize(r.sent[id]); }).join(" · ")
+                    : "Nothing yet");
+    if (all && all.at) row("Counted", ago(all.at) + (all.part ? " (partly — very large)" : ""));
+  });
+}
+(function(){
+  var b = $("stRefresh");
+  if (b) b.onclick = function(){ paintStorage(true); };
+})();
+
 /* ------------------------------------------------------------ sheets */
 
 var pendingId = null;
@@ -9167,6 +9283,7 @@ function setPage(name){
   if (name === "media") { try { paintMediaSettings(); } catch (e) {} }
   if (name === "blocked") { try { paintBlocked(); } catch (e) {} }
   if (name === "usage") {
+    try { paintStorage(false); } catch (e) {}
     /* Both parts drawn fresh: a phone's report may have arrived since. */
     try { paintOverview(); } catch (e) {}
     try { paintFamUsage(); } catch (e) {}
