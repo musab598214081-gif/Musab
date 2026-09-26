@@ -1439,16 +1439,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.8.1";
+var APP_VERSION = "1.8.2";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Admins can see photo and file storage in Settings → Usage, plus blocking from a chat (⋮ → Block)";
+var WHATS_NEW   = "Fixes: iPhone photos no longer sent sideways, faster photo downloads, more reliable large uploads";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-20g";
+var VERSION  = "2026-10-20h";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -2397,9 +2397,13 @@ function streamLive(){ return fsOpen && Date.now() - lastBeatAt < 75000; }
 
 function closeStreams(){ fsClose(); }
 
+var seenOld = {}, seenN = 0;
 function dispatch(m){
-  if (!m || m.event !== "message" || !m.id || seen[m.id]) return;
+  if (!m || m.event !== "message" || !m.id || seen[m.id] || seenOld[m.id]) return;
   seen[m.id] = 1;
+  /* Remembered in two halves, so an app left open for days doesn't keep
+     every message id it ever saw. */
+  if (++seenN > 3000) { seenOld = seen; seen = {}; seenN = 0; }
   if (m.topic === sigTopic(state.me)) takeSignal(m.message, m.time);
   else onRingMsg(m);
 }
@@ -7001,7 +7005,12 @@ function chatFlush(){
     if (!left) delete CHAT.gone[pid];
   });
   var text = JSON.stringify(CHAT);
-  try { localStorage.setItem(CHAT._k, text); } catch (e) {}
+  try { localStorage.setItem(CHAT._k, text); }
+  catch (e) {
+    /* Full: the older copy there would be read first next time and hide
+       every newer message. Removed, so the database copy is used. */
+    try { localStorage.removeItem(CHAT._k); } catch (x) {}
+  }
   idbPut(JSON.parse(text), CHAT._k);
 }
 window.addEventListener("pagehide", chatFlush);
@@ -8212,8 +8221,11 @@ function canvasBlob(c, type, q){
     try { c.toBlob(function(b){ res(b); }, type, q); } catch (e) { res(null); }
   });
 }
+/* Safari's quick decoder can ignore which way up a photo was taken, and
+   iPhone photos then went out sideways; an <img> always gets it right. */
+var DECODE_VIA_IMG = isIOS() || (/Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox|Android/.test(navigator.userAgent));
 function decodeImg(file){
-  if (window.createImageBitmap) {
+  if (window.createImageBitmap && !DECODE_VIA_IMG) {
     return createImageBitmap(file, { imageOrientation: "from-image" })
       .catch(function(){ return createImageBitmap(file); })
       .then(function(b){ return { img: b, w: b.width, h: b.height, done: function(){ try { b.close(); } catch (e) {} } }; })
@@ -8392,7 +8404,12 @@ function mediaFetch(pid, m, auto){
   mediaJobs[id] = new Promise(function(res){
     mqPush({ auto: !!auto, run: function(){
       mediaSetProg(id, 0);
-      return fetch(fsBase() + "/blob/" + id, { headers: { "X-Me": state.me, "X-Sec": mySec() }, cache: "no-store" })
+      /* A plain POST with who is asking inside: the browser sends it at
+         once, without a separate permission check first - one round trip
+         per photo instead of two. */
+      return fetch(fsBase() + "/blob/" + id, { method: "POST", cache: "no-store",
+                                              headers: { "Content-Type": "text/plain" },
+                                              body: JSON.stringify({ me: state.me, sec: mySec() }) })
         .then(function(r){
           if (r.status === 404 || r.status === 410) throw { gone: 1 };
           if (!r.ok) throw { st: r.status };
