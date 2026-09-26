@@ -636,7 +636,7 @@
   .cwho b{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cwho small{font-size:12px;color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cwho small.on{color:var(--go)} .cwho small.away{color:var(--amber)}
-  .cbody{flex:1 1 auto;overflow-y:auto;padding:10px 12px 12px;-webkit-overflow-scrolling:touch;
+  .cbody{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:10px 12px 12px;-webkit-overflow-scrolling:touch;
     overscroll-behavior:contain;display:flex;flex-direction:column;gap:4px}
   .cbody > *{max-width:640px;width:100%;margin-left:auto;margin-right:auto}
   .cempty{color:var(--mist);text-align:center;font-size:14px;margin:30px 20px}
@@ -689,6 +689,77 @@
   #chatBanner .btx{min-width:0;display:flex;flex-direction:column;font-size:14px}
   #chatBanner .btx span{color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media (prefers-reduced-motion:reduce){ #chatBanner{transition:none} }
+
+  /* ---- Replies, the message menu, Clear chat ---- */
+  #chat .chead .cmorebtn{padding:8px 6px;margin-left:-2px}
+  .cwrap{flex:1 1 auto;min-height:0;position:relative;display:flex;flex-direction:column}
+  /* Back to the latest, when you have scrolled up; a dot when something
+     new came in meanwhile. */
+  .cdown{position:absolute;right:14px;bottom:12px;width:42px;height:42px;border-radius:50%;border:0;
+    background:#22364D;color:var(--paper);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+  .cdown[hidden]{display:none}
+  .cdown svg{width:22px;height:22px}
+  .cdown.new::after{content:"";position:absolute;top:2px;right:2px;width:11px;height:11px;border-radius:50%;
+    background:var(--brass);box-shadow:0 0 0 2px var(--night)}
+  #chat .chead .cmorebtn svg{width:22px;height:22px}
+  /* A bubble can be swiped right to reply: the page keeps vertical
+     scrolling, the app gets the sideways move. */
+  .bub{touch-action:pan-y}
+  .bub.swiping{transition:none}
+  .bub.snap{transition:transform .18s ease-out}
+  .bub.swiping::before,.bub.snap::before{content:"";position:absolute;left:-34px;top:50%;width:26px;height:26px;margin-top:-13px;
+    border-radius:50%;background:var(--hearth) no-repeat center/15px 15px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239CB0C4' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14 4 9l5-5'/%3E%3Cpath d='M4 9h10.5a5.5 5.5 0 0 1 0 11H11'/%3E%3C/svg%3E");
+    opacity:var(--sw,0);transform:scale(calc(.6 + var(--sw,0) * .4));pointer-events:none}
+  .bub.armed::before{background-color:#22364D}
+  .bub.sel{box-shadow:0 0 0 2px var(--brass)}
+  .bub.flash{animation:cflash 1.4s ease-out}
+  @keyframes cflash{0%,35%{box-shadow:0 0 0 3px var(--brass)}100%{box-shadow:0 0 0 3px rgba(232,176,75,0)}}
+  @media (hover:none){ .bub{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none} }
+  /* The quoted message inside a reply. */
+  .bq{display:block;border-left:3px solid var(--q,var(--brass));background:rgba(0,0,0,.2);
+    border-radius:8px;padding:5px 8px 5px 9px;margin:1px -3px 5px;cursor:pointer;font-size:13.5px;
+    line-height:1.3;min-width:0}
+  .bq b{display:block;font-size:12.5px;font-weight:600;color:var(--q,var(--brass));
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bq span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    color:#C9D6E3;overflow-wrap:anywhere;white-space:pre-line}
+  .bq:active{background:rgba(0,0,0,.3)}
+  /* On a computer: a reply button beside the bubble, on hover. */
+  .brep{display:none}
+  @media (hover:hover) and (pointer:fine){
+    .brep{display:flex;position:absolute;top:50%;margin-top:-15px;width:30px;height:30px;border-radius:50%;
+      border:0;background:var(--hearth);color:var(--mist);align-items:center;justify-content:center;
+      cursor:pointer;opacity:0;transition:opacity .12s}
+    .bub.in .brep{right:-38px} .bub.out .brep{left:-38px}
+    .bub:hover .brep,.brep:focus-visible{opacity:1}
+    .brep:hover{color:var(--paper)}
+    .brep svg{width:16px;height:16px}
+  }
+  /* The bar above the typing box while replying. */
+  .crep{flex:0 0 auto;display:flex;align-items:center;gap:4px;margin:6px 10px 0;
+    background:var(--hearth);border-radius:14px;padding:4px 4px 4px 0;overflow:hidden}
+  .crep[hidden]{display:none}
+  .crq{flex:1;min-width:0;border-left:3px solid var(--q,var(--brass));padding:4px 10px;cursor:pointer}
+  .crq b{display:block;font-size:13px;font-weight:600;color:var(--q,var(--brass))}
+  .crq span{display:block;font-size:13.5px;color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crep .iconbtn{flex:0 0 auto;padding:8px}
+  .crep .iconbtn svg{width:18px;height:18px}
+  /* The small menu. */
+  #cmenu{position:fixed;z-index:60;min-width:170px;background:#22364D;border-radius:14px;padding:6px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45);display:flex;flex-direction:column}
+  #cmenu[hidden]{display:none}
+  #cmenu button{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;
+    color:var(--paper);font:inherit;font-size:15px;text-align:left;padding:11px 12px;border-radius:9px;cursor:pointer}
+  #cmenu button:hover,#cmenu button:focus-visible{background:rgba(255,255,255,.07);outline:0}
+  #cmenu button:active{background:rgba(255,255,255,.1)}
+  #cmenu button.danger{color:#FF8589}
+  #cmenu svg{width:19px;height:19px;flex:0 0 auto}
+  @media (prefers-reduced-motion:reduce){
+    .bub.snap{transition:none} .brep{transition:none}
+    .bub.flash{animation:none;box-shadow:0 0 0 3px var(--brass)}
+  }
 </style>
 </head>
 <body>
@@ -1055,9 +1126,24 @@
     <button class="qa ring" id="chatCall" aria-label="Call">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1Z"/></svg>
     </button>
+    <button class="iconbtn cmorebtn" id="chatMore" aria-label="More options" aria-haspopup="menu">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="18.5" r="1.9"/></svg>
+    </button>
   </div>
-  <div class="cbody" id="chatBody" aria-live="polite"></div>
+  <div class="cwrap">
+    <div class="cbody" id="chatBody" aria-live="polite"></div>
+    <button class="cdown" id="chatDown" aria-label="Go to the latest message" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg>
+    </button>
+  </div>
   <div class="cquick" id="chatQuick"></div>
+  <!-- Shown while you are replying to one message. -->
+  <div class="crep" id="chatReply" hidden>
+    <div class="crq" id="chatReplyQ"><b id="chatReplyWho"></b><span id="chatReplyText"></span></div>
+    <button class="iconbtn" id="chatReplyX" aria-label="Cancel reply">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
   <div class="cfoot">
     <textarea id="chatInput" rows="1" maxlength="4000" placeholder="Message" aria-label="Message"
               autocomplete="off" enterkeyhint="send"></textarea>
@@ -1067,6 +1153,18 @@
   </div>
 </div>
 <div id="chatBanner" role="status"></div>
+<!-- The small menu of a conversation (the ⋮ at the top) and of one
+     message (long-press, or right-click on a computer). -->
+<div id="cmenu" role="menu" hidden></div>
+
+<div class="sheet" id="clrSheet">
+  <div class="sheetbody">
+    <h2 id="clrTitle">Clear this chat?</h2>
+    <p class="sub" id="clrSub"></p>
+    <button class="btn danger strong" id="clrGo">Clear chat</button>
+    <button class="btn ghost" data-close="clrSheet">Cancel</button>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1090,16 +1188,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.4.0";
+var APP_VERSION = "1.5.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Chat with each person, a real Phone/Speaker switch, and calls that connect faster";
+var WHATS_NEW   = "Reply to a message (swipe it right), Clear chat, and smoother long conversations";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-20a";
+var VERSION  = "2026-10-20b";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -6224,26 +6322,55 @@ function openPastedLink(text){
  * Kept on this phone apart from the family settings (which travel in a
  * cookie that has no room for a conversation): localStorage first,
  * IndexedDB as the copy that survives the browser tidying up.
+ *
+ * Swipe a message right (or long-press it) to reply to it; the ⋮ at the
+ * top clears the conversation on this phone. See "replying" and
+ * "Clear chat" below.
  * ==================================================================== */
 
-var CHAT = null, chatTimer = null, chatOpenId = null, chatShowAll = false;
+var CHAT = null, chatTimer = null, chatOpenId = null;
 var CHAT_RANK = { failed: 0, sending: 1, sent: 2, delivered: 3, read: 4 };
 var CHAT_KEEP_DAYS = 180, CHAT_KEEP_N = 400, CHAT_MAX = 4000;
+/* How many items a conversation shows at first, and how many more each
+   step back in time adds. Older ones are drawn only when asked for.
+   chatFrom is the time of the oldest item drawn (null: the latest
+   CHAT_PAGE; 0: all), so new messages add to what is drawn instead of
+   pushing the oldest one out - which would shift what you are reading. */
+var CHAT_PAGE = 150, chatFrom = null, chatSkip = 0, chatItemsNow = [];
+/* The ids of cleared messages are remembered this long - a little more
+   than the server keeps a message - so a copy the server sends again
+   (after a reconnect) cannot bring a cleared message back. */
+var CHAT_GONE_MS = 8 * 86400000;
+/* Messages on their way to the server right now. Kept only in memory:
+   saved with the message, a flag like this outlived a closed app and
+   left the message stuck on "sending" for good. */
+var chatBusy = {};
+/* The message being replied to: { pid, re: { c, f, t } }. */
+var chatReply = null;
 
 function chatKey(){ return "familyNotifyer.chat." + state.house + "." + state.me; }
+function chatTidy(o){
+  /* A copy saved by an older version can carry the old in-flight flag. */
+  Object.keys(o.by).forEach(function(p){
+    (o.by[p] || []).forEach(function(m){ if (m && m.busy) delete m.busy; });
+  });
+  if (!o.gone || typeof o.gone !== "object") o.gone = {};
+  if (!o.clr || typeof o.clr !== "object") o.clr = {};
+  return o;
+}
 function chatStore(){
-  if (!state || !state.me || !state.house) return { by: {} };
+  if (!state || !state.me || !state.house) return { by: {}, gone: {}, clr: {} };
   var k = chatKey();
   if (CHAT && CHAT._k === k) return CHAT;
   var o = null;
   try { o = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { o = null; }
-  CHAT = (o && o.by && typeof o.by === "object") ? o : { by: {} };
+  CHAT = chatTidy((o && o.by && typeof o.by === "object") ? o : { by: {} });
   CHAT._k = k;
   if (!o) idbGet(k).then(function(v){
     /* Only adopted while nothing has arrived here yet. */
     if (!v || !v.by || !CHAT || CHAT._k !== k) return;
     var empty = !Object.keys(CHAT.by).some(function(p){ return CHAT.by[p].length; });
-    if (empty) { CHAT = v; CHAT._k = k; chatChanged(null); }
+    if (empty) { CHAT = chatTidy(v); CHAT._k = k; chatChanged(null); }
   });
   return CHAT;
 }
@@ -6251,9 +6378,14 @@ function chatSave(){ if (!chatTimer) chatTimer = setTimeout(chatFlush, 300); }
 function chatFlush(){
   if (chatTimer) { clearTimeout(chatTimer); chatTimer = null; }
   if (!CHAT || !CHAT._k) return;
-  var cut = Date.now() - CHAT_KEEP_DAYS * 86400000;
+  var now = Date.now(), cut = now - CHAT_KEEP_DAYS * 86400000, gcut = now - CHAT_GONE_MS;
   Object.keys(CHAT.by).forEach(function(pid){
     CHAT.by[pid] = CHAT.by[pid].filter(function(m){ return m.at >= cut; }).slice(-CHAT_KEEP_N);
+  });
+  Object.keys(CHAT.gone || {}).forEach(function(pid){
+    var g = CHAT.gone[pid], left = 0;
+    Object.keys(g).forEach(function(c){ if (g[c] < gcut) delete g[c]; else left++; });
+    if (!left) delete CHAT.gone[pid];
   });
   var text = JSON.stringify(CHAT);
   try { localStorage.setItem(CHAT._k, text); } catch (e) {}
@@ -6273,7 +6405,9 @@ function chatFind(pid, cid){
 }
 function chatLast(pid){ var l = chatStore().by[pid]; return l && l.length ? l[l.length - 1] : null; }
 function chatUnread(pid){
-  return (chatStore().by[pid] || []).filter(function(m){ return m.d === "in" && !m.r; }).length;
+  var l = chatStore().by[pid] || [], n = 0;
+  for (var i = 0; i < l.length; i++) if (l[i].d === "in" && !l[i].r) n++;
+  return n;
 }
 function chatUnreadAll(){
   var s = chatStore(), n = 0;
@@ -6300,17 +6434,23 @@ function chatSend(pid, text){
   if (!pid || !text) return;
   if (text.length > CHAT_MAX) text = text.slice(0, CHAT_MAX);
   var m = { c: "c" + rand(14), d: "out", t: text, at: Date.now(), st: "sending" };
+  if (chatReply && chatReply.pid === pid) {
+    m.re = { c: chatReply.re.c, f: chatReply.re.f, t: chatReply.re.t };
+    chatReplyCancel();
+  }
   chatInsert(chatList(pid), m);
   chatSave(); chatChanged(pid, true);
   chatDeliver(pid, m);
 }
 function chatDeliver(pid, m){
-  if (m.busy) return;
-  m.busy = true;
+  if (chatBusy[m.c]) return;
+  chatBusy[m.c] = 1;
   m.tries = (m.tries || 0) + 1;
-  fsRequest({ k: "chat", to: pid, cid: m.c, text: m.t, title: nameOf(state.me), url: noteUrl(pid) }, 15000)
+  var req = { k: "chat", to: pid, cid: m.c, text: m.t, title: nameOf(state.me), url: noteUrl(pid) };
+  if (m.re) req.re = m.re;
+  fsRequest(req, 15000)
     .then(function(r){
-      m.busy = false;
+      delete chatBusy[m.c];
       if (r && r.ok) {
         delete m.why;
         if (CHAT_RANK[m.st || "sent"] < CHAT_RANK.sent) m.st = "sent";
@@ -6320,6 +6460,11 @@ function chatDeliver(pid, m){
       } else {
         m.st = "failed";              /* sent again when the connection is back */
       }
+      chatSave(); chatChanged(pid);
+    }, function(){
+      /* Never left marked as on its way. */
+      delete chatBusy[m.c];
+      if (m.st === "sending") m.st = "failed";
       chatSave(); chatChanged(pid);
     });
 }
@@ -6331,18 +6476,27 @@ function chatRetry(){
   Object.keys(s.by).forEach(function(pid){
     if (!memberById(pid)) return;
     s.by[pid].forEach(function(m){
-      if (m.d === "out" && (m.st === "sending" || m.st === "failed") && !m.why && !m.busy &&
+      if (m.d === "out" && (m.st === "sending" || m.st === "failed") && !m.why && !chatBusy[m.c] &&
           now - m.at < 7 * 86400000 && (m.tries || 0) < 30) chatDeliver(pid, m);
     });
   });
 }
 
 /* ----------------------------------------------------------- receiving */
+/* The quote a reply carries - only what is expected, cut to size. */
+function chatReRead(re){
+  if (!re || typeof re !== "object" || typeof re.c !== "string" || !re.c) return null;
+  return { c: re.c.slice(0, 40), f: typeof re.f === "string" ? re.f.slice(0, 16) : "",
+           t: typeof re.t === "string" ? re.t.slice(0, 200) : "" };
+}
 function chatTake(f){
   if (!state || !state.me || !f || !f.cid) return;
   var mine = f.from === state.me;
   var pid = mine ? f.to : f.from;
   if (!pid || pid === state.me || !memberById(pid)) return;
+  /* Cleared on this phone: a copy sent again stays cleared. */
+  var gone = chatStore().gone[pid];
+  if (gone && gone[f.cid]) return;
   var m = chatFind(pid, f.cid);
   if (m) {
     /* Our own message, echoed back: it has reached the server. */
@@ -6352,12 +6506,18 @@ function chatTake(f){
     return;
   }
   m = { c: f.cid, d: mine ? "out" : "in", t: String(f.text || ""), at: f.time || Date.now() };
+  var re = chatReRead(f.re);
+  if (re) m.re = re;
   if (mine) m.st = "sent";              /* sent from another phone of ours */
   chatInsert(chatList(pid), m);
   chatSave();
+  var looking = false;
   if (!mine) {
-    var looking = chatOpenId === pid && !document.hidden;
-    if (looking) { m.r = 1; chatAck(pid, m.c, "r"); }
+    looking = chatOpenId === pid && !document.hidden;
+    /* Read at once when on screen. If you have scrolled up to read
+       something older you stay there: the button at the bottom shows a
+       dot instead of the conversation jumping away. */
+    if (looking) { m.r = 1; chatAck(pid, m.c, "r"); chatDownNew = true; }
     else {
       chatAck(pid, m.c, "d");
       if (Date.now() - (f.time || 0) < 120000 && !call && !group && !document.hidden) {
@@ -6366,14 +6526,14 @@ function chatTake(f){
       }
     }
   }
-  chatChanged(pid, looking);
+  chatChanged(pid);
 }
 function rcptTake(f){
   if (!state || !state.me || !f) return;
   var mine = f.from === state.me;       /* read on another phone of ours */
   var pid = mine ? f.to : f.from;
   var list = chatStore().by[pid];
-  if (!list) return;
+  if (!list || !list.length) return;
   var ids = {}; (f.ids || []).forEach(function(id){ ids[id] = 1; });
   var st = f.s === "r" ? "read" : "delivered", changed = false;
   list.forEach(function(m){
@@ -6409,10 +6569,33 @@ function chatMarkRead(pid){
   swPost({ t: "readchat", from: pid });
 }
 
-/* Something changed in one conversation (or, with null, in any). */
+/* Something changed in one conversation (or, with null, in any).
+   Changes are gathered and drawn once: a phone coming back online can
+   get a few hundred messages and ticks in a second, and drawing the
+   conversation and the family's cards for each one made it stutter.
+   The conversation is drawn on the next frame; the cards and the icon
+   badge a moment later (on a timer, so the badge is right even while
+   the app is in the background). */
+var chatPaintReq = false, chatPaintBottom = false, chatCardTimer = null;
+var chatRaf = window.requestAnimationFrame
+  ? function(fn){ window.requestAnimationFrame(fn); }
+  : function(fn){ setTimeout(fn, 16); };
 function chatChanged(pid, toBottom){
-  if (chatOpenId && (!pid || pid === chatOpenId)) chatPaint(!!toBottom);
-  paintCardNotes();
+  if (chatOpenId && (!pid || pid === chatOpenId)) {
+    if (toBottom) chatPaintBottom = true;
+    if (!chatPaintReq) {
+      chatPaintReq = true;
+      chatRaf(function(){
+        if (!chatPaintReq) return;            /* already drawn meanwhile */
+        chatPaintReq = false;
+        var b = chatPaintBottom; chatPaintBottom = false;
+        chatPaint(b);
+      });
+    }
+  }
+  if (!chatCardTimer) chatCardTimer = setTimeout(function(){
+    chatCardTimer = null; paintCardNotes();
+  }, 60);
 }
 
 /* ------------------------------------------------------ the icon badge */
@@ -6463,12 +6646,22 @@ function chatBanner(pid, text){
 var CHK1 = '<svg viewBox="0 0 16 11" width="15" height="11"><path d="M1.5 6 5 9.5 14.5 1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 var CHK2 = '<svg viewBox="0 0 20 11" width="19" height="11"><path d="M1.5 6 5 9.5 14.5 1M8.5 8.2 9.8 9.5 19 1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 var CLOCK = '<svg viewBox="0 0 12 12" width="11" height="11"><circle cx="6" cy="6" r="4.8" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3.3V6l1.8 1.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+var ICO_REPLY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
+var ICO_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.2"/><path d="M5 15V6.2A2.2 2.2 0 0 1 7.2 4H15"/></svg>';
+var ICO_RETRY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>';
+var ICO_CLEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.8h5V7M6.5 7l.9 12.2A1.9 1.9 0 0 0 9.3 21h5.4a1.9 1.9 0 0 0 1.9-1.8L17.5 7"/></svg>';
+/* The reply button beside a bubble is only for a mouse; a phone swipes. */
+var chatFine = !!(window.matchMedia && matchMedia("(hover: hover) and (pointer: fine)").matches);
+var chatReplyTpl = null;
 
 function openChat(id){
   var m = memberById(id);
   if (!m || id === state.me) return;
   var wasOpen = !!chatOpenId;
-  chatOpenId = id; chatShowAll = false; pendingId = id;
+  cmenuClose();
+  chatOpenId = id; chatFrom = null; chatDownNew = false; pendingId = id;
+  chatCache = { pid: null, map: {} };
+  chatReply = null; chatReplyPaint();
   var av = $("chatAv");
   av.textContent = initials(m.name); av.style.background = m.colour;
   $("chatName").textContent = m.name;
@@ -6491,7 +6684,10 @@ function openAct(id){ openChat(id); }
 
 function closeChat(fromHistory){
   if (!chatOpenId) return;
+  cmenuClose();
   chatOpenId = null;
+  chatReply = null; chatReplyPaint();
+  chatCache = { pid: null, map: {} };
   $("chat").classList.remove("on");
   $("chat").setAttribute("aria-hidden", "true");
   try { $("chatInput").blur(); } catch (e) {}
@@ -6511,50 +6707,139 @@ function chatPaintSub(){
 function chatItems(pid){
   var m = memberById(pid), items = [];
   (chatStore().by[pid] || []).forEach(function(x){ items.push({ k: "msg", at: x.at, m: x }); });
+  /* Calls and buzzes from before a Clear chat stay in Recent, not here. */
+  var cut = chatStore().clr[pid] || 0;
   if (m) recentList().forEach(function(r){
-    if (!r.grp && entryFor(r, m) && r.st !== "calling") items.push({ k: r.k, at: r.at, r: r });
+    if (!r.grp && r.at > cut && entryFor(r, m) && r.st !== "calling") items.push({ k: r.k, at: r.at, r: r });
   });
   items.sort(function(a, b){ return a.at - b.at; });
   return items;
 }
 
-function chatPaint(toBottom){
+/* Drawing a conversation. Every row - message, call, day heading - is
+   kept (by what it is) and used again next time unless something it
+   shows has changed, and the list on screen is only patched: a new
+   message adds one bubble, a tick swaps one, and nothing else is laid
+   out again. Only the latest CHAT_PAGE items are drawn at first; older
+   ones come in steps as you scroll back to the top. */
+var chatCache = { pid: null, map: {} };
+function chatSig(m){
+  return (m.st || "") + "|" + (m.why || "") + "|" + m.at + "|" + (m.re ? m.re.c : "");
+}
+function chatRow(map, old, key, sig, make){
+  while (map[key]) key += "+";            /* two rows can never share one node */
+  var c = old[key], el = c && c.s === sig ? c.el : make();
+  map[key] = { s: sig, el: el };
+  return el;
+}
+function chatPaint(toBottom, keep){
   var body = $("chatBody");
   if (!body || !chatOpenId) return;
+  /* Anything waiting to be drawn on the next frame is drawn now. */
+  if (chatPaintReq) { chatPaintReq = false; toBottom = toBottom || chatPaintBottom; chatPaintBottom = false; }
   var pid = chatOpenId;
+  if (chatCache.pid !== pid) chatCache = { pid: pid, map: {} };
   var near = body.scrollHeight - body.scrollTop - body.clientHeight < 90;
-  var items = chatItems(pid);
-  var LIMIT = 150, skip = chatShowAll ? 0 : Math.max(0, items.length - LIMIT);
-  body.innerHTML = "";
-  if (skip) {
+  var items = chatItems(pid), n = items.length, skip = 0;
+  if (chatFrom === null) {
+    skip = Math.max(0, n - CHAT_PAGE);
+    chatFrom = skip ? items[skip].at : 0;
+  } else if (chatFrom) {
+    while (skip < n && items[skip].at < chatFrom) skip++;
+  }
+  /* Reading the latest while a lot has come in (a phone back online):
+     back to drawing only the latest few, so it stays light. Nothing you
+     can see moves - the view is at the bottom. */
+  if (!keep && (near || toBottom) && n - skip > CHAT_PAGE * 2) {
+    skip = n - CHAT_PAGE;
+    chatFrom = items[skip].at;
+  }
+  chatSkip = skip; chatItemsNow = items;
+  var old = chatCache.map, map = {}, rows = [];
+  if (skip) rows.push(chatRow(map, old, "more", String(skip), function(){
     var more = document.createElement("button");
     more.className = "more cmore"; more.textContent = "Show earlier (" + skip + ")";
-    more.onclick = function(){ chatShowAll = true; chatPaint(false); body.scrollTop = 0; };
-    body.appendChild(more);
-  }
-  if (!items.length) {
+    more.onclick = chatEarlier;
+    return more;
+  }));
+  if (!n) rows.push(chatRow(map, old, "empty", nameOf(pid), function(){
     var hi = document.createElement("p");
     hi.className = "cempty";
     hi.textContent = "Messages, calls and buzzes with " + nameOf(pid) + " all show up here.";
-    body.appendChild(hi);
-  }
+    return hi;
+  }));
   var lastDay = "";
-  items.slice(skip).forEach(function(it){
+  for (var i = skip; i < n; i++) {
+    var it = items[i];
     var day = dayLabel(it.at);
     if (day !== lastDay) {
-      var dh = document.createElement("div"); dh.className = "cday";
-      var sp = document.createElement("span"); sp.textContent = day;
-      dh.appendChild(sp); body.appendChild(dh); lastDay = day;
+      lastDay = day;
+      rows.push(chatRow(map, old, "d:" + day, "", chatDayRow(day)));
     }
-    body.appendChild(it.k === "msg" ? chatBubble(pid, it.m) : chatEvent(pid, it.r));
-  });
+    if (it.k === "msg") rows.push(chatRow(map, old, it.m.c, chatSig(it.m), chatBubble.bind(null, pid, it.m)));
+    else {
+      var r = it.r;
+      rows.push(chatRow(map, old, "e:" + r.k + ":" + r.at + ":" + (r.pid || r.who),
+                        (r.k === "call" ? callLabel(r) : buzzLabel(r)) + "|" + r.st,
+                        chatEvent.bind(null, pid, r)));
+    }
+  }
+  chatCache.map = map;
+  /* Patch the list: rows already in place stay untouched. */
+  var cur = body.firstChild;
+  for (var j = 0; j < rows.length; j++) {
+    if (cur === rows[j]) { cur = cur.nextSibling; continue; }
+    body.insertBefore(rows[j], cur);
+  }
+  while (cur) { var nx = cur.nextSibling; body.removeChild(cur); cur = nx; }
   if (toBottom || near) body.scrollTop = body.scrollHeight;
+  chatDownPaint(body);
   chatQuick();
+}
+var chatDownNew = false;
+function chatDownPaint(body){
+  var b = $("chatDown");
+  if (!b) return;
+  var far = body.scrollHeight - body.scrollTop - body.clientHeight > 300;
+  if (!far) chatDownNew = false;
+  if (b.hidden === far) b.hidden = !far;
+  b.classList.toggle("new", far && chatDownNew);
+}
+function chatDayRow(day){
+  return function(){
+    var dh = document.createElement("div"); dh.className = "cday";
+    var sp = document.createElement("span"); sp.textContent = day;
+    dh.appendChild(sp);
+    return dh;
+  };
+}
+/* One step further back, keeping what is on screen where it is. */
+function chatEarlier(){
+  var body = $("chatBody");
+  if (!body || !chatOpenId || !chatSkip) return;
+  var fromBottom = body.scrollHeight - body.scrollTop;
+  var to = Math.max(0, chatSkip - CHAT_PAGE);
+  chatFrom = to ? chatItemsNow[to].at : 0;
+  chatPaint(false, true);
+  body.scrollTop = body.scrollHeight - fromBottom;
 }
 
 function chatBubble(pid, m){
   var d = document.createElement("div");
   d.className = "bub " + (m.d === "out" ? "out" : "in") + (m.st === "failed" ? " failed" : "");
+  d.setAttribute("data-c", m.c);
+  if (m.re && m.re.c) {
+    var q = document.createElement("div"); q.className = "bq";
+    q.setAttribute("data-q", m.re.c);
+    q.setAttribute("role", "button");
+    var who = m.re.f === state.me ? "You" : nameOf(m.re.f);
+    q.setAttribute("aria-label", "Reply to " + who + ": " + (m.re.t || "a message") + ". Show it");
+    q.style.setProperty("--q", quoteColour(m.re.f));
+    var qb = document.createElement("b"); qb.textContent = who;
+    var qs = document.createElement("span"); qs.textContent = m.re.t || "Message";
+    q.appendChild(qb); q.appendChild(qs);
+    d.appendChild(q);
+  }
   var t = document.createElement("span"); t.className = "bt"; t.textContent = m.t;
   var meta = document.createElement("span"); meta.className = "bm";
   var tm = document.createElement("span"); tm.textContent = timeOf(m.at);
@@ -6573,7 +6858,15 @@ function chatBubble(pid, m){
     var why = document.createElement("span"); why.className = "bwhy";
     why.textContent = m.why || "Not sent yet — it goes when you're back online. Tap to try now.";
     d.appendChild(why);
-    if (!m.why) d.onclick = function(){ m.st = "sending"; chatPaint(false); chatDeliver(pid, m); };
+  }
+  if (chatFine) {
+    if (!chatReplyTpl) {
+      chatReplyTpl = document.createElement("button");
+      chatReplyTpl.className = "brep"; chatReplyTpl.type = "button";
+      chatReplyTpl.setAttribute("aria-label", "Reply");
+      chatReplyTpl.innerHTML = ICO_REPLY;
+    }
+    d.appendChild(chatReplyTpl.cloneNode(true));
   }
   return d;
 }
@@ -6640,6 +6933,194 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener("scroll", chatFit);
 }
 
+/* ------------------------------------------------------------ replying
+ *
+ * Swipe a message to the right (or long-press it and pick Reply, or on
+ * a computer use the arrow beside it) and what you send next answers
+ * it: your message shows the one it answers on top, and tapping that
+ * scrolls to it. The quote carries the first words of the original, so
+ * it reads right even on a phone that no longer has the original. */
+function chatSnippet(t){ return String(t || "").replace(/\s+/g, " ").replace(/^ | $/g, "").slice(0, 160); }
+function quoteColour(id){ return id === state.me ? "var(--brass)" : "#7CC4F2"; }
+
+function chatReplyStart(pid, cid){
+  if (!pid || pid !== chatOpenId) return;
+  var m = chatFind(pid, cid);
+  if (!m) return;
+  chatReply = { pid: pid, re: { c: m.c, f: m.d === "out" ? state.me : pid, t: chatSnippet(m.t) } };
+  chatReplyPaint();
+  var i = $("chatInput");
+  try { i.focus({ preventScroll: true }); } catch (e) { try { i.focus(); } catch (e2) {} }
+}
+function chatReplyCancel(){ chatReply = null; chatReplyPaint(); }
+function chatReplyPaint(){
+  var bar = $("chatReply"), body = $("chatBody");
+  if (!bar) return;
+  var show = !!(chatReply && chatReply.pid === chatOpenId);
+  if (!show && bar.hidden) return;
+  var near = body && body.scrollHeight - body.scrollTop - body.clientHeight < 90;
+  if (show) {
+    var re = chatReply.re;
+    $("chatReplyWho").textContent = re.f === state.me ? "You" : nameOf(re.f);
+    $("chatReplyText").textContent = re.t || "Message";
+    bar.style.setProperty("--q", quoteColour(re.f));
+  }
+  bar.hidden = !show;
+  /* The bar takes room from the conversation: the latest message stays
+     in view if it was. */
+  if (near && body) body.scrollTop = body.scrollHeight;
+}
+
+/* To the message a quote points at - drawing older messages first if
+   it is further back than what is on screen - and a short glow on it. */
+function chatBubEl(cid){
+  var c = chatCache.map[cid];
+  return c && c.el.parentNode ? c.el : null;
+}
+function chatJump(cid){
+  var pid = chatOpenId;
+  if (!pid || !cid) return;
+  var el = chatBubEl(cid);
+  if (!el) {
+    var items = chatItems(pid), at = -1;
+    for (var i = items.length - 1; i >= 0; i--)
+      if (items[i].k === "msg" && items[i].m.c === cid) { at = i; break; }
+    if (at !== -1) {
+      var from = Math.max(0, at - 10);
+      chatFrom = from ? items[from].at : 0;
+      chatPaint(false, true);
+      el = chatBubEl(cid);
+    }
+  }
+  if (!el) { toast("That message isn't in this chat any more"); return; }
+  var calm = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  try { el.scrollIntoView({ block: "center", behavior: calm ? "auto" : "smooth" }); }
+  catch (e) { el.scrollIntoView(); }
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  clearTimeout(el._flash);
+  el._flash = setTimeout(function(){ el.classList.remove("flash"); }, 1500);
+}
+
+/* ---------------------------------------------------------- the menu */
+var cmenuState = null;
+function cmenuOpen(rect, items, opts){
+  cmenuClose();
+  opts = opts || {};
+  var menu = $("cmenu");
+  menu.innerHTML = "";
+  items.forEach(function(it){
+    var b = document.createElement("button");
+    b.type = "button"; b.setAttribute("role", "menuitem");
+    if (it.danger) b.className = "danger";
+    b.innerHTML = it.icon || "";
+    var sp = document.createElement("span"); sp.textContent = it.label;
+    b.appendChild(sp);
+    /* Choosing from the menu must not close the keyboard under it. */
+    b.addEventListener("mousedown", function(e){ e.preventDefault(); });
+    b.onclick = function(){ cmenuClose(); it.run(); };
+    menu.appendChild(b);
+  });
+  menu.hidden = false;
+  var vv = window.visualViewport;
+  var top0 = vv ? vv.offsetTop : 0, vh = vv ? vv.height : window.innerHeight;
+  var vw = window.innerWidth, mw = menu.offsetWidth, mh = menu.offsetHeight;
+  var x = opts.x != null ? opts.x : (opts.right ? rect.right - mw : rect.left);
+  var y = opts.y != null ? opts.y : rect.bottom + 6;
+  if (y + mh > top0 + vh - 8) y = (opts.y != null ? opts.y : rect.top - 6) - mh;
+  menu.style.left = Math.max(8, Math.min(x, vw - mw - 8)) + "px";
+  menu.style.top = Math.max(top0 + 8, Math.min(y, top0 + vh - mh - 8)) + "px";
+  function down(e){
+    if (menu.contains(e.target)) return;
+    /* A tap on the button that opened it just closes it. */
+    if (opts.anchor && opts.anchor.contains(e.target)) cmenuState.skipClick = Date.now();
+    cmenuClose();
+  }
+  function key(e){
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cmenuClose(true); return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      var bs = Array.prototype.slice.call(menu.querySelectorAll("button"));
+      var at = bs.indexOf(document.activeElement);
+      var nx = e.key === "ArrowDown" ? (at + 1) % bs.length : (at - 1 + bs.length) % bs.length;
+      if (bs[nx]) { e.preventDefault(); bs[nx].focus(); }
+    }
+  }
+  document.addEventListener("pointerdown", down, true);
+  document.addEventListener("keydown", key, true);
+  cmenuState = { onClose: opts.onClose, anchor: opts.anchor, skipClick: 0,
+                 off: function(){ document.removeEventListener("pointerdown", down, true);
+                                  document.removeEventListener("keydown", key, true); } };
+  if (opts.focus) { var f = menu.querySelector("button"); if (f) f.focus(); }
+}
+function cmenuClose(refocus){
+  var s = cmenuState;
+  if (!s) return;
+  cmenuState = null;
+  s.off();
+  var menu = $("cmenu");
+  menu.hidden = true; menu.innerHTML = "";
+  if (s.onClose) s.onClose();
+  if (refocus && s.anchor && s.anchor.focus) { try { s.anchor.focus(); } catch (e) {} }
+  cmenuLast = s;
+}
+var cmenuLast = null;
+
+function chatMsgMenu(el, opts){
+  var pid = chatOpenId, cid = el && el.getAttribute("data-c");
+  var m = pid && cid ? chatFind(pid, cid) : null;
+  if (!m) return;
+  opts = opts || {};
+  var items = [
+    { label: "Reply", icon: ICO_REPLY, run: function(){ chatReplyStart(pid, cid); } },
+    { label: "Copy", icon: ICO_COPY, run: function(){ copy(m.t, "Copied"); } }
+  ];
+  if (m.d === "out" && m.st === "failed" && !m.why)
+    items.push({ label: "Send again", icon: ICO_RETRY, run: function(){ chatRetryOne(pid, cid); } });
+  el.classList.add("sel");
+  cmenuOpen(el.getBoundingClientRect(), items, {
+    right: m.d === "out", x: opts.x, y: opts.y, focus: opts.focus,
+    onClose: function(){ el.classList.remove("sel"); }
+  });
+}
+function chatRetryOne(pid, cid){
+  var m = chatFind(pid, cid);
+  if (!m || m.st !== "failed" || m.why) return;
+  m.st = "sending"; chatChanged(pid); chatDeliver(pid, m);
+}
+
+/* ----------------------------------------------------------- Clear chat
+ *
+ * Empties one conversation on this phone, as in other messaging apps:
+ * the other person keeps theirs, and so do your other phones. Calls and
+ * buzzes stay in Recent. Nothing is sent anywhere. */
+function chatClearAsk(pid){
+  if (!pid) return;
+  var n = nameOf(pid);
+  $("clrTitle").textContent = "Clear chat with " + n + "?";
+  $("clrSub").textContent = "All messages, calls and buzzes in this chat are removed from this phone. " +
+    n + " keeps their copy, and your call history stays in Recent.";
+  $("clrGo").onclick = function(){
+    closeSheet("clrSheet");
+    chatClear(pid);
+    toast("Chat cleared");
+  };
+  openSheet("clrSheet");
+}
+function chatClear(pid){
+  var s = chatStore(), list = s.by[pid] || [], now = Date.now();
+  var g = s.gone[pid] || (s.gone[pid] = {});
+  list.forEach(function(m){
+    /* Only a recent message could ever be sent again by the server. */
+    if (now - m.at < CHAT_GONE_MS + 86400000) g[m.c] = now;
+  });
+  s.by[pid] = [];
+  s.clr[pid] = now;
+  if (chatReply && chatReply.pid === pid) chatReplyCancel();
+  if (chatOpenId === pid) chatFrom = null;
+  chatFlush();                          /* at once, not in a moment */
+  swPost({ t: "readchat", from: pid });
+  chatChanged(pid, true);
+}
+
 (function(){
   var send = function(){
     var i = $("chatInput");
@@ -6651,12 +7132,14 @@ if (window.visualViewport) {
   /* Keeps the keyboard up: the button must not take the focus. */
   ["pointerdown", "mousedown"].forEach(function(ev){
     $("chatSend").addEventListener(ev, function(e){ e.preventDefault(); });
+    $("chatReplyX").addEventListener(ev, function(e){ e.preventDefault(); });
   });
   $("chatInput").addEventListener("input", chatGrow);
   $("chatInput").addEventListener("keydown", function(e){
     /* Enter sends on a computer; on a phone it is a new line, and the
        button sends - as in other messaging apps. */
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !isPhone()) { e.preventDefault(); send(); }
+    if (e.key === "Escape" && chatReply) { e.preventDefault(); chatReplyCancel(); }
   });
   $("chatBack").onclick = function(){ closeChat(false); };
   $("chatCall").onclick = function(){ if (chatOpenId) chatCall(chatOpenId); };
@@ -6664,6 +7147,127 @@ if (window.visualViewport) {
     if (!chatOpenId) return;
     pendingId = chatOpenId; unlockAudio(); openMsgSheet();
   };
+  $("chatReplyX").onclick = chatReplyCancel;
+  $("chatReplyQ").onclick = function(){ if (chatReply) chatJump(chatReply.re.c); };
+  var more = $("chatMore");
+  more.onclick = function(e){
+    if (!chatOpenId) return;
+    if (cmenuLast && cmenuLast.anchor === more && Date.now() - cmenuLast.skipClick < 600) return;
+    var pid = chatOpenId;
+    cmenuOpen(more.getBoundingClientRect(), [
+      { label: "Clear chat", icon: ICO_CLEAR, danger: true, run: function(){ chatClearAsk(pid); } }
+    ], { right: true, anchor: more, focus: e.detail === 0 });
+  };
+
+  /* ---- Gestures on the messages, handled once for the whole list. ----
+     Swipe right: reply. Long-press (or right-click): the message menu.
+     Vertical movement is left to the page, so scrolling stays smooth. */
+  var body = $("chatBody"), g = null, SWIPE = 58, suppress = 0;
+  function bubOf(t){ return t && t.closest ? t.closest(".bub[data-c]") : null; }
+  function buzzLite(){ try { if (navigator.vibrate) navigator.vibrate(8); } catch (e) {} }
+  function place(x){
+    if (g !== x) return;
+    x.el.style.transform = x.dx ? "translateX(" + x.dx.toFixed(1) + "px)" : "";
+    x.el.style.setProperty("--sw", Math.min(1, x.dx / SWIPE).toFixed(3));
+  }
+  function end(fire){
+    var x = g;
+    if (!x) return;
+    g = null;
+    clearTimeout(x.lp);
+    /* The long-press opened the menu: the lift that follows is not a tap. */
+    if (x.menu) { suppress = Date.now(); return; }
+    if (!x.sw) return;
+    var el = x.el;
+    el.classList.remove("swiping", "armed");
+    el.classList.add("snap");
+    el.style.transform = "";
+    el.style.setProperty("--sw", "0");
+    setTimeout(function(){ el.classList.remove("snap"); el.style.removeProperty("--sw"); }, 220);
+    if (fire && x.dx >= SWIPE) { suppress = Date.now(); chatReplyStart(chatOpenId, el.getAttribute("data-c")); }
+  }
+  body.addEventListener("pointerdown", function(e){
+    if (g || e.pointerType === "mouse" || e.isPrimary === false) return;
+    var el = bubOf(e.target);
+    if (!el) return;
+    var x = g = { id: e.pointerId, el: el, x0: e.clientX, y0: e.clientY, dx: 0, sw: false, lp: 0, pend: false };
+    x.lp = setTimeout(function(){
+      if (g !== x || x.sw || cmenuState) return;
+      x.menu = true;
+      suppress = Date.now();
+      buzzLite();
+      chatMsgMenu(el);
+    }, 450);
+  }, { passive: true });
+  body.addEventListener("pointermove", function(e){
+    var x = g;
+    if (!x || e.pointerId !== x.id || x.menu) return;
+    var dx = e.clientX - x.x0, dy = e.clientY - x.y0;
+    if (!x.sw) {
+      if (Math.abs(dy) > 10 || dx < -10) { end(false); return; }   /* scrolling - not ours */
+      if (Math.abs(dx) > 8) clearTimeout(x.lp);
+      if (dx > 14 && dx > Math.abs(dy) * 1.6) {
+        x.sw = true; x.x0 += 14;
+        x.el.classList.add("swiping");
+        cmenuClose();
+      } else return;
+    }
+    var d = Math.max(0, e.clientX - x.x0);
+    if (d > SWIPE) d = SWIPE + (d - SWIPE) * 0.3;               /* a little resistance */
+    d = Math.min(d, SWIPE + 26);
+    var was = x.dx >= SWIPE;
+    x.dx = d;
+    if (!was && d >= SWIPE) { x.el.classList.add("armed"); buzzLite(); }
+    else if (was && d < SWIPE) x.el.classList.remove("armed");
+    if (!x.pend) { x.pend = true; chatRaf(function(){ x.pend = false; place(x); }); }
+  }, { passive: true });
+  body.addEventListener("pointerup", function(e){ if (g && e.pointerId === g.id) end(true); });
+  body.addEventListener("pointercancel", function(e){ if (g && e.pointerId === g.id) end(false); });
+  body.addEventListener("contextmenu", function(e){
+    var el = bubOf(e.target);
+    if (!el) return;
+    /* Text you selected on a computer keeps the browser's own menu. */
+    var sel = window.getSelection ? String(window.getSelection()) : "";
+    if (sel && chatFine) return;
+    e.preventDefault();
+    if (cmenuState) return;               /* the long-press already opened it */
+    /* A long-press on a touch screen: the lift that follows is not a tap.
+       (A right-click is never followed by one.) */
+    if (g) { clearTimeout(g.lp); g.menu = true; suppress = Date.now(); }
+    chatMsgMenu(el, e.pointerType === "touch" || !chatFine ? null : { x: e.clientX, y: e.clientY });
+  });
+  /* A button beside a bubble must not take the typing box's focus. */
+  body.addEventListener("mousedown", function(e){
+    if (e.target.closest && e.target.closest(".brep")) e.preventDefault();
+  });
+  body.addEventListener("click", function(e){
+    if (Date.now() - suppress < 700) { suppress = 0; return; }
+    var t = e.target;
+    if (!t.closest) return;
+    var q = t.closest(".bq");
+    if (q) { chatJump(q.getAttribute("data-q")); return; }
+    var rb = t.closest(".brep");
+    var el = bubOf(t);
+    if (rb && el) { chatReplyStart(chatOpenId, el.getAttribute("data-c")); return; }
+    if (el && el.classList.contains("failed")) chatRetryOne(chatOpenId, el.getAttribute("data-c"));
+  });
+  /* Back at the top of what is drawn: the next older ones come in. The
+     scroll is only looked at, never held up. */
+  var topBusy = false, downBusy = false;
+  $("chatDown").addEventListener("mousedown", function(e){ e.preventDefault(); });
+  $("chatDown").onclick = function(){
+    chatDownNew = false;
+    chatPaint(true);                      /* also goes back to drawing only the latest */
+  };
+  body.addEventListener("scroll", function(){
+    if (cmenuState && !cmenuState.anchor) cmenuClose();
+    if (!downBusy) { downBusy = true; chatRaf(function(){ downBusy = false; chatDownPaint(body); }); }
+    if (topBusy || body.scrollTop > 60) return;
+    var f = body.firstChild;
+    if (!f || !f.classList || !f.classList.contains("cmore")) return;
+    topBusy = true;
+    chatRaf(function(){ topBusy = false; if (body.scrollTop <= 60 && chatOpenId) chatEarlier(); });
+  }, { passive: true });
 })();
 
 /* ------------------------------------------------------------ sheets */
