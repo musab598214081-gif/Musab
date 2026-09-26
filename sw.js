@@ -5,7 +5,10 @@
  * opens the app when the notification is tapped.
  *
  * What it does:
- *   - shows calls, group calls, buzzes and missed calls;
+ *   - shows calls, group calls, buzzes, messages and missed calls - each
+ *     with its own feel: a call rings on and on, a buzz taps twice, a
+ *     message gives one short tick and stacks up per sender;
+ *   - keeps the app icon's badge (missed calls + unread messages);
  *   - keeps a call ringing: the server re-sends a ringing call every few
  *     seconds with the same tag, and each one replaces the last and
  *     rings again, until it is answered, declined or rings out;
@@ -17,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-10-13a";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-10-20a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var CALL_KINDS = { call: 1, group: 1 };
@@ -53,6 +56,27 @@ function isSilenced(tag) {
   if (silenced[tag]) return Promise.resolve(true);
   return savedSilenced().then(function (o) { if (o[tag]) silenced[tag] = 1; return !!o[tag]; });
 }
+/* The number on the app's icon: missed calls plus unread messages. The
+   open app sets the true figure (t:"badge"); while it is closed each
+   message or missed call adds one. */
+function badgeGet() {
+  return caches.open(STATE).then(function (c) { return c.match("badge"); })
+    .then(function (r) { return r ? r.json() : 0; }).catch(function () { return 0; });
+}
+function badgeSet(n) {
+  n = Math.max(0, Number(n) || 0);
+  try {
+    if (self.navigator.setAppBadge) {
+      if (n) self.navigator.setAppBadge(n).catch(function () {});
+      else if (self.navigator.clearAppBadge) self.navigator.clearAppBadge().catch(function () {});
+    }
+  } catch (x) {}
+  return caches.open(STATE).then(function (c) {
+    return c.put("badge", new Response(JSON.stringify(n)));
+  }).catch(function () {});
+}
+function badgeAdd() { return badgeGet().then(function (n) { return badgeSet(n + 1); }); }
+
 /* Every notification belonging to one call, whichever of its two labels
    it carries (see showRing). */
 function closeCall(tag) {
@@ -163,6 +187,7 @@ function handlePush(d) {
     var front = list.some(function (c) { return c.visibilityState === "visible" && c.focused; });
 
     if (kind === "cancel") return cancel(tag, d, front);
+    if (kind === "msg") return showMessage(d, front);
 
     /* A call that arrives long after it was sent (the phone was offline)
        is not ringing any more. "Long after" by the SERVER's clock: the
@@ -194,7 +219,29 @@ function handlePush(d) {
       }
       return showRing(d, kind, tag);
     }
+    if (kind === "missed") badgeAdd();
     return self.registration.showNotification(d.title || "Family Notifier", options(d, kind, false));
+  });
+}
+
+/* A chat message. One notification per sender: a second message from
+   the same person replaces the first and says how many are waiting,
+   instead of a pile of separate buzzes. One short tick - never the
+   long pattern a call uses. With the app on screen nothing is shown:
+   the app shows the message itself. */
+function showMessage(d, front) {
+  if (front && !IS_APPLE) return Promise.resolve();
+  var tag = d.tag || ("m-" + (d.from || ""));
+  return self.registration.getNotifications({ tag: tag }).then(function (ns) {
+    var prev = ns && ns[0] && ns[0].data ? ns[0].data : null;
+    var n = (prev && prev.n ? prev.n : 0) + 1;
+    var lines = (prev && prev.lines ? prev.lines : []).concat([String(d.body || "")]).slice(-4);
+    var o = options(Object.assign({}, d, { tag: tag }), "msg", false);
+    o.data.n = n; o.data.lines = lines;
+    o.body = n > 1 ? lines.join("\n") + "\n(" + n + " new messages)" : String(d.body || "");
+    return badgeAdd().then(function () {
+      return self.registration.showNotification(d.title || "New message", o);
+    });
   });
 }
 
@@ -244,8 +291,13 @@ function options(d, kind, quiet) {
   } else if (kind === "missed") {
     o.vibrate = [200, 120, 200];
     if (d.cb) o.actions = [{ action: "callback", title: "Call back" }];
+  } else if (kind === "msg") {
+    /* A message: one short tick. */
+    o.vibrate = [90];
+    o.data.from = d.from || null;
   } else {
-    o.vibrate = [400, 200, 400, 200, 400];
+    /* A buzz: two quick taps - "look at me", clearly not a call. */
+    o.vibrate = [220, 110, 220];
   }
   return o;
 }
@@ -305,6 +357,8 @@ self.addEventListener("notificationclick", function (e) {
   else if (e.action === "answer" && d.answer) url = d.answer;
   else if ((e.action === "callback" || d.kind === "missed") && d.cb)
     url = url + (url.indexOf("#") === -1 ? "#" : "&") + "cb=" + encodeURIComponent(d.cb);
+  else if (d.kind === "msg" && d.from)
+    url = url + (url.indexOf("#") === -1 ? "#" : "&") + "chat=" + encodeURIComponent(d.from);
 
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true })
     .then(function (list) {
@@ -348,6 +402,13 @@ self.addEventListener("message", function (e) {
     e.waitUntil(caches.delete(CFG));
   } else if (m.t === "audible" && m.tag) {
     if (m.on) audible[m.tag] = 1; else delete audible[m.tag];
+  } else if (m.t === "badge") {
+    e.waitUntil(badgeSet(m.n));
+  } else if (m.t === "readchat" && m.from) {
+    /* The conversation was opened: its notification has done its job. */
+    e.waitUntil(self.registration.getNotifications({ tag: "m-" + m.from }).then(function (ns) {
+      ns.forEach(function (n) { n.close(); });
+    }).catch(function () {}));
   } else if (m.t === "version" && e.source) {
     e.source.postMessage({ t: "version", v: SW_VERSION });
   }

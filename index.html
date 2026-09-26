@@ -620,6 +620,75 @@
   .status{display:flex;align-items:center;font-size:13px;color:var(--mist);margin:6px 2px 0}
   .status .led{width:8px;height:8px;border-radius:50%;background:var(--mist);margin-right:8px}
   .status.live .led{background:var(--go);box-shadow:0 0 0 3px rgba(47,191,113,.2)}
+
+  /* ---- A conversation ---- */
+  #chat{position:fixed;left:0;right:0;top:0;height:100%;z-index:35;display:none;flex-direction:column;
+    background:var(--night)}
+  #chat.on{display:flex}
+  #chat .chead{display:flex;align-items:center;gap:8px;flex:0 0 auto;
+    padding:calc(8px + env(safe-area-inset-top,0px)) 12px 8px 6px;
+    background:var(--hearth);border-bottom:1px solid var(--seam)}
+  #chat .chead .qa{width:42px;height:42px}
+  #chat .chead .qa svg{width:20px;height:20px}
+  .cav{width:38px;height:38px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;
+    justify-content:center;font-weight:700;font-size:14px;color:#0F1B2A}
+  .cwho{flex:1;min-width:0;display:flex;flex-direction:column}
+  .cwho b{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cwho small{font-size:12px;color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cwho small.on{color:var(--go)} .cwho small.away{color:var(--amber)}
+  .cbody{flex:1 1 auto;overflow-y:auto;padding:10px 12px 12px;-webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;display:flex;flex-direction:column;gap:4px}
+  .cbody > *{max-width:640px;width:100%;margin-left:auto;margin-right:auto}
+  .cempty{color:var(--mist);text-align:center;font-size:14px;margin:30px 20px}
+  .cmore{align-self:center;width:auto}
+  .cday{text-align:center;margin:12px auto 6px}
+  .cday span{font-size:12px;color:var(--mist);background:var(--hearth);padding:4px 10px;border-radius:10px}
+  .bub{position:relative;max-width:80% !important;width:auto !important;padding:7px 10px 6px;
+    border-radius:16px;font-size:15.5px;line-height:1.38;margin:1px 0}
+  .bub.in{background:var(--hearth);margin-left:0 !important;margin-right:auto !important;border-bottom-left-radius:6px}
+  .bub.out{background:#1F4C74;margin-left:auto !important;margin-right:0 !important;border-bottom-right-radius:6px}
+  @media (min-width:700px){ .bub.in{margin-left:max(0px,calc((100% - 640px)/2)) !important}
+                            .bub.out{margin-right:max(0px,calc((100% - 640px)/2)) !important} }
+  .bub .bt{white-space:pre-wrap;overflow-wrap:anywhere}
+  .bub .bm{float:right;display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#9FB6CC;
+    margin:6px 0 -2px 10px;position:relative;top:3px}
+  .bub .tk{display:inline-flex}
+  .bub .tk.read{color:#53BDEB}
+  .bub.failed{background:#4A2328;cursor:pointer}
+  .bub .bwhy{display:block;clear:both;font-size:12px;color:#FFB3B6;margin-top:4px}
+  .bub .tk.failed{color:#FF8589;font-weight:700}
+  .cev{align-self:center;display:flex;align-items:center;gap:7px;width:auto !important;
+    font-size:13px;color:var(--mist);background:rgba(255,255,255,.04);border-radius:12px;
+    padding:6px 12px;margin:4px auto}
+  .cev .ic{display:flex} .cev .ic svg{width:15px;height:15px}
+  .cev.missed{color:#FF8589}
+  .cbk{border:0;background:var(--go);color:#062414;border-radius:10px;padding:4px 10px;
+    font:inherit;font-size:12px;font-weight:600;cursor:pointer;margin-left:4px}
+  .cquick{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;padding:6px 12px 0;scrollbar-width:none}
+  .cquick::-webkit-scrollbar{display:none}
+  .chip2{flex:0 0 auto;border:1px solid var(--seam);background:transparent;color:var(--paper);
+    border-radius:16px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+  .chip2:active{background:var(--hearth)}
+  .cfoot{flex:0 0 auto;display:flex;align-items:flex-end;gap:8px;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))}
+  #chatInput{flex:1;resize:none;border:1px solid var(--seam);background:var(--hearth);color:var(--paper);
+    border-radius:20px;padding:10px 14px;font:inherit;font-size:16px;line-height:1.35;max-height:132px;
+    min-height:42px}
+  #chatInput:focus{outline:2px solid var(--brass);outline-offset:-1px}
+  #chatSend{width:44px;height:44px;border-radius:50%;border:0;background:var(--brass);color:var(--brass-ink);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+  #chatSend svg{width:21px;height:21px}
+  #chatSend:active{transform:scale(.94)}
+  .badge.msg{background:var(--brass);color:var(--brass-ink)}
+  .person .sub.unread{color:var(--paper);font-weight:500}
+  #chatBanner{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));
+    transform:translate(-50%,-160%);transition:transform .25s ease;z-index:90;
+    width:min(92%,480px);background:#22364D;border-radius:16px;padding:10px 12px;
+    display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:pointer}
+  #chatBanner.on{transform:translate(-50%,0)}
+  #chatBanner .btx{min-width:0;display:flex;flex-direction:column;font-size:14px}
+  #chatBanner .btx span{color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media (prefers-reduced-motion:reduce){ #chatBanner{transition:none} }
 </style>
 </head>
 <body>
@@ -849,6 +918,11 @@
     <button class="btn ghost" id="fsPushTest">Send a test notification</button>
     </div>
 
+    <div id="silentBlock" data-pages="calls">
+    <div class="sectiontitle">When your phone is on silent</div>
+    <p class="sub" id="silentHow"></p>
+    </div>
+
     <div id="micBlock" data-pages="calls">
     <div class="sectiontitle">Microphone</div>
     <p class="sub" id="micState">—</p>
@@ -967,6 +1041,33 @@
   </div>
 </div>
 
+<!-- One conversation with one person: messages, calls and buzzes. -->
+<div id="chat" aria-hidden="true" role="dialog" aria-label="Conversation">
+  <div class="chead">
+    <button class="iconbtn" id="chatBack" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <span class="cav" id="chatAv">?</span>
+    <div class="cwho"><b id="chatName">—</b><small id="chatSub"></small></div>
+    <button class="qa buzz" id="chatBuzz" aria-label="Buzz">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16h12c-1.1-1.2-1.7-2.8-1.7-4.9V9.5a4.3 4.3 0 0 0-8.6 0v1.6C7.7 13.2 7.1 14.8 6 16Z"/><path d="M10.2 19a2 2 0 0 0 3.6 0"/></svg>
+    </button>
+    <button class="qa ring" id="chatCall" aria-label="Call">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1Z"/></svg>
+    </button>
+  </div>
+  <div class="cbody" id="chatBody" aria-live="polite"></div>
+  <div class="cquick" id="chatQuick"></div>
+  <div class="cfoot">
+    <textarea id="chatInput" rows="1" maxlength="4000" placeholder="Message" aria-label="Message"
+              autocomplete="off" enterkeyhint="send"></textarea>
+    <button id="chatSend" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6l-.02 6.53L15 12 3.38 13.87z"/></svg>
+    </button>
+  </div>
+</div>
+<div id="chatBanner" role="status"></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -989,16 +1090,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.3.3";
+var APP_VERSION = "1.4.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Fixes from a full check of the app";
+var WHATS_NEW   = "Chat with each person, a real Phone/Speaker switch, and calls that connect faster";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-13a";
+var VERSION  = "2026-10-20a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1170,7 +1271,22 @@ function load(){
   return a;
 }
 
+/* Saving, batched. Every call, buzz and message used to write the whole
+   family state three times over (localStorage, IndexedDB, a cookie) the
+   moment it happened - several times a second at the start of a call,
+   on the main thread. Now changes within a quarter of a second go out
+   as one write, and anything pending is written at once when the page
+   is hidden or closed, so nothing is lost. */
+var saveTimer = null;
 function save(){
+  if (saveTimer) return;
+  saveTimer = setTimeout(saveNow, 250);
+}
+function saveFlush(){ if (saveTimer) saveNow(); }
+window.addEventListener("pagehide", saveFlush);
+document.addEventListener("visibilitychange", function(){ if (document.hidden) saveFlush(); });
+function saveNow(){
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   var okLocal = false;
   try {
     localStorage.setItem(STOREKEY, JSON.stringify(state));
@@ -1193,9 +1309,25 @@ function save(){
 }
 
 function wipeStorage(){
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   try { localStorage.removeItem(STOREKEY); } catch (e) {}
   cookieWrite(null);
   idbPut(null);
+  CHAT = null;
+}
+/* Conversations: erased only by "no undo" - an undoable removal keeps
+   them, so undoing brings them back too. */
+function chatWipe(){
+  try {
+    if (typeof chatTimer !== "undefined" && chatTimer) { clearTimeout(chatTimer); chatTimer = null; }
+    if (CHAT && CHAT._k) idbPut(null, CHAT._k);
+    CHAT = null;
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("familyNotifyer.chat.") === 0) localStorage.removeItem(k);
+    }
+  } catch (e) {}
+  CHAT = null;
 }
 
 /* The copy in IndexedDB can only be read asynchronously, so it is
@@ -1431,6 +1563,21 @@ function fsSetSince(t){
   if (!t || t <= fsSince()) return;
   try { localStorage.setItem(fsSinceKey(), String(t)); } catch (e) {}
 }
+/* "Are you still there?" - a ping, and a fresh connection if nothing at
+   all comes back within `ms`. Used on a timer, and straight away when the
+   phone switches network or wakes up. */
+/* Judged by the answer to the ping itself: a connection can still be
+   receiving while what this phone sends goes nowhere. */
+var lastPongAt = 0;
+function fsProbe(ms){
+  var ws = fsWs;
+  if (!ws || !fsOpen) { if (useFS() && !fsTimer) { fsRetry = 1000; fsConnect(); } return; }
+  var sentAt = Date.now();
+  try { ws.send("ping"); } catch (e) {}
+  setTimeout(function(){
+    if (ws === fsWs && lastPongAt < sentAt) { fsClose(); fsRetry = 1000; fsConnect(); paintStatus(false); }
+  }, ms || 8000);
+}
 function fsClose(){
   if (fsTimer) { clearTimeout(fsTimer); fsTimer = null; }
   if (fsPingTimer) { clearInterval(fsPingTimer); fsPingTimer = null; }
@@ -1461,16 +1608,17 @@ function fsConnect(){
     swConfig();
     lookEdge();
     setTimeout(coRequest, 1500);
-    fsPingTimer = setInterval(function(){
-      try { ws.send("ping"); } catch (e) {}
-      /* No answer for a long while: the connection died without saying. */
-      if (Date.now() - lastBeatAt > 75000 && ws === fsWs) { fsClose(); fsSchedule(); paintStatus(false); }
-    }, 30000);
+    /* Every 20 seconds a ping, and the answer expected within 10. A
+       connection that died without saying so - the phone changed network,
+       a mobile operator dropped it - used to go unnoticed for up to 75
+       seconds, and any call placed in that time never arrived. */
+    fsPingTimer = setInterval(function(){ fsProbe(10000); }, 20000);
+    chatRetry();
   };
   ws.onmessage = function(ev){
     if (ws !== fsWs) return;
     beat();
-    if (ev.data === "pong") return;
+    if (ev.data === "pong") { lastPongAt = Date.now(); return; }
     var f; try { f = JSON.parse(ev.data); } catch (e) { return; }
     fsFrame(f);
   };
@@ -1489,6 +1637,9 @@ function fsConnect(){
    is not; a family update or an admin request is. */
 var FS_LASTING = ["roster", "addreq", "usage", "hello", "rename", "joinno", "rot"];
 function fsFrame(f){
+  /* Chat messages and their ticks (see the Chat section). */
+  if (f.k === "chat") { fsSetSince(f.time); chatTake(f); return; }
+  if (f.k === "rcpt") { fsSetSince(f.time); rcptTake(f); return; }
   if (f.k === "msg") {
     /* Co-admin key messages: handled with the sender the server checked
        (f.from), never with a name written inside the message. */
@@ -1556,17 +1707,38 @@ function fsTakePres(p){
 /* A request that expects an answer. Over the live connection when it is
    up (cheapest and fastest), otherwise one plain HTTP request - which is
    also what a page that is closing uses, since it can still finish. */
+/* Requests that do no harm if they arrive twice: a call's messages are
+   matched by call id, a chat message by its own id, a ring replaces
+   itself. Only these are re-sent over HTTP when the live connection does
+   not answer in time. */
+var FS_RESEND = { send: 1, ring: 1, chat: 1, rcpt: 1, ringstop: 1, ringing: 1, sub: 1 };
 function fsRequest(frame, timeout, keepalive, viaHttp){
   if (fsOpen && fsWs && !keepalive && !viaHttp) {
+    var resend = !!FS_RESEND[frame.k];
     return new Promise(function(resolve){
       var q = "q" + (++fsSeq);
       frame.q = q;
+      /* The live connection gets a few seconds. If it is silent that
+         long it has probably died without saying so: the same request
+         goes by plain HTTP instead of failing, and the connection is
+         checked. A call on a flaky network no longer loses its offer or
+         answer to a connection that only looked open. */
+      var wait = resend ? Math.min(timeout || 10000, 4500) : (timeout || 10000);
       var t = setTimeout(function(){
-        if (fsReqs[q]) { delete fsReqs[q]; resolve({ ok: false, status: 0 }); }
-      }, timeout || 10000);
+        if (!fsReqs[q]) return;
+        delete fsReqs[q];
+        if (!resend) { resolve({ ok: false, status: 0 }); return; }
+        fsProbe(3000);
+        delete frame.q;
+        fsRequest(frame, timeout, false, true).then(resolve);
+      }, wait);
       fsReqs[q] = function(res){ clearTimeout(t); resolve(res); };
       try { fsWs.send(JSON.stringify(frame)); }
-      catch (e) { delete fsReqs[q]; clearTimeout(t); resolve({ ok: false, status: 0 }); }
+      catch (e) {
+        delete fsReqs[q]; clearTimeout(t);
+        if (resend) { delete frame.q; fsRequest(frame, timeout, false, true).then(resolve); }
+        else resolve({ ok: false, status: 0 });
+      }
     });
   }
   var body = {}; for (var k in frame) body[k] = frame[k];
@@ -2754,6 +2926,9 @@ function paintCallButtons(incoming){
       t.enabled = !t.enabled; off = !t.enabled;
     });
     call.muted = off;
+    /* Said to the other phone, so its silence check knows this is a
+       choice and not a broken microphone - and it can show it. */
+    sendSig(call.peer, { t: "mute", call: call.id, from: state.me, on: off }).catch(function(){});
     mute.button.classList.toggle("on", off);
     mute.button.innerHTML = off ? ICON.micoff : ICON.mic;
     mute.label.textContent = off ? "Unmute" : "Mute";
@@ -2775,57 +2950,148 @@ function paintCallButtons(incoming){
   add("hang", ICON.end, "End", function(){ hangUp("ended"); });
 }
 
-/* Speaker.
+/* Phone and Speaker.
  *
- * A web page cannot flip a phone between its earpiece and its
- * loudspeaker the way the phone app can - that switch belongs to the
- * phone. What a page CAN do is pick an audio output where the browser
- * offers a choice (laptops, some Android phones), and play the voice
- * louder. So Speaker does both: it moves the sound to a loudspeaker if
- * one is offered, and lifts the volume either way. */
-var speakerOn = false, boost = null;
+ * What a web page can and cannot do here. A browser on an iPhone or an
+ * Android phone decides by itself where a call's sound comes out - with
+ * the microphone open, both play it from the loudspeaker, and neither
+ * lets a page move it to the earpiece. That is why the old Speaker
+ * button seemed to do nothing: it could only nudge the volume up a
+ * little, from a speaker that was already on.
+ *
+ * So the two modes are now made clearly different in the one way a page
+ * can control - loudness - and routed for real wherever the browser does
+ * offer a choice (laptops, some Android phones, which list "earpiece" and
+ * "speaker" as outputs):
+ *
+ *   Phone    quiet enough to hold to your ear, like a handset
+ *   Speaker  much louder, through a limiter so it does not distort
+ *
+ * With headphones or a Bluetooth headset connected both play normally:
+ * the sound is in your ears either way.
+ *
+ * Safety first: the loudness is set in the page's audio engine, and a
+ * phone can pause that engine (a notification sound, the screen
+ * locking). Whenever it is not running, the call's own <audio> element
+ * plays instead - so changing the volume can never become silence. */
+var speakerOn = false;
+var OUT_EAR = 0.55, OUT_LOUD = 2.6;
+var outChains = [];            /* { el, stream, src, gain, comp } */
+var outInfo = { headset: false, how: "" };
+var volumeWorks = (function(){
+  try { var a = document.createElement("audio"); a.volume = 0.5; return Math.abs(a.volume - 0.5) < 0.02; }
+  catch (e) { return false; }
+})();
+function isPhone(){ return isIOS() || isAndroid(); }
+
+/* What this device offers: a named earpiece or loudspeaker output, and
+   whether a headset is plugged in. Labels only exist once the
+   microphone has been allowed - which it always has, during a call. */
+function outDevices(){
+  var none = { ear: null, loud: null, headset: false };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return Promise.resolve(none);
+  return navigator.mediaDevices.enumerateDevices().then(function(list){
+    var outs = list.filter(function(d){ return d.kind === "audiooutput"; });
+    var HS = /bluetooth|headset|headphone|airpods|earbuds|buds|hands-?free|wired|usb|beats/i;
+    return {
+      loud: outs.filter(function(d){ return /speaker|loud/i.test(d.label) && !/ear|receiver|handset/i.test(d.label) && !HS.test(d.label); })[0] || null,
+      ear: outs.filter(function(d){ return /earpiece|receiver|handset/i.test(d.label); })[0] || null,
+      headset: list.some(function(d){ return (d.kind === "audioinput" || d.kind === "audiooutput") && HS.test(d.label); })
+    };
+  }).catch(function(){ return none; });
+}
+
+function outChainOf(el){ return outChains.filter(function(c){ return c.el === el; })[0] || null; }
+function outChainOff(el){
+  var c = outChainOf(el);
+  if (c) {
+    try { c.src.disconnect(); c.gain.disconnect(); c.comp.disconnect(); } catch (e) {}
+    outChains = outChains.filter(function(x){ return x !== c; });
+  }
+  if (el) el.muted = false;
+}
+function outChainOn(el, level){
+  try {
+    unlockAudio();
+    if (!audioCtx || !el || !el.srcObject || !audioCtx.createMediaStreamSource) return false;
+    var c = outChainOf(el);
+    if (c && c.stream !== el.srcObject) { outChainOff(el); c = null; }
+    if (!c) {
+      var src = audioCtx.createMediaStreamSource(el.srcObject);
+      var gain = audioCtx.createGain();
+      var comp = audioCtx.createDynamicsCompressor();
+      /* A limiter: loud without the crackle of a voice pushed past full. */
+      comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 8;
+      comp.attack.value = 0.003; comp.release.value = 0.2;
+      src.connect(gain); gain.connect(comp); comp.connect(audioCtx.destination);
+      c = { el: el, stream: el.srcObject, src: src, gain: gain, comp: comp };
+      outChains.push(c);
+    }
+    c.gain.gain.setTargetAtTime(level, audioCtx.currentTime, 0.04);
+    el.volume = 1;              /* if the element ever has to take over */
+    outGuard();
+    return true;
+  } catch (e) { outChainOff(el); return false; }
+}
+/* The element stays playing (some browsers only pass a call's sound on
+   while it is attached to one) and is muted only while the audio engine
+   is really running - see the note above. */
+function outGuard(){
+  var running = !!(audioCtx && audioCtx.state === "running");
+  outChains.forEach(function(c){
+    if (!c.el.srcObject) return;
+    c.el.muted = running;
+    if (!running) { try { audioCtx.resume(); } catch (e) {} }
+  });
+}
+
+/* Puts one element's sound where the mode says. */
+function outRoute(el, loud){
+  if (!el) return Promise.resolve("");
+  return outDevices().then(function(d){
+    outInfo.headset = d.headset;
+    var target = loud ? d.loud : d.ear;
+    if (d.headset) {
+      outChainOff(el); el.volume = 1;
+      return outInfo.how = "headset";
+    }
+    if (el.setSinkId && target) {
+      el.setSinkId(target.deviceId).catch(function(){});
+      outChainOff(el); el.volume = 1;
+      return outInfo.how = "device";
+    }
+    if (loud) {
+      if (outChainOn(el, OUT_LOUD)) return outInfo.how = "louder";
+      outChainOff(el); el.volume = 1;
+      return outInfo.how = "";
+    }
+    /* Phone mode. On a laptop there is no ear to protect: normal volume. */
+    if (!isPhone()) { outChainOff(el); el.volume = 1; return outInfo.how = ""; }
+    if (volumeWorks) { outChainOff(el); el.volume = OUT_EAR; return outInfo.how = "quieter"; }
+    if (outChainOn(el, OUT_EAR)) return outInfo.how = "quieter";
+    outChainOff(el); el.volume = 1;
+    return outInfo.how = "";
+  });
+}
 
 function setSpeaker(on){
   speakerOn = !!on;
   var el = $("remoteAudio");
-  if (el.setSinkId && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-    navigator.mediaDevices.enumerateDevices().then(function(list){
-      var outs = list.filter(function(d){ return d.kind === "audiooutput"; });
-      var loud = outs.filter(function(d){
-        return /speaker|loud/i.test(d.label) && !/ear|receiver|handset/i.test(d.label);
-      })[0];
-      var ear = outs.filter(function(d){ return /ear|receiver|handset/i.test(d.label); })[0];
-      var target = speakerOn ? loud : (ear || outs.filter(function(d){
-        return d.deviceId === "default"; })[0]);
-      if (target) el.setSinkId(target.deviceId).catch(function(){});
-    }).catch(function(){});
-  }
-  setBoost(speakerOn);
-  if (call) $("callNote").textContent = speakerOn ? "Speaker on — louder" : "";
+  outRoute(el, speakerOn).then(function(how){
+    if (!call) return;
+    var note = $("callNote");
+    if (how === "headset") note.textContent = "Playing in your headphones";
+    else if (speakerOn) note.textContent = "Speaker — louder";
+    else note.textContent = how === "quieter" ? "Phone — quieter, hold it to your ear" :
+                            how === "device" ? "Phone — earpiece" : "";
+  });
 }
-
-function setBoost(on){
-  var el = $("remoteAudio");
-  try {
-    if (on) {
-      unlockAudio();
-      if (!audioCtx || !el.srcObject || boost) return;
-      var src = audioCtx.createMediaStreamSource(el.srcObject);
-      var gain = audioCtx.createGain();
-      gain.gain.value = 2.2;
-      src.connect(gain); gain.connect(audioCtx.destination);
-      /* The element keeps playing, silently: some browsers only feed a
-         call's audio onward while it is attached to one. */
-      el.muted = true;
-      boost = { src: src, gain: gain };
-    } else if (boost) {
-      try { boost.src.disconnect(); boost.gain.disconnect(); } catch (e) {}
-      boost = null;
-      el.muted = false;
-    }
-  } catch (e) {
-    boost = null; el.muted = false;
-  }
+/* Kept under its old name for the places that still call it. */
+function setBoost(on){ if (!on) { outChainOff($("remoteAudio")); speakerOn = false; } else setSpeaker(true); }
+function outReset(){
+  speakerOn = false;
+  outChains.slice().forEach(function(c){ outChainOff(c.el); });
+  try { $("remoteAudio").volume = 1; } catch (e) {}
 }
 
 /* ------------------------------------------------ the voice itself
@@ -2892,9 +3158,16 @@ function newPeer(peerId){
     var config = { iceServers: iceServers() };
     /* Relay only, when this call is known to need it - see noSound. */
     if (call && call.forcedRelay && hasRelay()) config.iceTransportPolicy = "relay";
-    /* Cloudflare only, when the family has chosen it. */
+    /* Relay first, when the family has chosen it ("Always through
+       Cloudflare"). Every relay that is set up is tried AT ONCE -
+       Cloudflare over UDP, TCP and TLS on port 443, plus the main relay
+       if there is one - and the call takes whichever answers. It used to
+       be Cloudflare alone, with twelve silent seconds before anything
+       else was tried: on a network that blocks or slows Cloudflare, that
+       was the call hanging on "Connecting…" before it finally found
+       another way. */
     if (call && call.viaCloudflare) {
-      config = { iceServers: iceServers("cloudflare"), iceTransportPolicy: "relay" };
+      config = { iceServers: iceServers(), iceTransportPolicy: "relay" };
     }
     /* Starts finding network paths (and reserving the relay) as soon as
        the connection exists, instead of when the answer is sent - see
@@ -2916,7 +3189,16 @@ function newPeer(peerId){
        included, once gathering finishes - trickled ones could arrive
        before it and be thrown away as belonging to nothing. */
     if (call.restarting) return;
-    if (!ev.candidate) { flushIce(peerId); return; }   /* gathering done */
+    if (!ev.candidate) {                               /* gathering done */
+      flushIce(peerId);
+      if (call.pc === pc) call.gatherDone = true;
+      relayCheck();
+      return;
+    }
+    /* Counted, so a phone that cannot reach ANY relay on this network
+       knows at once, instead of waiting for a timer (see relayCheck). */
+    if (/ typ relay /.test(ev.candidate.candidate || "") && (!call.pc || call.pc === pc))
+      call.relayCands = (call.relayCands || 0) + 1;
 
     /* Gathered into 300 ms batches rather than sent one at a time: a
        phone produces four to a dozen candidates, and this keeps a call
@@ -2931,13 +3213,23 @@ function newPeer(peerId){
 
   pc.ontrack = function(ev){
     var el = $("remoteAudio");
-    el.srcObject = ev.streams[0];
+    /* A track that arrives without a stream (it can, from some browsers)
+       used to leave the element with nothing to play - one of the ways a
+       call went one-way. It gets a stream of its own. */
+    var stream = (ev.streams && ev.streams[0]) || null;
+    if (!stream) {
+      stream = (el.srcObject instanceof MediaStream) ? el.srcObject : new MediaStream();
+      if (stream.getTracks().indexOf(ev.track) === -1) stream.addTrack(ev.track);
+    }
+    if (el.srcObject !== stream) el.srcObject = stream;
     /* Safari will not start audio without a gesture. Placing or
        answering the call is that gesture, but play() can still be
        refused, and an unhandled rejection here would surface as an
        error with no bearing on the call. */
     var p = el.play();
     if (p && p.catch) p.catch(function(){ needTapForSound(); });
+    /* Phone or Speaker, whichever is chosen, for this sound too. */
+    outRoute(el, speakerOn);
   };
 
   /* Listened for on BOTH events, on purpose.
@@ -3009,7 +3301,9 @@ function markConnected(){
   if (!call || call.state === "connected") return;   /* both events fire */
   stopTone();
   if (call.watchdog) { clearTimeout(call.watchdog); call.watchdog = null; }
+  if (call.relayTimer) { clearTimeout(call.relayTimer); call.relayTimer = null; }
   if (call.giveUp) { clearTimeout(call.giveUp); call.giveUp = null; }
+  call.fastGather = false;     /* later restarts (a new network) wait for relays */
   call.state = "connected";
   call.t0 = Date.now();
   keepAwake();
@@ -3023,7 +3317,7 @@ function markConnected(){
 
 function markFailed(){
   if (!call || call.state === "connected" || call.state === "failed") return;
-  if (call.viaCloudflare && !call.fellBack && call.pc) { fallBack(true); return; }
+  if (relayOnly() && call.pc) { fallBack(true); return; }
   /* The relay itself did not work - do not keep insisting on it. */
   if (call.forcedRelay && state.preferRelay) { state.preferRelay = false; save(); }
   call.state = "failed";
@@ -3044,17 +3338,57 @@ function markFailed(){
    candidate pairs before it admits defeat - if it ever reports failed
    at all. Twenty-five seconds is well past a connection that was going
    to work. */
+/* Changes which routes a live connection may use.
+ *
+ * The browser refuses a new configuration that differs from the old one
+ * in anything it cannot change mid-call - and the connection was made
+ * with a candidate pool that a bare { iceServers, iceTransportPolicy }
+ * quietly resets. So both switches ("relay didn't connect - try every
+ * route", and "no sound - go through the relay") threw, the error was
+ * swallowed, and the call restarted on exactly the routes that had just
+ * failed. Now the current configuration is read back and only the two
+ * fields changed; a refusal is at least reported. */
+function reconfigure(pc, policy){
+  try {
+    var c = pc.getConfiguration ? pc.getConfiguration() : {};
+    c.iceServers = policy === "relay" ? iceServers().filter(function(s){
+      return [].concat(s.urls).some(function(u){ return /^turns?:/i.test(u); });
+    }) : iceServers();
+    c.iceTransportPolicy = policy;
+    pc.setConfiguration(c);
+    return true;
+  } catch (e) {
+    try { console.warn("Could not change the call's routes:", e && e.message); } catch (x) {}
+    return false;
+  }
+}
+function relayOnly(){ return !!(call && (call.viaCloudflare || call.forcedRelay) && !call.fellBack); }
 function watchConnect(){
   if (!call) return;
   if (call.watchdog) clearTimeout(call.watchdog);
-  /* Cloudflare gets twelve seconds; past that the call is not waiting
-     on it any longer, and tries everything else. */
-  var cfFirst = call.viaCloudflare && !call.fellBack;
+  if (call.relayTimer) clearTimeout(call.relayTimer);
+  /* Relays get eight seconds - once both phones have their addresses a
+     working relay connects in one or two - and then the call stops
+     waiting on them and tries every route. */
+  var first = relayOnly();
   call.watchdog = setTimeout(function(){
     if (!call || call.state === "connected") return;
-    if (call.viaCloudflare && !call.fellBack) { fallBack(true); return; }
+    if (relayOnly()) { fallBack(true); return; }
     markFailed();
-  }, cfFirst ? 12000 : 25000);
+  }, first ? 8000 : 25000);
+  /* And sooner still when this phone plainly has no relay to offer. */
+  if (first) call.relayTimer = setTimeout(function(){ if (call) { call.gatherDone = true; relayCheck(); } }, 3500);
+}
+
+/* Relay-only, and this phone found no relay address at all - every relay
+   is blocked or unreachable on this network. Waiting cannot help; open
+   the other routes now. */
+function relayCheck(){
+  if (!call || !call.pc || !relayOnly() || call.state === "connected") return;
+  /* Only once both phones have agreed on the call: before the answer
+     there is no connection to move over yet. */
+  if (call.state !== "answered" || !call.gatherDone || call.relayCands) return;
+  fallBack(true);
 }
 
 /* Cloudflare did not connect this call: open every other route - phone
@@ -3065,11 +3399,12 @@ function fallBack(ours){
   call.fellBack = true;
   call.viaCloudflare = false;
   call.forcedRelay = false;
-  try { call.pc.setConfiguration({ iceServers: iceServers(), iceTransportPolicy: "all" }); }
-  catch (e) {}
+  /* The relays already failed: the restart need not wait for them. */
+  call.fastGather = true;
+  reconfigure(call.pc, "all");
   if (ours) sendSig(call.peer, { t:"fallback", call: call.id, from: state.me })
               .catch(function(){});
-  $("callNote").textContent = "Cloudflare did not connect — trying the other routes";
+  $("callNote").textContent = "The relay didn't connect — trying every route";
   restartIce();
   watchConnect();
 }
@@ -3550,6 +3885,23 @@ function onSignal(msg){
     return;
   }
   if (msg.t === "restart") { if (call.out) restartIce(); return; }
+  if (msg.t === "mute") {
+    call.theyMuted = !!msg.on;
+    if (call.voice) call.voice.inDead = 0;
+    var mn = $("callNote");
+    if (msg.on) { mn.textContent = nameOf(call.peer) + " muted their microphone"; mn.setAttribute("data-m", "1"); }
+    else if (mn.getAttribute("data-m")) { mn.textContent = ""; mn.removeAttribute("data-m"); }
+    return;
+  }
+  if (msg.t === "micchk") {
+    /* They hear nothing from this phone: get the microphone again. */
+    if (!call.muted && call.state === "connected") {
+      $("callNote").textContent = nameOf(call.peer) + " can't hear you — restarting your microphone";
+      if (call.voice) call.voice.fixedAt = Date.now();
+      swapMic();
+    }
+    return;
+  }
   if (msg.t === "relay") { goRelay(false); return; }
   if (msg.t === "fallback") { fallBack(false); return; }
 
@@ -3670,7 +4022,7 @@ function hangUp(why){
   if (call) clearCallNote(call.id);
   /* Moved into a group call: the group now owns the screen lock. */
   if (!group || group.state === "incoming") releaseAwake();
-  if (speakerOn || boost) { speakerOn = false; setBoost(false); }
+  outReset();
   if (call && call.t0) micTipAfterCall();
   if (!call) { hideCallScreen(); return; }
   if (call.recoverTimer) clearTimeout(call.recoverTimer);
@@ -3689,6 +4041,7 @@ function hangUp(why){
   finishUsage();
   if (call.giveUp)   clearTimeout(call.giveUp);
   if (call.watchdog) clearTimeout(call.watchdog);
+  if (call.relayTimer) clearTimeout(call.relayTimer);
   if (call.iceTimer) clearTimeout(call.iceTimer);
   if (call.timer)    clearInterval(call.timer);
   /* Goodbye goes out whenever the other phone knows about this call -
@@ -3825,7 +4178,7 @@ function restartIce(){
   call.restarting = true;
   pc.createOffer({ iceRestart: true })
     .then(function(offer){ return pc.setLocalDescription(offer); })
-    .then(function(){ return gathered(pc, 3000); })
+    .then(function(){ return gathered(pc, call && call.fastGather ? 1200 : 3000); })
     .then(function(){
       if (!call || call.id !== id) return;
       call.restarting = false;
@@ -3851,7 +4204,7 @@ function takeReoffer(msg){
   pc.setRemoteDescription({ type:"offer", sdp: msg.sdp })
     .then(function(){ return pc.createAnswer(); })
     .then(function(ans){ return pc.setLocalDescription(ans); })
-    .then(function(){ return gathered(pc, 3000); })
+    .then(function(){ return gathered(pc, call && call.fastGather ? 1200 : 3000); })
     .then(function(){
       if (!call || call.id !== id) return;
       call.restarting = false;
@@ -3876,7 +4229,12 @@ function networkChanged(){
 window.addEventListener("online", networkChanged);
 try {
   var nc = navigator.connection;
-  if (nc && nc.addEventListener) nc.addEventListener("change", networkChanged);
+  if (nc && nc.addEventListener) nc.addEventListener("change", function(){
+    networkChanged();
+    /* A new network usually means the family server's connection is dead
+       too, without knowing it yet: check now, not at the next ping. */
+    if (state && state.me) fsProbe(4000);
+  });
 } catch (e) {}
 
 /* The microphone going away mid-call.
@@ -3946,6 +4304,7 @@ function watchAudio(){
     call.pc.getStats(null).then(function(stats){
       sampleUsage(stats);
       sampleQuality(stats);
+      try { checkVoice(stats); } catch (e) {}
       var got = 0;
       stats.forEach(function(r){
         if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio"))
@@ -4023,39 +4382,162 @@ function sampleUsage(stats){
   u.route = route;
 }
 
-/* Three bars, from the round trip and the share of voice packets lost
-   since the last look - the two things you actually hear. */
+/* Three bars - what you actually hear, judged calmly.
+ *
+ * The old bars dropped to one on a single bad two-second reading, read
+ * the delay from whichever network path came first (often a spare that
+ * was never used, still showing its slow first measurement), and called
+ * 350 ms "poor" - an ordinary figure for a call between continents. So a
+ * good call on two strong connections could show a poor signal.
+ *
+ * Now:
+ *   - the delay is the path the call really uses;
+ *   - loss is the share of sound the phone had to fill in itself, after
+ *     RED has repaired what it could - what reaches your ear - rather
+ *     than raw packets lost on the way;
+ *   - readings are averaged, and the bars move only when two readings in
+ *     a row agree;
+ *   - "fair" starts at half a second's round trip and "poor" near one
+ *     second, where a conversation really does start to trip over
+ *     itself. */
+function selectedPair(stats){
+  var pair = null;
+  stats.forEach(function(r){
+    if (!pair && r.type === "transport" && r.selectedCandidatePairId && stats.get)
+      pair = stats.get(r.selectedCandidatePairId) || null;
+  });
+  if (!pair) stats.forEach(function(r){
+    if (!pair && r.type === "candidate-pair" && r.state === "succeeded" && (r.selected || r.nominated)) pair = r;
+  });
+  return pair;
+}
 function sampleQuality(stats){
   if (!call) return;
-  var rtt = null, lost = 0, got = 0;
+  var pair = selectedPair(stats);
+  var rtt = pair && typeof pair.currentRoundTripTime === "number" ? pair.currentRoundTripTime : null;
+  var lost = 0, got = 0, conc = 0, samp = 0, jit = null, theirLoss = null;
   stats.forEach(function(r){
-    if (r.type === "candidate-pair" && r.state === "succeeded" &&
-        typeof r.currentRoundTripTime === "number" && (r.nominated || r.selected || rtt === null))
-      rtt = r.currentRoundTripTime;
-    if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio")) {
+    var audio = r.kind === "audio" || r.mediaType === "audio";
+    if (r.type === "inbound-rtp" && audio) {
       lost += r.packetsLost || 0; got += r.packetsReceived || 0;
+      conc += r.concealedSamples || 0; samp += r.totalSamplesReceived || 0;
+      if (typeof r.jitter === "number") jit = r.jitter;
     }
+    /* What THEIR phone reports about the sound it gets from you. */
+    if (r.type === "remote-inbound-rtp" && audio && typeof r.fractionLost === "number")
+      theirLoss = r.fractionLost;
+    if (rtt === null && r.type === "remote-inbound-rtp" && audio && typeof r.roundTripTime === "number")
+      rtt = r.roundTripTime;
   });
-  var q = call.q || { lost: 0, got: 0 };
-  var dl = lost - q.lost, dg = got - q.got;
-  call.q = { lost: lost, got: got };
-  var loss = (dl + dg) > 0 ? dl / (dl + dg) : 0;
-  /* Kept for the whole call, so its record can say how it really went:
-     average delay, share of voice lost, and the moments it was poor. */
+  var q = call.q || { lost: 0, got: 0, conc: 0, samp: 0 };
+  var dl = lost - q.lost, dg = got - q.got, dc = conc - q.conc, ds = samp - q.samp;
+  call.q = { lost: lost, got: got, conc: conc, samp: samp };
+  var loss = (dl + dg) > 0 ? Math.max(0, dl) / (dl + dg) : 0;
+  var filled = ds > 0 ? Math.max(0, dc) / ds : null;
+  var heard = filled !== null ? filled : loss;
+
+  /* The call's record, as before. */
   var qs = call.qs = call.qs || { n: 0, rtt: 0, rttN: 0, lost: 0, got: 0, poor: 0 };
   qs.n++;
   if (rtt !== null) { qs.rtt += rtt * 1000; qs.rttN++; }
   if (dl > 0) qs.lost += dl;
   if (dg > 0) qs.got += dg;
-  if ((rtt !== null && rtt > 0.4) || loss > 0.05) qs.poor++;
   if (!qs.codec || qs.n % 10 === 1) {
     var cd = codecOfPc(call.pc) || codecOf(stats); if (cd) qs.codec = cd;
   }
+
+  var sm = call.qsm = call.qsm || { rtt: null, bad: 0, level: 3, pend: 3, pendN: 0, dry: 0 };
+  if (rtt !== null) sm.rtt = sm.rtt === null ? rtt : sm.rtt * 0.65 + rtt * 0.35;
+  sm.bad = sm.bad * 0.55 + heard * 0.45;
+  sm.dry = dg > 0 ? 0 : sm.dry + 1;
   var level = 3;
-  if ((rtt !== null && rtt > 0.35) || loss > 0.03) level = 2;
-  if ((rtt !== null && rtt > 0.7) || loss > 0.1 || dg === 0) level = 1;
+  if ((sm.rtt !== null && sm.rtt > 0.5) || sm.bad > 0.04 || (jit !== null && jit > 0.08)) level = 2;
+  if ((sm.rtt !== null && sm.rtt > 0.95) || sm.bad > 0.12 || sm.dry >= 2) level = 1;
+  if (level === sm.level) sm.pendN = 0;
+  else {
+    if (sm.pend === level) sm.pendN++; else { sm.pend = level; sm.pendN = 1; }
+    if (sm.pendN >= 2) { sm.level = level; sm.pendN = 0; }
+  }
+  if (sm.level === 1) qs.poor++;
   var el = $("callQual");
-  if (el) el.className = "qual on q" + level;
+  if (el) {
+    el.className = "qual on q" + sm.level;
+    el.title = "Call quality" + (sm.rtt !== null ? " · delay " + Math.round(sm.rtt * 1000) + " ms" : "") +
+               " · " + (Math.round(sm.bad * 1000) / 10) + "% filled in";
+  }
+  /* Your sound is breaking up at their end, though it arrives fine here:
+     worth saying, because otherwise only they know. */
+  var bt = call.theirBad = (call.theirBad || 0) * 0.5 + (theirLoss !== null ? theirLoss : 0) * 0.5;
+  var note = $("callNote");
+  if (note && !call.recovering) {
+    if (bt > 0.15 && (!note.textContent || note.getAttribute("data-q"))) {
+      note.textContent = nameOf(call.peer) + " may hear you breaking up";
+      note.setAttribute("data-q", "1");
+    } else if (bt < 0.06 && note.getAttribute("data-q")) {
+      note.textContent = ""; note.removeAttribute("data-q");
+    }
+  }
+}
+
+/* Sound in both directions.
+ *
+ * "One of us can hear, the other can't" has causes the packet counter
+ * (watchAudio) cannot see, because packets keep flowing:
+ *   - this phone's microphone was taken away (another app, Siri, a
+ *     Bluetooth change) or went silent - the call sends pure silence;
+ *   - the other phone's microphone did the same;
+ *   - this phone's sound is stuck: the page's audio engine paused, or
+ *     the browser refused to start playing.
+ * Checked every two seconds, from the sound's own energy. A real room
+ * is never perfectly silent, so exact zero for several seconds means a
+ * dead microphone, not a quiet person. Each side mends its own end, and
+ * tells the other when it hears nothing from them. */
+function checkVoice(stats){
+  if (!call || call.state !== "connected" || call.recovering) return;
+  var v = call.voice = call.voice || { inE: null, outE: null, inDead: 0, outDead: 0, fixedAt: 0, askedAt: 0 };
+  var inE = null, outE = null;
+  stats.forEach(function(r){
+    var audio = r.kind === "audio" || r.mediaType === "audio";
+    if (r.type === "inbound-rtp" && audio && typeof r.totalAudioEnergy === "number") inE = (inE || 0) + r.totalAudioEnergy;
+    if (r.type === "media-source" && audio && typeof r.totalAudioEnergy === "number") outE = (outE || 0) + r.totalAudioEnergy;
+  });
+
+  /* This phone's microphone. */
+  var track = call.stream && call.stream.getAudioTracks()[0];
+  var gone = !!(track && (track.readyState === "ended" || track.muted));
+  if (!call.muted && outE !== null && v.outE !== null && outE - v.outE <= 1e-10) v.outDead++;
+  else v.outDead = 0;
+  v.outE = outE;
+  if (!call.muted && (gone || v.outDead >= 4) && Date.now() - v.fixedAt > 20000) {
+    v.fixedAt = Date.now(); v.outDead = 0;
+    $("callNote").textContent = "Your microphone stopped — restarting it";
+    swapMic();
+  }
+
+  /* Their microphone. */
+  if (!call.theyMuted && inE !== null && v.inE !== null && inE - v.inE <= 1e-10) v.inDead++;
+  else {
+    if (v.inDead >= 5 && $("callNote").getAttribute("data-v")) {
+      $("callNote").textContent = ""; $("callNote").removeAttribute("data-v");
+    }
+    v.inDead = 0;
+  }
+  v.inE = inE;
+  if (v.inDead === 5 && Date.now() - v.askedAt > 20000) {
+    v.askedAt = Date.now();
+    $("callNote").textContent = "No sound from " + nameOf(call.peer) + "'s microphone — asking their phone to restart it";
+    $("callNote").setAttribute("data-v", "1");
+    sendSig(call.peer, { t: "micchk", call: call.id, from: state.me }).catch(function(){});
+  }
+
+  /* This phone's own playback. */
+  var el = $("remoteAudio");
+  if (el && el.srcObject && el.paused && !v.playTried) {
+    v.playTried = true;
+    var p = el.play();
+    if (p && p.then) p.then(function(){ v.playTried = false; }, function(){ needTapForSound(); });
+  }
+  outGuard();
 }
 
 function fmtBytes(n){
@@ -4189,6 +4671,10 @@ function paintUsage(){
 
 function noSound(){
   if (!call) return;
+  /* Nothing arriving can also be their microphone dying (some phones
+     then send nothing at all): ask their phone to restart it too - it
+     costs one message, and it is the fix when that is the cause. */
+  sendSig(call.peer, { t: "micchk", call: call.id, from: state.me }).catch(function(){});
   /* Silent through Cloudflare: try the other routes rather than give up. */
   if (call.viaCloudflare && !call.fellBack) {
     sendSig(call.peer, { t:"fallback", call: call.id, from: state.me }).catch(function(){});
@@ -4215,10 +4701,7 @@ function goRelay(ours){
   /* Remembered on this phone: its network needs the relay, so the next
      call starts there. */
   if (!state.preferRelay) { state.preferRelay = true; save(); }
-  try {
-    call.pc.setConfiguration({ iceServers: iceServers(),
-                               iceTransportPolicy: "relay" });
-  } catch (e) {}
+  reconfigure(call.pc, "relay");
   $("callNote").textContent = "No sound was getting through — switching to the relay";
   if (call.state === "connected") {
     call.recovering = true;
@@ -4347,7 +4830,14 @@ var TONES = {
   soft: {
     name: "Soft", gap: 3.9,
     steps: [ { f:[523], d:.5, r:.12 }, { f:[784], d:.7, r:.3 } ]
-  }
+  },
+  /* Not ringtones - never offered in Settings. A buzz is a two-note
+     doorbell, played once; a message a single short tick. Neither
+     sounds anything like a call. */
+  _buzz: { name: "Buzz", gap: 0.05,
+    steps: [ { f:[988], d:.18, r:.06 }, { f:[784], d:.34, r:.05 } ] },
+  _msg:  { name: "Message", gap: 0.05,
+    steps: [ { f:[1319], d:.07, r:.02 } ] }
 };
 var TONE_ORDER = ["classic","digital","chime","urgent","soft","knock"];
 
@@ -4357,8 +4847,13 @@ function toneName(){
 
 function unlockAudio(){
   try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      /* Paused or interrupted by the phone: the call's own element takes
+         over at once (see outGuard), and back again when it resumes. */
+      try { audioCtx.addEventListener("statechange", outGuard); } catch (e) {}
+    }
+    if (audioCtx.state === "suspended" || audioCtx.state === "interrupted") audioCtx.resume();
   } catch (e) {}
 }
 
@@ -4775,6 +5270,38 @@ function askNotify(){
   } catch (e) {}
 }
 
+/* A short sound for a buzz or a message: played once, never looped,
+   never over a call or a ring, and it respects the phone's silent
+   switch (a call's ring deliberately does not - see tone()). */
+var cueAt = 0;
+function cue(key, vib){
+  if (Date.now() - cueAt < 700) return;          /* a burst sounds once */
+  cueAt = Date.now();
+  try { if (navigator.vibrate && vib) navigator.vibrate(vib); } catch (e) {}
+  if (call || group || ringLoud || document.hidden) return;
+  var el = ringElement();
+  try { ringSrc(el, key); } catch (e) { return; }
+  audioSession("ambient");
+  el.loop = false; el.muted = false; el.volume = key === "_msg" ? 0.6 : 1;
+  try { el.currentTime = 0; } catch (e) {}
+  var back = function(){ if (!ringLoud && !call && !group) audioSession("auto"); };
+  var p = null;
+  try { p = el.play(); } catch (e) { p = Promise.reject(e); }
+  Promise.resolve(p).then(function(){ setTimeout(back, 1500); }, function(){
+    back();
+    /* The sound file was refused: the audio engine, if it is running. */
+    if (audioCtx && audioCtx.state === "running") {
+      try {
+        var d = toneSamples(key), b = audioCtx.createBuffer(1, d.length, RING_SR);
+        b.getChannelData(0).set(d);
+        var src = audioCtx.createBufferSource(), g = audioCtx.createGain();
+        g.gain.value = key === "_msg" ? 0.4 : 0.8;
+        src.buffer = b; src.connect(g); g.connect(audioCtx.destination); src.start();
+      } catch (e) {}
+    }
+  });
+}
+
 function showBuzz(from, what){
   var m = memberByTitle(from);
   var name = m ? m.name : String(from || "Someone");
@@ -4785,9 +5312,10 @@ function showBuzz(from, what){
   paintWho($("ring"), m && m.colour);
   $("ringWhat").textContent = what || "wants your attention";
   $("ring").classList.add("on");
-  tone({ buzz: true });
+  /* Its own sound and two quick taps - it used to be the full ringtone
+     with a call's vibration, so a buzz felt exactly like a call. */
+  cue("_buzz", [220, 110, 220]);
   if (document.hidden) systemNotify(from, what || "wants your attention");
-  setTimeout(stopTone, 5000);
 }
 
 /* ------------------------------------------------------------ recent */
@@ -4944,16 +5472,24 @@ function lastWith(name){
   var m = null;
   (state.members || []).forEach(function(x){ if (x.name === name) m = x; });
   var list = recentList().filter(function(x){ return m ? entryFor(x, m) : x.who === name; });
-  if (!list.length) return null;
+  var msg = m ? chatLast(m.id) : null;
+  var unread = m ? chatUnread(m.id) : 0;
+  if (!list.length && !msg) return null;
   var unseen = m ? missedCount(m) : 0;
   if (unseen) {
     var lastMiss = list.filter(function(x){ return x.k === "call" && x.st === "missed"; })[0];
     return { text: (unseen > 1 ? unseen + " missed calls" : "Missed call") + " · " +
-                   ago(lastMiss ? lastMiss.at : list[0].at), missed: true, count: unseen };
+                   ago(lastMiss ? lastMiss.at : list[0].at), missed: true, count: unseen + unread };
   }
+  /* The latest message, as a messaging app's list shows it. */
   var r = list[0];
+  if (msg && (!r || msg.at >= r.at)) {
+    return { text: (unread > 1 ? unread + " new · " : "") + (msg.d === "out" ? "You: " : "") +
+                   msg.t.replace(/\s+/g, " ") + " · " + ago(msg.at),
+             missed: false, unread: unread > 0, count: unread, msgOnly: unread > 0 };
+  }
   return { text: (r.k === "call" ? callLabel(r) : buzzLabel(r)) + " · " + ago(r.at),
-           missed: false, count: 0 };
+           missed: false, unread: unread > 0, count: unread, msgOnly: unread > 0 };
 }
 
 function paintMain(){
@@ -5014,7 +5550,7 @@ function paintMain(){
     var last = lastWith(m.name);
     var sub = document.createElement("span");
     sub.className = "sub" + (last && last.missed ? " missed" : "");
-    sub.textContent = last ? last.text : "Tap to call or buzz";
+    sub.textContent = last ? last.text : "Tap to chat, call or buzz";
     nm.appendChild(sub);
 
     var go = document.createElement("span");
@@ -5251,7 +5787,8 @@ function paintTileNotes(){
     var bd = av.querySelector(".badge");
     if (bd) bd.remove();
     if (last && last.count) {
-      bd = document.createElement("span"); bd.className = "badge"; bd.textContent = last.count;
+      bd = document.createElement("span"); bd.className = "badge" + (last.msgOnly ? " msg" : "");
+      bd.textContent = last.count;
       av.appendChild(bd);
     }
     var st = presenceOf(id), tt = theirTime(id);
@@ -5264,7 +5801,8 @@ function paintTileNotes(){
       av.appendChild(moon);
     } else if (moon && !(tt && tt.night)) moon.remove();
     t.setAttribute("aria-label", name + ", " + st.text + (tt ? ", " + tt.short : "") +
-      (last && last.count ? ", " + last.count + " missed call" + (last.count > 1 ? "s" : "") : ""));
+      (last && last.count ? ", " + last.count + (last.msgOnly ? " new message" : " missed call") +
+                            (last.count > 1 ? "s" : "") : ""));
     t.title = name + " · " + st.text + (tt ? " · " + tt.short : "");
   });
   var sum = $("presSum");
@@ -5287,15 +5825,17 @@ function paintCardNotes(){
     var sub = card.querySelector(".sub");
     if (!sub) return;
     var last = lastWith(card.getAttribute("data-who"));
-    sub.className = "sub" + (last && last.missed ? " missed" : "");
-    sub.textContent = last ? last.text : "Tap to call or buzz";
+    sub.className = "sub" + (last && last.missed ? " missed" : last && last.unread ? " unread" : "");
+    sub.textContent = last ? last.text : "Tap to chat, call or buzz";
     var dot = card.querySelector(".dot"), bd = dot && dot.querySelector(".badge");
     if (bd) bd.remove();
     if (dot && last && last.count) {
-      bd = document.createElement("span"); bd.className = "badge"; bd.textContent = last.count;
+      bd = document.createElement("span"); bd.className = "badge" + (last.msgOnly ? " msg" : "");
+      bd.textContent = last.count;
       dot.appendChild(bd);
     }
   });
+  paintBadge();
 }
 
 var showEarlier = false;
@@ -5363,6 +5903,7 @@ function foldRuns(list){
 
 function paintRecent(){
   paintCardNotes();
+  if (chatOpenId) chatPaint(false);
   paintTabs();
   var box = $("recentBox");
   if (!box) return;
@@ -5631,11 +6172,473 @@ function openPastedLink(text){
   if (!tryJoin()) paintMain();
 }
 
+/* ==================================================================== *
+ * Chat - one conversation per person
+ *
+ * Tapping a person opens their conversation, the way messaging apps do:
+ * everything between the two of you in one place and in order - typed
+ * messages, calls (answered, missed, declined) and buzzes - with Call
+ * and Buzz at the top and a box to type in at the bottom.
+ *
+ * Messages go through the family server (see chat() in
+ * family-server.js), which keeps them for a week for a phone that is
+ * off, and wakes a closed phone with a quiet notification - one short
+ * tick, never a call's ring. Each message carries its own id, so a
+ * resend after a bad connection is delivered once. Ticks:
+ *   one clock   waiting to go         one tick    reached the server
+ *   two ticks   reached their phone   blue ticks  they have read it
+ *
+ * Kept on this phone apart from the family settings (which travel in a
+ * cookie that has no room for a conversation): localStorage first,
+ * IndexedDB as the copy that survives the browser tidying up.
+ * ==================================================================== */
+
+var CHAT = null, chatTimer = null, chatOpenId = null, chatShowAll = false;
+var CHAT_RANK = { failed: 0, sending: 1, sent: 2, delivered: 3, read: 4 };
+var CHAT_KEEP_DAYS = 180, CHAT_KEEP_N = 400, CHAT_MAX = 4000;
+
+function chatKey(){ return "familyNotifyer.chat." + state.house + "." + state.me; }
+function chatStore(){
+  if (!state || !state.me || !state.house) return { by: {} };
+  var k = chatKey();
+  if (CHAT && CHAT._k === k) return CHAT;
+  var o = null;
+  try { o = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { o = null; }
+  CHAT = (o && o.by && typeof o.by === "object") ? o : { by: {} };
+  CHAT._k = k;
+  if (!o) idbGet(k).then(function(v){
+    /* Only adopted while nothing has arrived here yet. */
+    if (!v || !v.by || !CHAT || CHAT._k !== k) return;
+    var empty = !Object.keys(CHAT.by).some(function(p){ return CHAT.by[p].length; });
+    if (empty) { CHAT = v; CHAT._k = k; chatChanged(null); }
+  });
+  return CHAT;
+}
+function chatSave(){ if (!chatTimer) chatTimer = setTimeout(chatFlush, 300); }
+function chatFlush(){
+  if (chatTimer) { clearTimeout(chatTimer); chatTimer = null; }
+  if (!CHAT || !CHAT._k) return;
+  var cut = Date.now() - CHAT_KEEP_DAYS * 86400000;
+  Object.keys(CHAT.by).forEach(function(pid){
+    CHAT.by[pid] = CHAT.by[pid].filter(function(m){ return m.at >= cut; }).slice(-CHAT_KEEP_N);
+  });
+  var text = JSON.stringify(CHAT);
+  try { localStorage.setItem(CHAT._k, text); } catch (e) {}
+  idbPut(JSON.parse(text), CHAT._k);
+}
+window.addEventListener("pagehide", chatFlush);
+document.addEventListener("visibilitychange", function(){
+  if (document.hidden) { chatFlush(); return; }
+  if (chatOpenId) chatMarkRead(chatOpenId);
+});
+
+function chatList(pid){ var s = chatStore(); return s.by[pid] || (s.by[pid] = []); }
+function chatFind(pid, cid){
+  var l = chatStore().by[pid] || [];
+  for (var i = l.length - 1; i >= 0; i--) if (l[i].c === cid) return l[i];
+  return null;
+}
+function chatLast(pid){ var l = chatStore().by[pid]; return l && l.length ? l[l.length - 1] : null; }
+function chatUnread(pid){
+  return (chatStore().by[pid] || []).filter(function(m){ return m.d === "in" && !m.r; }).length;
+}
+function chatUnreadAll(){
+  var s = chatStore(), n = 0;
+  Object.keys(s.by).forEach(function(pid){ if (memberById(pid)) n += chatUnread(pid); });
+  return n;
+}
+function chatInsert(list, m){
+  list.push(m);
+  if (list.length > 1 && list[list.length - 2].at > m.at)
+    list.sort(function(a, b){ return a.at - b.at; });
+}
+
+/* Where tapping the notification goes: the recipient's own link, as for
+   a call (see ringPush) - short enough to fit a notification. */
+function noteUrl(memberId){
+  var home = location.origin + location.pathname;
+  try { var mine = linkFor(memberId); if (mine.length < 1400) home = mine; } catch (e) {}
+  return home + (home.indexOf("#") === -1 ? "#" : "&") + "n=1";
+}
+
+/* ------------------------------------------------------------ sending */
+function chatSend(pid, text){
+  text = String(text || "").replace(/^\s+|\s+$/g, "");
+  if (!pid || !text) return;
+  if (text.length > CHAT_MAX) text = text.slice(0, CHAT_MAX);
+  var m = { c: "c" + rand(14), d: "out", t: text, at: Date.now(), st: "sending" };
+  chatInsert(chatList(pid), m);
+  chatSave(); chatChanged(pid, true);
+  chatDeliver(pid, m);
+}
+function chatDeliver(pid, m){
+  if (m.busy) return;
+  m.busy = true;
+  m.tries = (m.tries || 0) + 1;
+  fsRequest({ k: "chat", to: pid, cid: m.c, text: m.t, title: nameOf(state.me), url: noteUrl(pid) }, 15000)
+    .then(function(r){
+      m.busy = false;
+      if (r && r.ok) {
+        delete m.why;
+        if (CHAT_RANK[m.st || "sent"] < CHAT_RANK.sent) m.st = "sent";
+      } else if (r && (r.status === 403 || r.status === 400)) {
+        m.st = "failed";
+        m.why = r.why === "notintouch" ? "You can't message " + nameOf(pid) : "The family server refused it";
+      } else {
+        m.st = "failed";              /* sent again when the connection is back */
+      }
+      chatSave(); chatChanged(pid);
+    });
+}
+/* Everything that did not go - sent again whenever the live connection
+   (re)opens. The server drops a copy it already has. */
+function chatRetry(){
+  if (!state || !state.me) return;
+  var s = chatStore(), now = Date.now();
+  Object.keys(s.by).forEach(function(pid){
+    if (!memberById(pid)) return;
+    s.by[pid].forEach(function(m){
+      if (m.d === "out" && (m.st === "sending" || m.st === "failed") && !m.why && !m.busy &&
+          now - m.at < 7 * 86400000 && (m.tries || 0) < 30) chatDeliver(pid, m);
+    });
+  });
+}
+
+/* ----------------------------------------------------------- receiving */
+function chatTake(f){
+  if (!state || !state.me || !f || !f.cid) return;
+  var mine = f.from === state.me;
+  var pid = mine ? f.to : f.from;
+  if (!pid || pid === state.me || !memberById(pid)) return;
+  var m = chatFind(pid, f.cid);
+  if (m) {
+    /* Our own message, echoed back: it has reached the server. */
+    if (mine && CHAT_RANK[m.st || "sent"] < CHAT_RANK.sent) {
+      m.st = "sent"; chatSave(); chatChanged(pid);
+    }
+    return;
+  }
+  m = { c: f.cid, d: mine ? "out" : "in", t: String(f.text || ""), at: f.time || Date.now() };
+  if (mine) m.st = "sent";              /* sent from another phone of ours */
+  chatInsert(chatList(pid), m);
+  chatSave();
+  if (!mine) {
+    var looking = chatOpenId === pid && !document.hidden;
+    if (looking) { m.r = 1; chatAck(pid, m.c, "r"); }
+    else {
+      chatAck(pid, m.c, "d");
+      if (Date.now() - (f.time || 0) < 120000 && !call && !group && !document.hidden) {
+        cue("_msg", [60]);
+        chatBanner(pid, m.t);
+      }
+    }
+  }
+  chatChanged(pid, looking);
+}
+function rcptTake(f){
+  if (!state || !state.me || !f) return;
+  var mine = f.from === state.me;       /* read on another phone of ours */
+  var pid = mine ? f.to : f.from;
+  var list = chatStore().by[pid];
+  if (!list) return;
+  var ids = {}; (f.ids || []).forEach(function(id){ ids[id] = 1; });
+  var st = f.s === "r" ? "read" : "delivered", changed = false;
+  list.forEach(function(m){
+    if (!ids[m.c]) return;
+    if (mine) { if (m.d === "in" && !m.r) { m.r = 1; changed = true; } }
+    else if (m.d === "out" && CHAT_RANK[st] > CHAT_RANK[m.st || "sent"]) { m.st = st; changed = true; }
+  });
+  if (changed) { chatSave(); chatChanged(pid); }
+}
+
+var ackQ = {}, ackTimer = null;
+function chatAck(pid, cid, s){
+  var q = ackQ[pid] = ackQ[pid] || { d: [], r: [] };
+  q[s].push(cid);
+  if (!ackTimer) ackTimer = setTimeout(chatAckFlush, 500);
+}
+function chatAckFlush(){
+  ackTimer = null;
+  var q = ackQ; ackQ = {};
+  Object.keys(q).forEach(function(pid){
+    ["d", "r"].forEach(function(s){
+      for (var i = 0; i < q[pid][s].length; i += 200)
+        fsRequest({ k: "rcpt", to: pid, s: s, ids: q[pid][s].slice(i, i + 200) }, 10000);
+    });
+  });
+}
+function chatMarkRead(pid){
+  var ids = [];
+  (chatStore().by[pid] || []).forEach(function(m){
+    if (m.d === "in" && !m.r) { m.r = 1; ids.push(m.c); }
+  });
+  if (ids.length) { chatSave(); ids.forEach(function(id){ chatAck(pid, id, "r"); }); chatChanged(pid); }
+  swPost({ t: "readchat", from: pid });
+}
+
+/* Something changed in one conversation (or, with null, in any). */
+function chatChanged(pid, toBottom){
+  if (chatOpenId && (!pid || pid === chatOpenId)) chatPaint(!!toBottom);
+  paintCardNotes();
+}
+
+/* ------------------------------------------------------ the icon badge */
+var badgeLast = -1;
+function swPost(msg){
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.getRegistration().then(function(reg){
+      var w = reg && reg.active; if (w) w.postMessage(msg);
+    }).catch(function(){});
+  } catch (e) {}
+}
+function paintBadge(){
+  if (!state || !state.me) return;
+  var n = missedCount(null) + chatUnreadAll();
+  if (n === badgeLast) return;
+  badgeLast = n;
+  try {
+    if (navigator.setAppBadge) {
+      var p = n ? navigator.setAppBadge(n) : (navigator.clearAppBadge ? navigator.clearAppBadge() : null);
+      if (p && p.catch) p.catch(function(){});
+    }
+  } catch (e) {}
+  swPost({ t: "badge", n: n });
+}
+
+/* A message from somebody else, while you are elsewhere in the app. */
+var bannerTimer = null;
+function chatBanner(pid, text){
+  var b = $("chatBanner");
+  if (!b) return;
+  var m = memberById(pid);
+  b.innerHTML = "";
+  var av = document.createElement("span"); av.className = "cav";
+  av.style.background = m ? m.colour : "#5B8DEF"; av.textContent = initials(m ? m.name : "?");
+  var tx = document.createElement("span"); tx.className = "btx";
+  var nm = document.createElement("b"); nm.textContent = nameOf(pid);
+  var bd = document.createElement("span"); bd.textContent = text;
+  tx.appendChild(nm); tx.appendChild(bd);
+  b.appendChild(av); b.appendChild(tx);
+  b.onclick = function(){ b.classList.remove("on"); openChat(pid); };
+  b.classList.add("on");
+  if (bannerTimer) clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(function(){ b.classList.remove("on"); }, 4500);
+}
+
+/* ------------------------------------------------------------- screen */
+var CHK1 = '<svg viewBox="0 0 16 11" width="15" height="11"><path d="M1.5 6 5 9.5 14.5 1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var CHK2 = '<svg viewBox="0 0 20 11" width="19" height="11"><path d="M1.5 6 5 9.5 14.5 1M8.5 8.2 9.8 9.5 19 1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var CLOCK = '<svg viewBox="0 0 12 12" width="11" height="11"><circle cx="6" cy="6" r="4.8" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3.3V6l1.8 1.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+
+function openChat(id){
+  var m = memberById(id);
+  if (!m || id === state.me) return;
+  var wasOpen = !!chatOpenId;
+  chatOpenId = id; chatShowAll = false; pendingId = id;
+  var av = $("chatAv");
+  av.textContent = initials(m.name); av.style.background = m.colour;
+  $("chatName").textContent = m.name;
+  chatPaintSub();
+  $("chatInput").value = ""; chatGrow();
+  $("chat").classList.add("on");
+  $("chat").setAttribute("aria-hidden", "false");
+  /* The phone's Back button closes the conversation, not the app. */
+  if (!wasOpen) { try { history.pushState({ fmnChat: 1 }, ""); } catch (e) {} }
+  clearMissed(m);
+  chatFit();
+  chatPaint(true);
+  chatMarkRead(id);
+  unlockAudio();
+  askNotify();
+}
+/* The old name, used all over: a person's card, the panel, Recent,
+   "Call back" on a missed call - all now open the conversation. */
+function openAct(id){ openChat(id); }
+
+function closeChat(fromHistory){
+  if (!chatOpenId) return;
+  chatOpenId = null;
+  $("chat").classList.remove("on");
+  $("chat").setAttribute("aria-hidden", "true");
+  try { $("chatInput").blur(); } catch (e) {}
+  if (!fromHistory && history.state && history.state.fmnChat) { try { history.back(); } catch (e) {} }
+  paintCardNotes();
+}
+window.addEventListener("popstate", function(){ if (chatOpenId) closeChat(true); });
+
+function chatPaintSub(){
+  if (!chatOpenId) return;
+  var st = presenceOf(chatOpenId), tt = theirTime(chatOpenId);
+  var sub = $("chatSub");
+  sub.textContent = st.text + (tt ? " · " + (tt.night ? "\u263E " : "") + tt.short : "");
+  sub.className = st.k;
+}
+
+function chatItems(pid){
+  var m = memberById(pid), items = [];
+  (chatStore().by[pid] || []).forEach(function(x){ items.push({ k: "msg", at: x.at, m: x }); });
+  if (m) recentList().forEach(function(r){
+    if (!r.grp && entryFor(r, m) && r.st !== "calling") items.push({ k: r.k, at: r.at, r: r });
+  });
+  items.sort(function(a, b){ return a.at - b.at; });
+  return items;
+}
+
+function chatPaint(toBottom){
+  var body = $("chatBody");
+  if (!body || !chatOpenId) return;
+  var pid = chatOpenId;
+  var near = body.scrollHeight - body.scrollTop - body.clientHeight < 90;
+  var items = chatItems(pid);
+  var LIMIT = 150, skip = chatShowAll ? 0 : Math.max(0, items.length - LIMIT);
+  body.innerHTML = "";
+  if (skip) {
+    var more = document.createElement("button");
+    more.className = "more cmore"; more.textContent = "Show earlier (" + skip + ")";
+    more.onclick = function(){ chatShowAll = true; chatPaint(false); body.scrollTop = 0; };
+    body.appendChild(more);
+  }
+  if (!items.length) {
+    var hi = document.createElement("p");
+    hi.className = "cempty";
+    hi.textContent = "Messages, calls and buzzes with " + nameOf(pid) + " all show up here.";
+    body.appendChild(hi);
+  }
+  var lastDay = "";
+  items.slice(skip).forEach(function(it){
+    var day = dayLabel(it.at);
+    if (day !== lastDay) {
+      var dh = document.createElement("div"); dh.className = "cday";
+      var sp = document.createElement("span"); sp.textContent = day;
+      dh.appendChild(sp); body.appendChild(dh); lastDay = day;
+    }
+    body.appendChild(it.k === "msg" ? chatBubble(pid, it.m) : chatEvent(pid, it.r));
+  });
+  if (toBottom || near) body.scrollTop = body.scrollHeight;
+  chatQuick();
+}
+
+function chatBubble(pid, m){
+  var d = document.createElement("div");
+  d.className = "bub " + (m.d === "out" ? "out" : "in") + (m.st === "failed" ? " failed" : "");
+  var t = document.createElement("span"); t.className = "bt"; t.textContent = m.t;
+  var meta = document.createElement("span"); meta.className = "bm";
+  var tm = document.createElement("span"); tm.textContent = timeOf(m.at);
+  meta.appendChild(tm);
+  if (m.d === "out") {
+    var tk = document.createElement("span");
+    tk.className = "tk " + (m.st || "sent");
+    tk.innerHTML = m.st === "sending" ? CLOCK : m.st === "failed" ? "!" :
+                   m.st === "delivered" || m.st === "read" ? CHK2 : CHK1;
+    tk.setAttribute("aria-label", { sending: "Sending", failed: "Not sent", sent: "Sent",
+                                    delivered: "Delivered", read: "Read" }[m.st || "sent"]);
+    meta.appendChild(tk);
+  }
+  d.appendChild(t); d.appendChild(meta);
+  if (m.st === "failed") {
+    var why = document.createElement("span"); why.className = "bwhy";
+    why.textContent = m.why || "Not sent yet — it goes when you're back online. Tap to try now.";
+    d.appendChild(why);
+    if (!m.why) d.onclick = function(){ m.st = "sending"; chatPaint(false); chatDeliver(pid, m); };
+  }
+  return d;
+}
+
+function chatEvent(pid, r){
+  var d = document.createElement("div");
+  var missed = r.k === "call" && r.st === "missed";
+  d.className = "cev" + (missed ? " missed" : "");
+  var ic = document.createElement("span"); ic.className = "ic";
+  ic.innerHTML = r.k === "buzz" ? ICON.bell : (r.dir === "out" ? ICON.outArr : ICON.inArr);
+  var tx = document.createElement("span");
+  tx.textContent = (r.k === "call" ? callLabel(r) : buzzLabel(r)) + " · " + timeOf(r.at);
+  d.appendChild(ic); d.appendChild(tx);
+  if (missed) {
+    var cb = document.createElement("button");
+    cb.className = "cbk"; cb.textContent = "Call back";
+    cb.onclick = function(){ chatCall(pid); };
+    d.appendChild(cb);
+  }
+  return d;
+}
+
+/* Quick replies, while nothing is typed - sent as messages. */
+function chatQuick(){
+  var q = $("chatQuick");
+  if (!q) return;
+  var empty = !$("chatInput").value;
+  q.style.display = empty ? "" : "none";
+  if (q.childNodes.length) return;
+  QUICK.forEach(function(text){
+    var b = document.createElement("button");
+    b.className = "chip2"; b.textContent = text;
+    b.onclick = function(){ if (chatOpenId) chatSend(chatOpenId, text); };
+    q.appendChild(b);
+  });
+}
+
+function chatGrow(){
+  var i = $("chatInput");
+  if (!i) return;
+  i.style.height = "auto";
+  i.style.height = Math.min(i.scrollHeight, 132) + "px";
+  var q = $("chatQuick"); if (q) q.style.display = i.value ? "none" : "";
+}
+
+function chatCall(pid){
+  unlockAudio(); askNotify();
+  nightCheck([pid], function(){ startCall(pid); });
+}
+
+/* With the keyboard up, the conversation fits the part of the screen
+   that is left, so the box you type in is never hidden under it. */
+function chatFit(){
+  var c = $("chat"), vv = window.visualViewport;
+  if (!c || !c.classList.contains("on") || !vv) return;
+  var body = $("chatBody");
+  var near = body && body.scrollHeight - body.scrollTop - body.clientHeight < 90;
+  c.style.height = vv.height + "px";
+  c.style.top = vv.offsetTop + "px";
+  if (near) body.scrollTop = body.scrollHeight;
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", chatFit);
+  window.visualViewport.addEventListener("scroll", chatFit);
+}
+
+(function(){
+  var send = function(){
+    var i = $("chatInput");
+    if (!chatOpenId || !i.value.replace(/\s/g, "")) return;
+    chatSend(chatOpenId, i.value);
+    i.value = ""; chatGrow();
+  };
+  $("chatSend").onclick = send;
+  /* Keeps the keyboard up: the button must not take the focus. */
+  ["pointerdown", "mousedown"].forEach(function(ev){
+    $("chatSend").addEventListener(ev, function(e){ e.preventDefault(); });
+  });
+  $("chatInput").addEventListener("input", chatGrow);
+  $("chatInput").addEventListener("keydown", function(e){
+    /* Enter sends on a computer; on a phone it is a new line, and the
+       button sends - as in other messaging apps. */
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !isPhone()) { e.preventDefault(); send(); }
+  });
+  $("chatBack").onclick = function(){ closeChat(false); };
+  $("chatCall").onclick = function(){ if (chatOpenId) chatCall(chatOpenId); };
+  $("chatBuzz").onclick = function(){
+    if (!chatOpenId) return;
+    pendingId = chatOpenId; unlockAudio(); openMsgSheet();
+  };
+})();
+
 /* ------------------------------------------------------------ sheets */
 
 var pendingId = null;
 
-function openAct(id){
+/* The old action sheet - replaced by the conversation (openChat). */
+function openActSheet(id){
   pendingId = id;
   $("actTitle").textContent = nameOf(id);
   var st = presenceOf(id);
@@ -6205,6 +7208,7 @@ function applyUpdate(){
     .then(function(r){ return r && r.update(); }).catch(function(){}));
   function go(){
     try { localStorage.setItem("fmn-updated-from", VERSION); } catch (e) {}
+    saveFlush(); chatFlush();
     location.reload();
   }
   Promise.race([Promise.all(jobs), new Promise(function(r){ setTimeout(r, 4000); })]).then(go, go);
@@ -7390,6 +8394,14 @@ function readIntent(){
       callBackTo = null;
     }, 400);
   }
+  /* A message notification: straight into that conversation. */
+  var ch = h.match(/[#&]chat=([A-Za-z0-9]{3,16})(&|$)/);
+  if (ch) {
+    var chatTo = ch[1];
+    setTimeout(function(){
+      if (state && state.me && memberById(chatTo) && !call && !group) openChat(chatTo);
+    }, 400);
+  }
   /* "Join" on a group call's notification. */
   var gr = h.match(/[#&]gr=([A-Za-z0-9_-]{4,32})(&|$)/);
   if (gr) groupAutoJoin(gr[1]);
@@ -7409,7 +8421,7 @@ function readIntent(){
     if (joinReqs[ap[1]]) approveJoin(ap[1]);
     else approveIntent = ap[1];
   }
-  if ((openedFromNote || autoAnswerUntil || cb || gr || ap || jr) && !/[#&]j=/.test(h))
+  if ((openedFromNote || autoAnswerUntil || cb || ch || gr || ap || jr) && !/[#&]j=/.test(h))
     history.replaceState(null, "", location.pathname);
 }
 
@@ -8076,6 +9088,8 @@ function removeThisPhone(noUndo){
       if (noUndo) localStorage.removeItem(UNDO_KEY);
       else localStorage.setItem(UNDO_KEY, JSON.stringify({ at: Date.now(), state: snap }));
     } catch (e) {}
+    chatFlush();
+    if (noUndo) chatWipe();
     wipeStorage();
     closeStreams();
     state = null;
@@ -8658,6 +9672,7 @@ function presenceOf(id){
 }
 function paintPresence(){
   paintTileNotes();
+  chatPaintSub();
   Array.prototype.forEach.call(document.querySelectorAll(".person[data-id]"), function(card){
     var st = presenceOf(card.getAttribute("data-id"));
     var d = card.querySelector(".pdot"), t = card.querySelector(".pres");
@@ -9391,10 +10406,10 @@ function sfuAttach(g, l, track){
     l.audio.autoplay = true;
     l.audio.setAttribute("playsinline", "");
     $("gAudio").appendChild(l.audio);
-    if (g.speaker) sinkTo(l.audio, true);
   }
   l.audio.srcObject = new MediaStream([track]);
   l.track = track;
+  sinkTo(l.audio, !!g.speaker);
   var p = l.audio.play();
   if (p && p.catch) p.catch(function(){ gTapForSound(); });
   sfuLinkUp(g, l);
@@ -9446,9 +10461,9 @@ function openLink(g, id, offerer, at){
       l.audio.autoplay = true;
       l.audio.setAttribute("playsinline", "");
       $("gAudio").appendChild(l.audio);
-      if (g.speaker) sinkTo(l.audio, true);
     }
     l.audio.srcObject = ev.streams[0] || new MediaStream([ev.track]);
+    sinkTo(l.audio, !!g.speaker);
     var p = l.audio.play();
     if (p && p.catch) p.catch(function(){ gTapForSound(); });
   };
@@ -9524,7 +10539,7 @@ function closeLink(g, id){
   if (l.iceTimer) clearTimeout(l.iceTimer);
   if (l.virtual) { if (g.sfu && l.mid) delete g.sfu.byMid[l.mid]; }
   else { try { l.pc.close(); } catch (e) {} }
-  if (l.audio) { try { l.audio.srcObject = null; l.audio.remove(); } catch (e) {} }
+  if (l.audio) { outChainOff(l.audio); try { l.audio.srcObject = null; l.audio.remove(); } catch (e) {} }
 }
 function closeAllLinks(g){ Object.keys(g.links).forEach(function(id){ closeLink(g, id); }); }
 
@@ -9818,11 +10833,14 @@ function paintGroupButtons(incoming){
   add("spk", ICON.spk, "Speaker", function(){
     if (!group) return;
     group.speaker = !group.speaker;
+    var jobs = [];
     Object.keys(group.links).forEach(function(id){
-      if (group.links[id].audio) sinkTo(group.links[id].audio, group.speaker);
+      if (group.links[id].audio) jobs.push(sinkTo(group.links[id].audio, group.speaker));
     });
-    if (!document.createElement("audio").setSinkId)
-      gNote(group.speaker ? "Use your phone's volume buttons — this browser picks the speaker itself" : "");
+    Promise.all(jobs).then(function(){
+      gNote(outInfo.how === "headset" ? "Playing in your headphones"
+          : group.speaker ? "Speaker — louder" : (isPhone() ? "Phone — quieter, hold it to your ear" : ""));
+    });
     paintGroup();
   });
   add("add", ICON.addp, "Add", function(){
@@ -9832,16 +10850,8 @@ function paintGroupButtons(incoming){
   add("hang", ICON.end, "Leave", groupLeave);
 }
 
-function sinkTo(el, loud){
-  if (!el.setSinkId || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
-  navigator.mediaDevices.enumerateDevices().then(function(list){
-    var outs = list.filter(function(d){ return d.kind === "audiooutput"; });
-    var sp = outs.filter(function(d){ return /speaker|loud/i.test(d.label) && !/ear|receiver|handset/i.test(d.label); })[0];
-    var ear = outs.filter(function(d){ return /ear|receiver|handset/i.test(d.label); })[0];
-    var target = loud ? sp : (ear || outs.filter(function(d){ return d.deviceId === "default"; })[0]);
-    if (target) el.setSinkId(target.deviceId).catch(function(){});
-  }).catch(function(){});
-}
+/* The same Phone / Speaker as a one-to-one call (see outRoute). */
+function sinkTo(el, loud){ return outRoute(el, !!loud); }
 
 function gTapForSound(){
   gNote("Tap anywhere to hear everyone");
@@ -9893,8 +10903,32 @@ if (state) {
     writeJSON(USAGEKEY, ledger);
   }
 })();
+/* What ringing on silent can and cannot do, said plainly for this phone.
+   A web app cannot ring through the silent switch or Do Not Disturb
+   while it is closed - only a phone's own apps can. What it can do: ring
+   out loud while it is open (it does), keep re-sending the call's
+   notification so the phone keeps vibrating, and point at the phone's
+   own settings that let those notifications through. */
+(function(){
+  var el = $("silentHow");
+  if (!el) return;
+  el.innerHTML = isIOS()
+    ? "With the app open, a call rings out loud even on silent. With it closed, an iPhone " +
+      "doesn't let any web app ring through silent - but it can <b>vibrate</b> for every ring: " +
+      "Settings → Sounds &amp; Haptics → Haptics → <b>Always Play</b>. If you use a Focus " +
+      "(Sleep, Work), allow Family Notifier's notifications in it."
+    : isAndroid()
+    ? "With the app open, a call rings out loud. With it closed, a call is your browser's " +
+      "notification: in vibrate mode every ring vibrates in a long pattern (a message vibrates " +
+      "once, a buzz twice). To let calls through Do Not Disturb: long-press a call notification → " +
+      "<b>Settings</b> → this site → turn on <b>Override Do Not Disturb</b> (and make sure it is set to alert)."
+    : "Calls ring out loud while the app is open. On a computer, check that notifications for " +
+      "this site are allowed and not muted by Focus / Do Not Disturb.";
+})();
+
 readIntent();
 if (!redeemInvite() && !tryJoin()) paintMain();
+setTimeout(paintBadge, 1500);
 if (state && state.me) { openStreams(); fsCheckPush().then(paintPushWarn); }
 
 restoreFromIdb();
@@ -9931,7 +10965,7 @@ document.addEventListener("visibilitychange", function(){
      connection without saying so, so reopen; after a glance away, just
      catch up on anything missed. */
   if (hiddenAt && Date.now() - hiddenAt > 30000) { fsRetry = 1000; openStreams(); }
-  else reviveStreams();
+  else { reviveStreams(); if (hiddenAt && Date.now() - hiddenAt > 5000) fsProbe(5000); }
 });
 
 window.addEventListener("online", function(){
