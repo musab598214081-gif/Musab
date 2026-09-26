@@ -310,7 +310,9 @@
   .contacts .clab + .seg{margin-top:0}
   .swatches.mini .swatch{width:30px;height:30px;margin:0 8px 8px 0}
   /* Ringtones: a compact grid, the chosen one in brass. */
-  #toneList{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #toneList,.tonegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  input.vol{width:100%;accent-color:var(--brass);height:28px;margin:0}
+  .toneopt.none .tp{background:transparent;border:1px dashed var(--seam)}
   .toneopt{display:flex;align-items:center;gap:10px;padding:14px 12px;border-radius:14px;
     background:var(--night);border:1px solid var(--seam);color:var(--paper);font:inherit;
     font-size:15px;cursor:pointer;text-align:left}
@@ -756,7 +758,102 @@
   #cmenu button:active{background:rgba(255,255,255,.1)}
   #cmenu button.danger{color:#FF8589}
   #cmenu svg{width:19px;height:19px;flex:0 0 auto}
+  /* ---- Pictures, files and locations ---- */
+  .attbtn{width:44px;height:44px;flex:0 0 auto;border-radius:50%;border:0;background:transparent;
+    color:var(--mist);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-right:-4px}
+  .attbtn svg{width:26px;height:26px}
+  .attbtn:active{background:var(--hearth)}
+  #chat.drop .cbody{outline:2px dashed var(--brass);outline-offset:-8px}
+  .bub.media{padding:4px 4px 5px}
+  .bub.media > .bt{padding:0 6px}
+  .bub.media > .mimg + .bt,.bub.media > .mfile + .bt,.bub.media > .mloc + .bt{display:inline-block;margin-top:4px}
+  .bub.media > .bm{margin-right:6px}
+  .bub.media > .bwhy{padding:0 6px}
+  .bub.media > .bq{margin:0 0 4px}
+  .mimg{position:relative;overflow:hidden;border-radius:12px;background:#0B1623;cursor:pointer;max-width:100%}
+  .mimg img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block}
+  .mimg .full{opacity:0}
+  .mimg.ok .full{opacity:1}
+  .msz{position:absolute;left:8px;bottom:8px;font-size:11.5px;color:#E6EEF6;background:rgba(8,14,22,.6);
+    padding:2px 7px;border-radius:9px}
+  .msz:empty{display:none}
+  .bub.photo.nocap > .bm{position:absolute;right:10px;bottom:10px;margin:0;top:auto;float:none;
+    background:rgba(8,14,22,.55);padding:2px 7px;border-radius:9px;color:#E6EEF6}
+  .bub.photo.nocap{padding-bottom:4px}
+  .mst{width:46px;height:46px;border-radius:50%;border:0;padding:0;display:flex;align-items:center;
+    justify-content:center;background:rgba(8,14,22,.62);color:#fff;cursor:pointer;flex:0 0 auto;position:relative}
+  .mst svg{width:22px;height:22px;position:relative}
+  .mimg .mst{position:absolute;left:50%;top:50%;margin:-23px 0 0 -23px}
+  .mst.ok,.mst.gone,.mst.blocked{display:none}
+  .mfile .mst.ok{display:flex;background:rgba(255,255,255,.08)}
+  .mst.run,.mst.up,.mst.prep{background:conic-gradient(var(--brass) calc(var(--p,0) * 1turn),rgba(8,14,22,.62) 0)}
+  .mst.run::before,.mst.up::before,.mst.prep::before{content:"";position:absolute;inset:3px;border-radius:50%;
+    background:rgba(8,14,22,.85)}
+  .mst.prep{animation:mspin 1s linear infinite;--p:.25}
+  @keyframes mspin{to{transform:rotate(1turn)}}
+  .mimg .mst.prep{animation:none}
+  .mfile{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;background:rgba(0,0,0,.18);
+    min-width:min(230px,62vw);cursor:pointer}
+  .fic{width:38px;height:46px;border-radius:7px;background:var(--brass);color:var(--brass-ink);
+    font-weight:700;font-size:10.5px;display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:6px;flex:0 0 auto;letter-spacing:.2px}
+  .ftx{flex:1;min-width:0;display:flex;flex-direction:column}
+  .ftx b{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ftx small{font-size:12px;color:#9FB6CC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mfile .mst{width:40px;height:40px}
+  .mloc{display:flex;align-items:center;gap:10px;padding:9px;border-radius:12px;background:rgba(0,0,0,.18);
+    min-width:min(240px,64vw);cursor:pointer}
+  .mloc .lic{width:40px;height:40px;border-radius:50%;background:var(--go);color:#062414;display:flex;
+    align-items:center;justify-content:center;flex:0 0 auto}
+  .mloc .lic svg{width:22px;height:22px}
+  .mloc .ltx{flex:1;min-width:0;display:flex;flex-direction:column}
+  .mloc .ltx b{font-size:14.5px;font-weight:600}
+  .mloc .ltx small{font-size:12px;color:#9FB6CC}
+  .mloc .lgo{font-size:12.5px;font-weight:600;color:var(--brass);white-space:nowrap}
+  .attgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;margin:4px 0 6px}
+  .atile{position:relative;border-radius:12px;background:var(--night);overflow:hidden;aspect-ratio:1;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px}
+  .atile.pic{padding:0}
+  .atile img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
+  .atile .anm{font-size:11.5px;color:var(--paper);text-align:center;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+  .atile .asz{position:absolute;left:4px;right:4px;bottom:4px;font-size:10.5px;text-align:center;
+    color:#E6EEF6;background:rgba(8,14,22,.6);border-radius:7px;padding:1px 4px}
+  .atile.big{outline:2px solid var(--stop);outline-offset:-2px}
+  .atile.big .asz{background:var(--stop);color:#fff}
+  .locst{font-size:14px;line-height:1.45;margin:0 0 4px;color:var(--mist)}
+  .locst:empty{display:none}
+  .locst.ok{color:var(--go)} .locst.bad{color:#FF8589}
+  #mview{position:fixed;top:0;left:0;right:0;bottom:0;z-index:55;background:#05090F;display:flex;
+    flex-direction:column}
+  #mview[hidden]{display:none}
+  .mvtop{display:flex;align-items:center;gap:6px;padding:calc(6px + env(safe-area-inset-top,0px)) 8px 6px}
+  .mvtop .iconbtn{color:var(--paper)}
+  .mvwho{flex:1;min-width:0;display:flex;flex-direction:column}
+  .mvwho b{font-size:16px} .mvwho small{font-size:12px;color:var(--mist)}
+  .mvwrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in}
+  .mvwrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+  .mvwrap.zoom{overflow:auto;display:block;cursor:zoom-out}
+  .mvwrap.zoom img{max-width:none;max-height:none;width:250%;height:auto}
+  .mvcap{margin:0;padding:10px 16px calc(14px + env(safe-area-inset-bottom,0px));font-size:15px;
+    line-height:1.4;color:var(--paper);max-height:30vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+
+  /* ---- Screen sharing in a call ---- */
+  .scr{flex:1 1 auto;min-height:0;width:100%;max-width:1100px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;margin:10px 0}
+  .scr[hidden]{display:none}
+  .scr video{flex:1 1 auto;min-height:0;width:100%;border-radius:14px;background:#000;object-fit:contain;cursor:zoom-in}
+  .scrcap{font-size:13px;color:var(--mist);margin:8px 0 0;text-align:center}
+  #call.scrin{padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+  #call.scrin .halo,#call.scrin .qual{display:none}
+  #call.scrin .peer{font-size:20px;margin-bottom:2px}
+  #call.scrin .state{font-size:14px}
+  #call .controls{max-width:520px}
+  .rnd.scrbtn{background:rgba(255,255,255,.1)}
+  .rnd.scrbtn.on{background:var(--brass);color:var(--brass-ink)}
+
   @media (prefers-reduced-motion:reduce){
+    .mst.prep{animation:none}
     .bub.snap{transition:none} .brep{transition:none}
     .bub.flash{animation:none;box-shadow:0 0 0 3px var(--brass)}
   }
@@ -818,6 +915,11 @@
     <p class="peer" id="callPeer">—</p>
     <p class="state" id="callState">Calling…</p>
     <div class="qual" id="callQual" title="Call quality"><span></span><span></span><span></span></div>
+  </div>
+  <!-- The other person's screen, while they share it. -->
+  <div class="scr" id="scrView" hidden>
+    <video id="scrVideo" playsinline autoplay muted aria-label="Shared screen"></video>
+    <p class="scrcap" id="scrCap"></p>
   </div>
   <div class="controls">
     <div class="callbtns" id="callBtns"></div>
@@ -1001,12 +1103,47 @@
     <button class="btn ghost" id="micAllow">Allow the microphone now</button>
     </div>
 
+    <div id="mediaBlock" data-pages="media">
+    <div class="sectiontitle">Download automatically</div>
+    <p class="sub" id="mediaNet"></p>
+    <label class="chk"><input type="checkbox" id="mapw"><span>Photos on Wi-Fi</span></label>
+    <label class="chk"><input type="checkbox" id="mapm"><span>Photos on mobile data</span></label>
+    <label class="chk"><input type="checkbox" id="mafw"><span>Files on Wi-Fi</span></label>
+    <label class="chk"><input type="checkbox" id="mafm"><span>Files on mobile data</span></label>
+    <p class="sub">Anything not downloaded shows a download button with its size, so you
+      decide. Nothing downloads by itself during a call, so the call keeps the bandwidth,
+      and nothing does while Data Saver is on.</p>
+    <div class="sectiontitle">Storage on this phone</div>
+    <p class="sub" id="mediaUse">—</p>
+    <button class="btn ghost" id="mediaFree">Free up space</button>
+    <div class="sectiontitle">Sizes</div>
+    <p class="sub" id="mediaLim"></p>
+    </div>
+
     <div id="toneBlock" data-pages="ringtone">
-    <div class="sectiontitle">Ringtone</div>
-    <p class="sub">How this phone sounds when somebody calls or buzzes you.
-      Tap one to hear it at full ring volume. This is your own setting — it
-      doesn't change what anyone else hears.</p>
-    <div id="toneList"></div>
+    <p class="sub">Two sounds, never mixed up: the ringtone is only for
+      someone calling you, and one short sound is for everything else. These
+      are your own settings on this phone — they don't change what anyone
+      else hears.</p>
+
+    <div class="sectiontitle">Incoming calls</div>
+    <p class="sub">Rings until you answer or decline, or the caller gives up. Tap one to hear it.</p>
+    <div id="toneList" class="tonegrid"></div>
+    <label for="ringVol">Ringtone volume</label>
+    <input type="range" id="ringVol" class="vol" min="2" max="10" step="1">
+    <label class="chk"><input type="checkbox" id="ringVib"><span>Vibrate when a call comes in</span></label>
+
+    <div class="sectiontitle">Messages and everything else</div>
+    <p class="sub">One short sound for messages, photos, files, locations, missed
+      calls, buzzes and other alerts. Tap one to hear it.</p>
+    <div id="noteList" class="tonegrid"></div>
+    <label for="noteVol">Notification volume</label>
+    <input type="range" id="noteVol" class="vol" min="1" max="10" step="1">
+    <label class="chk"><input type="checkbox" id="noteVib"><span>Vibrate for notifications</span></label>
+    <label class="chk"><input type="checkbox" id="noteOpen"><span>Play a soft sound for messages in the chat you have open</span></label>
+
+    <div class="sectiontitle">With the app closed or the phone locked</div>
+    <p class="sub" id="sndClosedNote"></p>
     </div>
 
     <div id="presBlock" style="display:none" data-pages="status">
@@ -1145,6 +1282,9 @@
     </button>
   </div>
   <div class="cfoot">
+    <button class="attbtn" id="chatAtt" aria-label="Send a photo, file or location" aria-haspopup="menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
     <textarea id="chatInput" rows="1" maxlength="4000" placeholder="Message" aria-label="Message"
               autocomplete="off" enterkeyhint="send"></textarea>
     <button id="chatSend" aria-label="Send">
@@ -1153,6 +1293,52 @@
   </div>
 </div>
 <div id="chatBanner" role="status"></div>
+<!-- Picking pictures and files (hidden - opened from the + menu). -->
+<input type="file" id="attPhotos" accept="image/*" multiple hidden>
+<input type="file" id="attCamera" accept="image/*" capture="environment" hidden>
+<input type="file" id="attFiles" multiple hidden>
+
+<div class="sheet" id="attSheet">
+  <div class="sheetbody">
+    <h2 id="attTitle">Send</h2>
+    <p class="sub" id="attNote"></p>
+    <div class="attgrid" id="attGrid"></div>
+    <label for="attCap">Add a message (optional)</label>
+    <input type="text" id="attCap" maxlength="4000" autocomplete="off" placeholder="Message">
+    <label class="chk" id="attHdRow"><input type="checkbox" id="attHd">
+      <span>HD photos — sharper, but about three times the data</span></label>
+    <button class="btn" id="attGo">Send</button>
+    <button class="btn ghost" id="attCancel">Cancel</button>
+  </div>
+</div>
+
+<div class="sheet" id="locSheet">
+  <div class="sheetbody">
+    <h2 id="locTitle">Share your location?</h2>
+    <p class="sub" id="locSub"></p>
+    <p class="locst" id="locState" role="status"></p>
+    <button class="btn" id="locGo">Find my location</button>
+    <button class="btn ghost" id="locCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- A photo, full screen. -->
+<div id="mview" role="dialog" aria-label="Photo" hidden>
+  <div class="mvtop">
+    <button class="iconbtn" id="mvClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="mvwho"><b id="mvWho"></b><small id="mvWhen"></small></div>
+    <button class="iconbtn" id="mvShare" aria-label="Share">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 7.5 12 4l4 3.5"/><path d="M7 11H6a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 18 11h-1"/></svg>
+    </button>
+    <button class="iconbtn" id="mvSave" aria-label="Save to phone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8 10.5l4 4 4-4"/><path d="M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+    </button>
+  </div>
+  <div class="mvwrap" id="mvWrap"><img id="mvImg" alt="Photo"></div>
+  <p class="mvcap" id="mvCap" hidden></p>
+</div>
 <!-- The small menu of a conversation (the ⋮ at the top) and of one
      message (long-press, or right-click on a computer). -->
 <div id="cmenu" role="menu" hidden></div>
@@ -1188,16 +1374,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.5.0";
+var APP_VERSION = "1.7.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Reply to a message (swipe it right), Clear chat, and smoother long conversations";
+var WHATS_NEW   = "A ringtone only for calls, one short sound for everything else — both adjustable in Settings → Sounds";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-20b";
+var VERSION  = "2026-10-20d";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1279,7 +1465,7 @@ function snapshot(){
            turn2: state.turn2 || null, route: state.route || null,
            server: state.server || null, token: state.token || null,
            fs: state.fs || null,
-           tone: state.tone || "classic",
+           tone: state.tone || "classic", snd: state.snd || null,
            pending: state.pending || [], presOff: !!state.presOff, tzOff: !!state.tzOff,
            missedIds: state.missedIds || [], grpSeen: state.grpSeen || {},
            admin: state.admin || null, admins: state.admins || [],
@@ -1785,7 +1971,10 @@ function fsFrame(f){
   } else if (f.k === "auth" && f.ok === false) {
     takeAuthFail();
   } else if (f.k === "caps") {
-    fsCaps = { sfu: !!f.sfu, turn: !!f.turn };
+    /* media: pictures and files, with their limits (null: not set up on
+       this server). A server that says anything about media at all also
+       takes locations. */
+    fsCaps = { sfu: !!f.sfu, turn: !!f.turn, media: f.media || null, loc: "media" in f };
   } else if (f.k === "guest") {
     takeGuest(f);
   } else if (f.k === "joinreq") {
@@ -2047,6 +2236,8 @@ function swConfig(){
                              skew: fsSkew });
     });
   }).catch(function(){});
+  /* And the sound settings, whether or not the rest could be sent. */
+  sndToHelper();
 }
 
 /* Takes this call's notification off this device - it was answered,
@@ -3045,6 +3236,14 @@ function paintCallButtons(incoming){
     openGroupPicker("add");
   });
 
+  /* Only where a web page can share a screen at all - on a computer.
+     Phones can still see a screen someone shares with them. */
+  if (SCR_CAN) {
+    var sb = add("scrbtn", ICO_SCREEN, "Share screen", scrToggle);
+    sb.button.id = "scrBtn"; sb.label.id = "scrLbl";
+    scrPaint();
+  }
+
   add("hang", ICON.end, "End", function(){ hangUp("ended"); });
 }
 
@@ -3310,6 +3509,8 @@ function newPeer(peerId){
   };
 
   pc.ontrack = function(ev){
+    /* A shared screen has its own place; the call's sound is untouched. */
+    if (ev.track && ev.track.kind === "video") { scrTake(ev.track); return; }
     var el = $("remoteAudio");
     /* A track that arrives without a stream (it can, from some browsers)
        used to leave the element with nothing to play - one of the ways a
@@ -3411,6 +3612,7 @@ function markConnected(){
   $("callNote").textContent = "";
   startTimer();
   setTimeout(showRoute, 600);
+  scrHello();
 }
 
 function markFailed(){
@@ -3849,7 +4051,11 @@ function noteMissed(peer, callId, quiet){
   if (callId) { state.missedIds.push(callId); state.missedIds = state.missedIds.slice(-40); }
   lastMissedAt = Date.now();
   logCall(peer, "in", "missed", { cid: callId || undefined });
-  if (!quiet) toast("Missed call from " + nameOf(peer) + " — tap their name to call back");
+  if (!quiet) {
+    toast("Missed call from " + nameOf(peer) + " — tap their name to call back");
+    /* A missed call is a notification, not a call: the short sound. */
+    notifySound("missed");
+  }
 }
 
 function onSignal(msg){
@@ -3947,6 +4153,11 @@ function onSignal(msg){
 
   if (!call || msg.call !== call.id) return;
 
+  /* Screen sharing: what the other phone can show, and whether it is
+     sharing now. */
+  if (msg.t === "scr-cap") { scrPeerCan(); return; }
+  if (msg.t === "scr") { call.scrTheirs = !!msg.on; scrPaint(); return; }
+
   if (msg.t === "answer" && call.pc) {
     stopTone();
     setCallState("Connecting…");
@@ -3975,10 +4186,27 @@ function onSignal(msg){
     return;
   }
 
-  if (msg.t === "reoffer" && call.pc) { takeReoffer(msg); return; }
+  if (msg.t === "reoffer" && call.pc) {
+    /* Both phones changed the call at the same moment (one started
+       sharing its screen while the other repaired the connection): the
+       caller's change goes first, the other phone steps back and makes
+       its own again straight after. */
+    if (call.pc.signalingState === "have-local-offer") {
+      if (call.out) return;
+      var again = !!call.scrNeg;
+      call.pc.setLocalDescription({ type: "rollback" }).then(function(){
+        takeReoffer(msg);
+        if (again) setTimeout(scrNegotiate, 1500);
+      }).catch(function(){});
+      return;
+    }
+    takeReoffer(msg); return;
+  }
   if (msg.t === "reanswer" && call.pc) {
     if (call.pc.signalingState !== "have-local-offer") return;
+    call.scrNeg = false;
     call.pc.setRemoteDescription({ type:"answer", sdp: msg.sdp })
+      .then(function(){ if (call && call.scrTx) { scrLimit(call.scrTx.sender); prioritiseAudio(); } })
       .then(checkSoon).catch(function(){});
     return;
   }
@@ -4155,6 +4383,7 @@ function hangUp(why){
     sendSig(call.peer, { t:"bye", call: call.id, from: state.me },
             { keepalive: true })
       .catch(function(){});
+  scrEnd();
   if (call.pc) { try { call.pc.close(); } catch (e) {} }
   if (call.warmPc) { try { call.warmPc.close(); } catch (e) {} call.warmPc = null; }
   stopStream(call.stream);
@@ -4178,6 +4407,188 @@ function stopStream(s){
   if (!s) return;
   s.getTracks().forEach(function(t){ try { t.stop(); } catch (e) {} });
 }
+
+/* ================================================================ *
+ * Sharing your screen in a call
+ *
+ * On a computer, "Share screen" asks the browser which screen, window or
+ * tab to show, and sends it into the call as a second stream beside the
+ * voice - the call is not restarted, and the voice keeps priority: the
+ * picture is capped at a few frames a second and a modest bitrate, and
+ * is the first thing the connection lets go of when the network is
+ * tight. Stop it with the same button or the browser's own "Stop
+ * sharing". Phones cannot share their screen from a web page, but they
+ * show a screen shared with them - tap it to see it full screen.
+ *
+ * Only offered once the other phone has said it can show a screen, so
+ * an older copy of the app on the other end is never sent one.
+ * One-to-one calls only; group calls stay voice-only for now.
+ * ================================================================ */
+var SCR_CAN = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && !isPhone();
+var ICO_SCREEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20h7M12 16.5V20M12 13V7.5M9.5 10 12 7.5l2.5 2.5"/></svg>';
+
+/* Every phone on this version can show a shared screen - said once the
+   call connects, and answered once. */
+function scrHello(){
+  if (!call || call.scrHi) return;
+  call.scrHi = true;
+  sendSig(call.peer, { t: "scr-cap", call: call.id, from: state.me }).catch(function(){});
+}
+function scrPeerCan(){
+  if (!call) return;
+  call.peerScr = true;
+  if (!call.scrHi && call.state === "connected") scrHello();
+  scrPaint();
+}
+
+function scrToggle(){
+  if (!call || !call.pc || call.state !== "connected") { toast("Share your screen once the call has connected"); return; }
+  if (call.scr) { scrStop(); return; }
+  if (!call.peerScr) { toast(nameOf(call.peer) + " needs the latest version of the app to see your screen"); return; }
+  var id = call.id;
+  navigator.mediaDevices.getDisplayMedia({
+    video: { frameRate: { ideal: 8, max: 15 }, width: { max: 1920 }, height: { max: 1080 } },
+    audio: false
+  }).then(function(stream){
+    if (!call || call.id !== id || !call.pc || call.state !== "connected") { stopStream(stream); return; }
+    var track = stream.getVideoTracks()[0];
+    if (!track) { stopStream(stream); return; }
+    try { track.contentHint = "detail"; } catch (e) {}
+    call.scr = stream;
+    /* The browser's own "Stop sharing" bar. */
+    track.onended = function(){ if (call && call.scr === stream) scrStop(); };
+    var tx = call.scrTx, pc = call.pc;
+    var ready = (tx && !tx.stopped && pc.getTransceivers().indexOf(tx) !== -1)
+      ? tx.sender.replaceTrack(track).then(function(){ tx.direction = "sendonly"; })
+      : Promise.resolve().then(function(){ call.scrTx = pc.addTransceiver(track, { direction: "sendonly" }); });
+    return ready.then(function(){
+      if (!call || call.id !== id) return;
+      scrLimit(call.scrTx.sender);
+      sendSig(call.peer, { t: "scr", call: id, from: state.me, on: true }).catch(function(){});
+      scrNegotiate();
+      scrPaint();
+    });
+  }).catch(function(e){
+    if (e && (e.name === "NotAllowedError" || e.name === "AbortError")) return;   /* you chose not to */
+    toast("Couldn't share the screen");
+  });
+}
+
+function scrStop(){
+  if (!call || !call.scr) return;
+  var s = call.scr;
+  call.scr = null;
+  stopStream(s);
+  var tx = call.scrTx;
+  if (tx && call.pc && call.pc.signalingState !== "closed") {
+    tx.sender.replaceTrack(null).catch(function(){});
+    try { tx.direction = "inactive"; } catch (e) {}
+    scrNegotiate();
+  }
+  sendSig(call.peer, { t: "scr", call: call.id, from: state.me, on: false }).catch(function(){});
+  scrPaint();
+}
+
+/* The call described again with the screen in (or out). The same
+   exchange a network repair uses; the other phone answers it as one. */
+function scrNegotiate(tries){
+  if (!call || !call.pc) return;
+  var pc = call.pc, id = call.id;
+  if (pc.signalingState !== "stable" || call.restarting) {
+    if ((tries || 0) < 12) setTimeout(function(){ if (call && call.id === id) scrNegotiate((tries || 0) + 1); }, 500);
+    return;
+  }
+  call.scrNeg = true;
+  pc.createOffer().then(function(o){ return pc.setLocalDescription(o); })
+    .then(function(){ return gathered(pc, 800); })
+    .then(function(){
+      if (!call || call.id !== id) return;
+      return sendSig(call.peer, { t: "reoffer", call: id, from: state.me, sdp: pc.localDescription.sdp });
+    })
+    .then(function(){
+      setTimeout(function(){
+        if (call && call.id === id && pc.signalingState === "have-local-offer") {
+          call.scrNeg = false;
+          pc.setLocalDescription({ type: "rollback" }).catch(function(){});
+        }
+      }, 10000);
+    })
+    .catch(function(){ if (call) call.scrNeg = false; });
+}
+
+/* The voice first: the picture gets a small, low-priority share. Less
+   again when the call goes through a relay. */
+function scrLimit(sender){
+  try {
+    if (!sender || !sender.getParameters) return;
+    var p = sender.getParameters();
+    if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+    var e = p.encodings[0];
+    e.maxBitrate = relayOnly() ? 600000 : 1200000;
+    e.maxFramerate = 10;
+    e.priority = "low";
+    e.networkPriority = "low";
+    p.degradationPreference = "maintain-resolution";
+    sender.setParameters(p).catch(function(){
+      /* Some browsers refuse the preference; the limits alone will do. */
+      try { delete p.degradationPreference; sender.setParameters(p).catch(function(){}); } catch (x) {}
+    });
+  } catch (e) {}
+}
+
+/* Their screen arriving. */
+function scrTake(track){
+  if (!call) return;
+  call.scrIn = track;
+  var v = $("scrVideo");
+  v.srcObject = new MediaStream([track]);
+  var show = function(){ if (call && call.scrIn === track) scrPaint(); };
+  track.onmute = show; track.onunmute = show; track.onended = show;
+  var p = v.play();
+  if (p && p.catch) p.catch(function(){});
+  scrPaint();
+}
+
+function scrPaint(){
+  var view = $("scrView");
+  if (!view) return;
+  var t = call && call.scrIn;
+  var showIn = !!(call && call.scrTheirs && t && t.readyState === "live");
+  if (view.hidden === showIn) view.hidden = !showIn;
+  $("call").classList.toggle("scrin", showIn);
+  $("scrCap").textContent = showIn ? nameOf(call.peer) + " is sharing their screen · tap it to see it full screen" : "";
+  var b = $("scrBtn"), l = $("scrLbl");
+  if (b) {
+    var on = !!(call && call.scr);
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-label", on ? "Stop sharing" : "Share screen");
+    l.textContent = on ? "Stop sharing" : "Share screen";
+    b.style.opacity = call && call.state === "connected" && call.peerScr ? "" : ".5";
+  }
+}
+
+/* The call is over: nothing left shared or showing. */
+function scrEnd(){
+  if (call && call.scr) { stopStream(call.scr); call.scr = null; }
+  var v = $("scrVideo");
+  if (v) { try { v.pause(); } catch (e) {} v.srcObject = null; }
+  if ($("scrView")) $("scrView").hidden = true;
+  $("call").classList.remove("scrin");
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+}
+
+(function(){
+  var v = $("scrVideo");
+  if (!v) return;
+  v.addEventListener("click", function(){
+    try {
+      if (v.webkitEnterFullscreen && isIOS()) { v.webkitEnterFullscreen(); return; }
+      if (document.fullscreenElement) { document.exitFullscreen(); return; }
+      if (v.requestFullscreen) v.requestFullscreen().catch(function(){});
+      else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen();
+    } catch (e) {}
+  });
+})();
 
 /* ================================================================ *
  * Keeping a call going
@@ -4358,6 +4769,7 @@ function swapMic(){
     track.enabled = !call.muted;
     var old = call.stream;
     var sender = call.pc.getSenders().filter(function(s){
+      if (call.scrTx && s === call.scrTx.sender) return false;     /* the screen's, not the voice's */
       return s.track === null || (s.track && s.track.kind === "audio");
     })[0];
     return (sender ? sender.replaceTrack(track) : Promise.resolve())
@@ -4929,19 +5341,89 @@ var TONES = {
     name: "Soft", gap: 3.9,
     steps: [ { f:[523], d:.5, r:.12 }, { f:[784], d:.7, r:.3 } ]
   },
-  /* Not ringtones - never offered in Settings. A buzz is a two-note
-     doorbell, played once; a message a single short tick. Neither
-     sounds anything like a call. */
-  _buzz: { name: "Buzz", gap: 0.05,
-    steps: [ { f:[988], d:.18, r:.06 }, { f:[784], d:.34, r:.05 } ] },
-  _msg:  { name: "Message", gap: 0.05,
-    steps: [ { f:[1319], d:.07, r:.02 } ] }
+  /* An old telephone's bell: two quick trills. */
+  retro: {
+    name: "Old phone", gap: 2.2,
+    steps: (function(){
+      var s = [], i;
+      for (i = 0; i < 16; i++) s.push({ f:[1000,1250], d:.03, r:.022 });
+      s[s.length - 1] = { f:[1000,1250], d:.03, r:.2 };
+      for (i = 0; i < 16; i++) s.push({ f:[1000,1250], d:.03, r:.022 });
+      return s;
+    })()
+  },
+  rise: {
+    name: "Rising", gap: 1.7,
+    steps: [ { f:[523], d:.14, r:.03 }, { f:[659], d:.14, r:.03 },
+             { f:[784], d:.14, r:.03 }, { f:[1047], d:.32, r:.1 } ]
+  },
+
+  /* ---- Notification sounds: short, played once, never looped. One of
+     these is used for every message and alert - none of them sounds
+     anything like a ringtone. `k` makes a note fade like a struck bell
+     instead of stopping flat. */
+  n_ding:   { name: "Ding", note: true, gap: 0.05,
+    steps: [ { f:[1568], d:.5, r:0, k:.13 } ] },
+  n_pop:    { name: "Pop", note: true, gap: 0.05,
+    steps: [ { f:[880], d:.08, r:.02, k:.03 }, { f:[1175], d:.13, r:0, k:.045 } ] },
+  n_chord:  { name: "Chord", note: true, gap: 0.05,
+    steps: [ { f:[784,988,1175], d:.6, r:0, k:.2 } ] },
+  n_bubble: { name: "Bubble", note: true, gap: 0.05,
+    steps: [ { f:[660], d:.07, r:.025, k:.035 }, { f:[990], d:.07, r:.025, k:.035 },
+             { f:[1320], d:.14, r:0, k:.06 } ] },
+  n_tick:   { name: "Tick", note: true, gap: 0.05,
+    steps: [ { f:[1319], d:.07, r:.02 } ] },
+
+  /* What you hear while calling someone - the standard ring-back, the
+     same for everyone. Your ringtone is only ever for calls TO you. */
+  _back: { name: "Ring-back", gap: 4,
+    steps: [ { f:[440,480], d:2, r:0 } ] }
 };
-var TONE_ORDER = ["classic","digital","chime","urgent","soft","knock"];
+var TONE_ORDER = ["classic","digital","chime","urgent","soft","knock","retro","rise"];
+var NOTE_ORDER = ["n_ding","n_pop","n_chord","n_bubble","n_tick","none"];
 
 function toneName(){
-  return (state && state.tone && TONES[state.tone]) ? state.tone : "classic";
+  return (state && state.tone && TONE_ORDER.indexOf(state.tone) !== -1) ? state.tone : "classic";
 }
+
+/* ------------------------------------------------ sound settings
+ *
+ * Two sounds, never mixed up:
+ *   the ringtone        an incoming call, and nothing else - it rings on
+ *                       until the call is answered, declined or gives up;
+ *   the notification    one short sound for everything else: messages,
+ *                       photos, files, locations, missed calls, buzzes,
+ *                       join requests.
+ * Each with its own volume and vibration. Kept with the family's
+ * settings on this phone (so they survive closing the app and
+ * restarting the phone), and handed to the notification helper, which
+ * follows them while the app is closed. */
+var SND_DEF = { rv: 1, rvib: true, nt: "n_ding", nv: 0.7, nvib: true, nopen: true };
+function sndPrefs(){
+  var s = (state && state.snd) || {}, o = {};
+  Object.keys(SND_DEF).forEach(function(k){ o[k] = typeof s[k] === typeof SND_DEF[k] ? s[k] : SND_DEF[k]; });
+  if (NOTE_ORDER.indexOf(o.nt) === -1) o.nt = SND_DEF.nt;
+  o.rv = Math.max(0.2, Math.min(1, o.rv));
+  o.nv = Math.max(0.1, Math.min(1, o.nv));
+  return o;
+}
+function sndSet(k, v){
+  if (!state) { toast("Save your family first"); return; }
+  var o = sndPrefs(); o[k] = v;
+  state.snd = o;
+  save();
+  sndToHelper();
+}
+/* The notification helper (sw.js) follows these while the app is closed:
+   no sound at all when the notification sound is None, and each kind of
+   vibration only if it is on. */
+function sndToHelper(){
+  var p = sndPrefs();
+  swPost({ t: "sound", p: { note: p.nt !== "none", nvib: p.nvib, rvib: p.rvib } });
+}
+/* A volume, as a step the sound files are made at: 10 steps is plenty
+   to hear, and keeps a handful of files instead of one per slider pixel. */
+function volStep(v){ return Math.max(1, Math.min(10, Math.round(v * 10))) / 10; }
 
 function unlockAudio(){
   try {
@@ -5053,6 +5535,7 @@ function toneSamples(key){
     for (i = 0; i < n && n0 + i < data.length; i++) {
       var t = i / RING_SR;
       var env = Math.max(0, Math.min(1, t / 0.008, (st.d - t) / 0.03));
+      if (st.k) env *= Math.exp(-t / st.k);
       var v = 0;
       for (var k = 0; k < st.f.length; k++) {
         var f = st.f[k], w = 2 * Math.PI * f * t;
@@ -5072,8 +5555,10 @@ function toneSamples(key){
   ringSamples[key] = data;
   return data;
 }
-function toneWavUrl(key){
-  if (ringUrls[key]) return ringUrls[key];
+function toneWavUrl(key, vol){
+  vol = volStep(vol == null ? 1 : vol);
+  var ck = key + "@" + vol;
+  if (ringUrls[ck]) return ringUrls[ck];
   var d = toneSamples(key), n = d.length;
   var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), o = 0;
   function str(t){ for (var j = 0; j < t.length; j++) v.setUint8(o++, t.charCodeAt(j)); }
@@ -5082,11 +5567,11 @@ function toneWavUrl(key){
   str("RIFF"); u32(36 + n * 2); str("WAVE"); str("fmt "); u32(16); u16(1); u16(1);
   u32(RING_SR); u32(RING_SR * 2); u16(2); u16(16); str("data"); u32(n * 2);
   for (var i = 0; i < n; i++) {
-    var x = Math.max(-1, Math.min(1, d[i]));
+    var x = Math.max(-1, Math.min(1, d[i] * vol));
     v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7FFF, true); o += 2;
   }
-  ringUrls[key] = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
-  return ringUrls[key];
+  ringUrls[ck] = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  return ringUrls[ck];
 }
 
 var ringEl = null, ringPrimed = false, ringLoud = false;
@@ -5098,9 +5583,9 @@ function ringElement(){
   }
   return ringEl;
 }
-function ringSrc(el, key){
-  var url = toneWavUrl(key);
-  if (el.getAttribute("data-tone") !== key) { el.src = url; el.setAttribute("data-tone", key); }
+function ringSrc(el, key, vol){
+  var url = toneWavUrl(key, vol);
+  if (el.getAttribute("src") !== url) el.src = url;
 }
 /* On iPhone the ring should sound through the loudspeaker even with the
    silent switch on, like a phone call - "playback" does that. Put back
@@ -5113,9 +5598,10 @@ function audioSession(type){
    played on a tap play again later without one. */
 function primeRinger(){
   unlockAudio();
+  primeNote();
   if (ringPrimed || ringLoud) return;
   var el = ringElement();
-  try { ringSrc(el, toneName()); } catch (e) { return; }
+  try { ringSrc(el, toneName(), sndPrefs().rv); } catch (e) { return; }
   el.muted = true;
   var p;
   try { p = el.play(); } catch (e) { el.muted = false; return; }
@@ -5143,20 +5629,21 @@ function reportAudible(tag, on){
 
 /* The ring of the page's own audio engine, for a browser that refuses
    the sound file. Loud version for incoming, as before for ring-back. */
-function engineRing(key, loud){
+function engineRing(key, loud, vol){
   if (!audioCtx) return null;
   try {
-    var src = audioCtx.createBufferSource();
+    var src = audioCtx.createBufferSource(), g = audioCtx.createGain();
     if (loud) {
       var d = toneSamples(key);
       var b = audioCtx.createBuffer(1, d.length, RING_SR);
       b.getChannelData(0).set(d);
       src.buffer = b;
     } else src.buffer = toneBuffer(key);
+    g.gain.value = vol == null ? 1 : vol;
     src.loop = true;
-    src.connect(audioCtx.destination);
+    src.connect(g); g.connect(audioCtx.destination);
     src.start();
-    return src;
+    return { stop: function(){ try { src.stop(); src.disconnect(); g.disconnect(); } catch (e) {} } };
   } catch (e) { return null; }
 }
 
@@ -5199,20 +5686,21 @@ function ringBlocked(opts){
 }
 
 /* tone()            the ring-back you hear while calling someone
-   tone({incoming})  somebody calling you - loud, and never silently
-   tone({buzz})      a buzz - loud, a few seconds */
+   tone({incoming})  somebody calling you - your ringtone, loud, and
+                     never silently. The only thing that ever plays it. */
 function tone(opts){
   opts = opts || {};
   unlockAudio();
   stopTone();
-  var key = toneName(), spec = TONES[key] || TONES.classic;
-  var loud = !!(opts.incoming || opts.buzz);
+  var loud = !!opts.incoming;
+  var sp = sndPrefs(), rv = sp.rv;
+  var key = loud ? toneName() : "_back", spec = TONES[key] || TONES.classic;
   var stops = [], on = true;
 
   if (loud) {
     audioSession("playback");
     var el = ringElement();
-    try { ringSrc(el, key); } catch (e) {}
+    try { ringSrc(el, key, rv); } catch (e) {}
     el.loop = true; el.muted = false; el.volume = 1;
     try { el.currentTime = 0; } catch (e) {}
     ringLoud = true;
@@ -5229,9 +5717,9 @@ function tone(opts){
       var tryEngine = function(){
         if (!on) return;
         if (audioCtx && audioCtx.state === "running") {
-          var src = engineRing(key, true);
+          var src = engineRing(key, true, rv);
           if (src) {
-            stops.push(function(){ try { src.stop(); src.disconnect(); } catch (e) {} });
+            stops.push(function(){ src.stop(); });
             if (opts.incoming) reportAudible(opts.tag, true);
             return;
           }
@@ -5249,8 +5737,8 @@ function tone(opts){
       if (opts.incoming) reportAudible(opts.tag, false);
     });
   } else if (audioCtx) {
-    var src = engineRing(key, false);
-    if (src) stops.push(function(){ try { src.stop(); src.disconnect(); } catch (e) {} });
+    var src = engineRing(key, false, 0.6);
+    if (src) stops.push(function(){ src.stop(); });
     else {
       /* A very old browser: one pass at a time. */
       var iv = null;
@@ -5268,19 +5756,28 @@ function tone(opts){
      as one long pattern, renewed well before it runs out. */
   function vibrate(){
     if (!navigator.vibrate) return;
+    /* Notes closer together than a phone's motor can follow (a bell's
+       trill) are felt as one long buzz. */
     var one = [];
-    spec.steps.forEach(function(st){ one.push(Math.round(st.d * 1000), Math.round(st.r * 1000)); });
+    spec.steps.forEach(function(st){
+      var on = Math.round(st.d * 1000), off = Math.round(st.r * 1000);
+      if (one.length && one[one.length - 1] < 60) { one[one.length - 2] += one[one.length - 1] + on; one[one.length - 1] = off; }
+      else one.push(on, off);
+    });
     one[one.length - 1] += Math.round(spec.gap * 1000);
-    var pat = [];
+    var pat = one.slice(0, 60);
     while (pat.length + one.length <= 60) pat = pat.concat(one);
     try { navigator.vibrate(pat); } catch (e) {}
   }
-  vibrate();
-  var vib = setInterval(vibrate, 15000);
-  stops.push(function(){
-    clearInterval(vib);
-    if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
-  });
+  /* Only an incoming call vibrates, and only if you want it to. */
+  if (loud && sp.rvib) {
+    vibrate();
+    var vib = setInterval(vibrate, 15000);
+    stops.push(function(){
+      clearInterval(vib);
+      if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
+    });
+  }
 
   /* The ring must keep sounding. While this screen says it is ringing
      out loud, the family server stops re-sending the call's
@@ -5303,8 +5800,8 @@ function tone(opts){
           clearInterval(iv);          /* handed over: never two rings at once */
           reportAudible(opts.tag, false);
           if (audioCtx && audioCtx.state === "running") {
-            var src2 = engineRing(key, true);
-            if (src2) stops.push(function(){ try { src2.stop(); src2.disconnect(); } catch (e) {} });
+            var src2 = engineRing(key, true, rv);
+            if (src2) stops.push(function(){ src2.stop(); });
           } else stops.push(ringBlocked(opts));
         }
       });
@@ -5324,7 +5821,7 @@ function previewTone(key){
   unlockAudio();
   stopTone();
   var el = ringElement();
-  try { ringSrc(el, key); } catch (e) { playPattern(key); return; }
+  try { ringSrc(el, key, sndPrefs().rv); } catch (e) { playPattern(key); return; }
   el.loop = false; el.muted = false; el.volume = 1;
   try { el.currentTime = 0; } catch (e) {}
   var p; try { p = el.play(); } catch (e) { p = Promise.reject(e); }
@@ -5401,24 +5898,59 @@ function askNotify(){
   } catch (e) {}
 }
 
-/* A short sound for a buzz or a message: played once, never looped,
-   never over a call or a ring, and it respects the phone's silent
-   switch (a call's ring deliberately does not - see tone()). */
-var cueAt = 0;
-function cue(key, vib){
-  if (Date.now() - cueAt < 700) return;          /* a burst sounds once */
-  cueAt = Date.now();
-  try { if (navigator.vibrate && vib) navigator.vibrate(vib); } catch (e) {}
-  if (call || group || ringLoud || document.hidden) return;
-  var el = ringElement();
-  try { ringSrc(el, key); } catch (e) { return; }
+/* The notification sound: one short sound for everything that is not an
+   incoming call - a message, a photo, a file, a location, a missed call,
+   a buzz, a join request. Played once, never looped, never over a call
+   or a ring, and it respects the phone's silent switch (a call's ring
+   deliberately does not - see tone()). It has its own sound element, so
+   it can never replace or cut into the ringtone.
+
+   With the app in the background or the phone locked, the phone's own
+   notification plays instead (see sw.js) - so nothing sounds twice.
+   opts.inChat: the conversation it belongs to is open - softer, and
+   only if "Sounds in an open chat" is on. */
+var noteAt = 0, noteEl = null, notePrimed = false;
+function noteElement(){
+  if (!noteEl) {
+    noteEl = new Audio();
+    noteEl.preload = "auto";
+    noteEl.setAttribute("playsinline", "");
+  }
+  return noteEl;
+}
+function primeNote(){
+  if (notePrimed) return;
+  var p = sndPrefs();
+  if (p.nt === "none") return;
+  var el = noteElement();
+  try { el.src = toneWavUrl(p.nt, p.nv); } catch (e) { return; }
+  el.muted = true;
+  var q; try { q = el.play(); } catch (e) { el.muted = false; return; }
+  Promise.resolve(q).then(function(){ el.pause(); el.muted = false; notePrimed = true; },
+                          function(){ el.muted = false; });
+}
+function notifySound(kind, opts){
+  opts = opts || {};
+  if (document.hidden) return;                   /* the phone's notification sounds */
+  if (Date.now() - noteAt < 700) return;          /* a burst sounds once */
+  noteAt = Date.now();
+  var p = sndPrefs();
+  if (opts.inChat && !p.nopen) return;
+  if (call || group || ringLoud) return;          /* never over a call */
+  try { if (navigator.vibrate && p.nvib && !opts.inChat) navigator.vibrate([100, 70, 100]); } catch (e) {}
+  if (p.nt === "none") return;
+  playNote(p.nt, opts.inChat ? p.nv * 0.5 : p.nv);
+}
+function playNote(key, vol){
+  var el = noteElement();
+  try { el.src = toneWavUrl(key, vol); } catch (e) { return; }
   audioSession("ambient");
-  el.loop = false; el.muted = false; el.volume = key === "_msg" ? 0.6 : 1;
+  el.loop = false; el.muted = false;
   try { el.currentTime = 0; } catch (e) {}
   var back = function(){ if (!ringLoud && !call && !group) audioSession("auto"); };
-  var p = null;
-  try { p = el.play(); } catch (e) { p = Promise.reject(e); }
-  Promise.resolve(p).then(function(){ setTimeout(back, 1500); }, function(){
+  var q = null;
+  try { q = el.play(); } catch (e) { q = Promise.reject(e); }
+  Promise.resolve(q).then(function(){ notePrimed = true; setTimeout(back, 1500); }, function(){
     back();
     /* The sound file was refused: the audio engine, if it is running. */
     if (audioCtx && audioCtx.state === "running") {
@@ -5426,7 +5958,7 @@ function cue(key, vib){
         var d = toneSamples(key), b = audioCtx.createBuffer(1, d.length, RING_SR);
         b.getChannelData(0).set(d);
         var src = audioCtx.createBufferSource(), g = audioCtx.createGain();
-        g.gain.value = key === "_msg" ? 0.4 : 0.8;
+        g.gain.value = vol;
         src.buffer = b; src.connect(g); g.connect(audioCtx.destination); src.start();
       } catch (e) {}
     }
@@ -5443,9 +5975,8 @@ function showBuzz(from, what){
   paintWho($("ring"), m && m.colour);
   $("ringWhat").textContent = what || "wants your attention";
   $("ring").classList.add("on");
-  /* Its own sound and two quick taps - it used to be the full ringtone
-     with a call's vibration, so a buzz felt exactly like a call. */
-  cue("_buzz", [220, 110, 220]);
+  /* The notification sound - never the ringtone: a buzz is not a call. */
+  notifySound("buzz");
   if (document.hidden) systemNotify(from, what || "wants your attention");
 }
 
@@ -5616,7 +6147,7 @@ function lastWith(name){
   var r = list[0];
   if (msg && (!r || msg.at >= r.at)) {
     return { text: (unread > 1 ? unread + " new · " : "") + (msg.d === "out" ? "You: " : "") +
-                   msg.t.replace(/\s+/g, " ") + " · " + ago(msg.at),
+                   msgText(msg).replace(/\s+/g, " ") + " · " + ago(msg.at),
              missed: false, unread: unread > 0, count: unread, msgOnly: unread > 0 };
   }
   return { text: (r.k === "call" ? callLabel(r) : buzzLabel(r)) + " · " + ago(r.at),
@@ -6352,7 +6883,12 @@ function chatKey(){ return "familyNotifyer.chat." + state.house + "." + state.me
 function chatTidy(o){
   /* A copy saved by an older version can carry the old in-flight flag. */
   Object.keys(o.by).forEach(function(p){
-    (o.by[p] || []).forEach(function(m){ if (m && m.busy) delete m.busy; });
+    (o.by[p] || []).forEach(function(m){
+      if (!m) return;
+      if (m.busy) delete m.busy;
+      /* Closed while a picture was still being prepared: it never went. */
+      if (m.prep) { delete m.prep; m.st = "failed"; m.why = "This didn't finish preparing — send it again"; }
+    });
   });
   if (!o.gone || typeof o.gone !== "object") o.gone = {};
   if (!o.clr || typeof o.clr !== "object") o.clr = {};
@@ -6433,21 +6969,21 @@ function chatSend(pid, text){
   text = String(text || "").replace(/^\s+|\s+$/g, "");
   if (!pid || !text) return;
   if (text.length > CHAT_MAX) text = text.slice(0, CHAT_MAX);
-  var m = { c: "c" + rand(14), d: "out", t: text, at: Date.now(), st: "sending" };
-  if (chatReply && chatReply.pid === pid) {
-    m.re = { c: chatReply.re.c, f: chatReply.re.f, t: chatReply.re.t };
-    chatReplyCancel();
-  }
-  chatInsert(chatList(pid), m);
-  chatSave(); chatChanged(pid, true);
-  chatDeliver(pid, m);
+  chatDeliver(pid, chatNewOut(pid, text, null));
 }
 function chatDeliver(pid, m){
-  if (chatBusy[m.c]) return;
+  if (!m || chatBusy[m.c] || m.prep) return;
+  /* A picture or file goes up first; the message follows once it is there. */
+  if (m.a && (m.a.k === "img" || m.a.k === "file") && !m.a.up) {
+    m.tries = (m.tries || 0) + 1;
+    mediaUpload(pid, m);
+    return;
+  }
   chatBusy[m.c] = 1;
   m.tries = (m.tries || 0) + 1;
   var req = { k: "chat", to: pid, cid: m.c, text: m.t, title: nameOf(state.me), url: noteUrl(pid) };
   if (m.re) req.re = m.re;
+  if (m.a) req.a = attWire(m.a);
   fsRequest(req, 15000)
     .then(function(r){
       delete chatBusy[m.c];
@@ -6476,7 +7012,7 @@ function chatRetry(){
   Object.keys(s.by).forEach(function(pid){
     if (!memberById(pid)) return;
     s.by[pid].forEach(function(m){
-      if (m.d === "out" && (m.st === "sending" || m.st === "failed") && !m.why && !chatBusy[m.c] &&
+      if (m.d === "out" && (m.st === "sending" || m.st === "failed") && !m.why && !chatBusy[m.c] && !m.prep &&
           now - m.at < 7 * 86400000 && (m.tries || 0) < 30) chatDeliver(pid, m);
     });
   });
@@ -6508,6 +7044,9 @@ function chatTake(f){
   m = { c: f.cid, d: mine ? "out" : "in", t: String(f.text || ""), at: f.time || Date.now() };
   var re = chatReRead(f.re);
   if (re) m.re = re;
+  var att = chatAttRead(f.a);
+  if (att) { m.a = att; if (mine) att.up = 1; if (f.lbl) m.t = ""; }
+  if (!m.t && !m.a) return;
   if (mine) m.st = "sent";              /* sent from another phone of ours */
   chatInsert(chatList(pid), m);
   chatSave();
@@ -6517,15 +7056,20 @@ function chatTake(f){
     /* Read at once when on screen. If you have scrolled up to read
        something older you stay there: the button at the bottom shows a
        dot instead of the conversation jumping away. */
-    if (looking) { m.r = 1; chatAck(pid, m.c, "r"); chatDownNew = true; }
-    else {
+    var fresh = Date.now() - (f.time || 0) < 120000;
+    if (looking) {
+      m.r = 1; chatAck(pid, m.c, "r"); chatDownNew = true;
+      if (fresh) notifySound("msg", { inChat: true });
+    } else {
       chatAck(pid, m.c, "d");
-      if (Date.now() - (f.time || 0) < 120000 && !call && !group && !document.hidden) {
-        cue("_msg", [60]);
-        chatBanner(pid, m.t);
+      if (fresh && !call && !group && !document.hidden) {
+        notifySound("msg");
+        chatBanner(pid, msgText(m));
       }
     }
   }
+  /* Downloaded by itself if Settings say so for this network. */
+  if (m.a && !mediaHave(m.a.id) && mediaAutoOk(m.a, m.at)) mediaFetch(pid, m, true);
   chatChanged(pid);
 }
 function rcptTake(f){
@@ -6688,13 +7232,18 @@ function closeChat(fromHistory){
   chatOpenId = null;
   chatReply = null; chatReplyPaint();
   chatCache = { pid: null, map: {} };
+  mediaRelease();
   $("chat").classList.remove("on");
   $("chat").setAttribute("aria-hidden", "true");
   try { $("chatInput").blur(); } catch (e) {}
   if (!fromHistory && history.state && history.state.fmnChat) { try { history.back(); } catch (e) {} }
   paintCardNotes();
 }
-window.addEventListener("popstate", function(){ if (chatOpenId) closeChat(true); });
+window.addEventListener("popstate", function(){
+  /* Back closes the photo first, then the conversation. */
+  if (viewer) { viewerClose(true); return; }
+  if (chatOpenId) closeChat(true);
+});
 
 function chatPaintSub(){
   if (!chatOpenId) return;
@@ -6724,7 +7273,8 @@ function chatItems(pid){
    ones come in steps as you scroll back to the top. */
 var chatCache = { pid: null, map: {} };
 function chatSig(m){
-  return (m.st || "") + "|" + (m.why || "") + "|" + m.at + "|" + (m.re ? m.re.c : "");
+  return (m.st || "") + "|" + (m.why || "") + "|" + m.at + "|" + (m.re ? m.re.c : "") +
+         (m.a ? "|" + (m.a.gone ? "g" : "") + (m.a.up ? "u" : "") + (m.prep ? "p" : "") : "");
 }
 function chatRow(map, old, key, sig, make){
   while (map[key]) key += "+";            /* two rows can never share one node */
@@ -6826,7 +7376,8 @@ function chatEarlier(){
 
 function chatBubble(pid, m){
   var d = document.createElement("div");
-  d.className = "bub " + (m.d === "out" ? "out" : "in") + (m.st === "failed" ? " failed" : "");
+  d.className = "bub " + (m.d === "out" ? "out" : "in") + (m.st === "failed" ? " failed" : "") +
+    (m.a ? " media" + (m.a.k === "img" ? " photo" : "") + (m.t ? "" : " nocap") : "");
   d.setAttribute("data-c", m.c);
   if (m.re && m.re.c) {
     var q = document.createElement("div"); q.className = "bq";
@@ -6840,6 +7391,7 @@ function chatBubble(pid, m){
     q.appendChild(qb); q.appendChild(qs);
     d.appendChild(q);
   }
+  if (m.a) d.appendChild(chatMediaEl(m));
   var t = document.createElement("span"); t.className = "bt"; t.textContent = m.t;
   var meta = document.createElement("span"); meta.className = "bm";
   var tm = document.createElement("span"); tm.textContent = timeOf(m.at);
@@ -6853,7 +7405,8 @@ function chatBubble(pid, m){
                                     delivered: "Delivered", read: "Read" }[m.st || "sent"]);
     meta.appendChild(tk);
   }
-  d.appendChild(t); d.appendChild(meta);
+  if (m.t) d.appendChild(t);
+  d.appendChild(meta);
   if (m.st === "failed") {
     var why = document.createElement("span"); why.className = "bwhy";
     why.textContent = m.why || "Not sent yet — it goes when you're back online. Tap to try now.";
@@ -6947,7 +7500,7 @@ function chatReplyStart(pid, cid){
   if (!pid || pid !== chatOpenId) return;
   var m = chatFind(pid, cid);
   if (!m) return;
-  chatReply = { pid: pid, re: { c: m.c, f: m.d === "out" ? state.me : pid, t: chatSnippet(m.t) } };
+  chatReply = { pid: pid, re: { c: m.c, f: m.d === "out" ? state.me : pid, t: chatSnippet(msgText(m)) } };
   chatReplyPaint();
   var i = $("chatInput");
   try { i.focus({ preventScroll: true }); } catch (e) { try { i.focus(); } catch (e2) {} }
@@ -7069,10 +7622,20 @@ function chatMsgMenu(el, opts){
   var m = pid && cid ? chatFind(pid, cid) : null;
   if (!m) return;
   opts = opts || {};
-  var items = [
-    { label: "Reply", icon: ICO_REPLY, run: function(){ chatReplyStart(pid, cid); } },
-    { label: "Copy", icon: ICO_COPY, run: function(){ copy(m.t, "Copied"); } }
-  ];
+  var a = m.a;
+  var items = [{ label: "Reply", icon: ICO_REPLY, run: function(){ chatReplyStart(pid, cid); } }];
+  if (m.t) items.push({ label: "Copy", icon: ICO_COPY, run: function(){ copy(m.t, "Copied"); } });
+  if (a && a.k === "loc") {
+    items.push({ label: "Open in Maps", icon: ICO_PIN, run: function(){ openMaps(a); } });
+    items.push({ label: "Copy coordinates", icon: ICO_COPY, run: function(){ copy(a.lat.toFixed(5) + ", " + a.lon.toFixed(5), "Copied"); } });
+  } else if (a && !a.gone && !attBlocked(a) && (mediaHave(a.id) || m.d === "in" || a.up)) {
+    items.push({ label: a.k === "img" ? "Save to phone" : "Save file", icon: ICO_SAVE, run: function(){
+      if (mediaHave(a.id)) mediaSave(m, false);
+      else mediaFetch(pid, m, false).then(function(ok){ if (ok) toast("Downloaded — tap Save again to keep it"); });
+    } });
+    if (navigator.share && navigator.canShare && mediaHave(a.id))
+      items.push({ label: "Share", icon: ICO_SHARE, run: function(){ mediaSave(m, true); } });
+  }
   if (m.d === "out" && m.st === "failed" && !m.why)
     items.push({ label: "Send again", icon: ICO_RETRY, run: function(){ chatRetryOne(pid, cid); } });
   el.classList.add("sel");
@@ -7096,7 +7659,7 @@ function chatClearAsk(pid){
   if (!pid) return;
   var n = nameOf(pid);
   $("clrTitle").textContent = "Clear chat with " + n + "?";
-  $("clrSub").textContent = "All messages, calls and buzzes in this chat are removed from this phone. " +
+  $("clrSub").textContent = "All messages, photos, files, calls and buzzes in this chat are removed from this phone. " +
     n + " keeps their copy, and your call history stays in Recent.";
   $("clrGo").onclick = function(){
     closeSheet("clrSheet");
@@ -7112,6 +7675,10 @@ function chatClear(pid){
     /* Only a recent message could ever be sent again by the server. */
     if (now - m.at < CHAT_GONE_MS + 86400000) g[m.c] = now;
   });
+  /* Its pictures and files leave this phone too. */
+  var media = list.filter(function(m){ return m.a && m.a.id; }).map(function(m){ return m.a.id; });
+  list.forEach(function(m){ var x = mediaXhr[m.c]; if (x) { try { x.abort(); } catch (e) {} } });
+  if (media.length) mediaDrop(media);
   s.by[pid] = [];
   s.clr[pid] = now;
   if (chatReply && chatReply.pid === pid) chatReplyCancel();
@@ -7249,6 +7816,12 @@ function chatClear(pid){
     var rb = t.closest(".brep");
     var el = bubOf(t);
     if (rb && el) { chatReplyStart(chatOpenId, el.getAttribute("data-c")); return; }
+    var mb = t.closest(".mimg,.mfile,.mloc");
+    if (mb && el) {
+      var sb = t.closest(".mst");
+      mediaTap(chatOpenId, el.getAttribute("data-c"), sb ? sb.getAttribute("data-act") : "");
+      return;
+    }
     if (el && el.classList.contains("failed")) chatRetryOne(chatOpenId, el.getAttribute("data-c"));
   });
   /* Back at the top of what is drawn: the next older ones come in. The
@@ -7269,6 +7842,1027 @@ function chatClear(pid){
     chatRaf(function(){ topBusy = false; if (body.scrollTop <= 60 && chatOpenId) chatEarlier(); });
   }, { passive: true });
 })();
+
+/* ==================================================================== *
+ * Pictures, files and locations in chat
+ *
+ * A picture is made smaller on this phone before it goes (1600 px on the
+ * long side, JPEG - usually 150-500 KB instead of 3-5 MB, and the
+ * picture's hidden details, like where it was taken, are left behind).
+ * A file goes exactly as it is. Either way it is encrypted here first
+ * (AES-GCM, a new key for every one); the family server stores only the
+ * encrypted bytes, and the key travels inside the chat message.
+ *
+ * The message itself carries a tiny preview (about 1 KB), so a
+ * conversation shows its pictures at once, before any of them is
+ * downloaded. The real picture comes down when you tap it, or by itself
+ * if Settings -> Chats and media says so for the network you are on.
+ *
+ * What was downloaded (or sent) is kept on this phone, in its own
+ * database, up to MEDIA_CAP - the oldest-looked-at go first. Nothing is
+ * sent or fetched during a call unless you ask, so calls keep the
+ * bandwidth.
+ *
+ * A received file is only ever saved, never opened as a page: a file
+ * from anyone is treated as plain bytes.
+ * ==================================================================== */
+
+var MEDIA_CAP = 300 * 1048576;          /* kept on this phone, at most   */
+var MEDIA_AUTO_DAYS = 7;                /* older ones wait to be tapped  */
+var MEDIA_BATCH = 20;                   /* files picked at once          */
+/* Programs and pages - never sent, never saved from a message. */
+var MEDIA_BLOCK = /\.(exe|msi|msix|bat|cmd|com|scr|pif|cpl|vbs|vbe|js|mjs|jse|wsf|wsh|ps1|psm1|jar|apk|aab|xapk|app|dmg|pkg|sh|bash|run|bin|html?|xhtml|mht|svgz?|hta|lnk|reg|dll|sys|iso|img)$/i;
+/* Kinds a saved file may keep as its type; anything else is saved as
+   plain bytes. */
+var MEDIA_SAFE_TYPE = /^(image\/(jpeg|png|gif|webp|heic|heif|avif)|video\/(mp4|quicktime|webm|3gpp)|audio\/[\w.+-]+|application\/pdf|text\/(plain|csv))$/i;
+
+var mediaIdx = null;      /* id -> [bytes, last used] - what this phone has */
+var mediaUrls = {};       /* id -> object URL, while the conversation is open */
+var mediaJobs = {};       /* id -> download in progress                    */
+var mediaProg = {};       /* id -> 0..1                                    */
+var mediaXhr = {};        /* message id -> upload in progress              */
+var mediaErr = {};        /* id -> the last download failed                */
+
+function mediaCaps(){ return (typeof fsCaps !== "undefined" && fsCaps.media) || null; }
+function mediaCrypto(){ return !!(window.crypto && crypto.subtle && crypto.getRandomValues); }
+function mediaReady(){ return !!(mediaCaps() && mediaCrypto() && window.indexedDB); }
+
+function fmtSize(n){
+  n = Number(n) || 0;
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return Math.max(1, Math.round(n / 1024)) + " KB";
+  return (n / 1048576).toFixed(n < 10485760 ? 1 : 0).replace(/\.0$/, "") + " MB";
+}
+function b64uEnc(bytes){
+  var s = "";
+  for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64uDec(s){
+  s = String(s).replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  var b = atob(s), o = new Uint8Array(b.length);
+  for (var i = 0; i < b.length; i++) o[i] = b.charCodeAt(i);
+  return o;
+}
+function randB64(n){ return b64uEnc(crypto.getRandomValues(new Uint8Array(n))); }
+function blobBuf(b){
+  if (b.arrayBuffer) return b.arrayBuffer();
+  return new Promise(function(res, rej){
+    var r = new FileReader();
+    r.onload = function(){ res(r.result); };
+    r.onerror = function(){ rej(r.error); };
+    r.readAsArrayBuffer(b);
+  });
+}
+
+/* How a message's attachment is described in one line - the person's
+   card, a notification, a quoted reply. */
+function attLabel(a){
+  if (!a) return "";
+  return a.k === "img" ? "\uD83D\uDCF7 Photo" : a.k === "loc" ? "\uD83D\uDCCD Location"
+       : "\uD83D\uDCCE " + (a.n || "File");
+}
+function msgText(m){
+  if (!m) return "";
+  if (!m.a) return m.t || "";
+  if (!m.t) return attLabel(m.a);
+  return (m.a.k === "img" ? "\uD83D\uDCF7 " : m.a.k === "loc" ? "\uD83D\uDCCD " : "\uD83D\uDCCE ") + m.t;
+}
+
+/* What a received message may say about its attachment - the same checks
+   as the server, so an older server cannot pass along anything odd. */
+function chatAttRead(a){
+  if (!a || typeof a !== "object") return null;
+  var num = function(v, max){ var x = Math.round(Number(v)); return isFinite(x) && x >= 0 ? Math.min(x, max) : 0; };
+  if (a.k === "loc") {
+    var lat = Number(a.lat), lon = Number(a.lon);
+    if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    return { k: "loc", lat: lat, lon: lon, acc: num(a.acc, 100000) };
+  }
+  if (a.k !== "img" && a.k !== "file") return null;
+  if (!/^[A-Za-z0-9_-]{16,40}$/.test(a.id || "") || !/^[A-Za-z0-9_-]{43}$/.test(a.key || "") ||
+      !/^[A-Za-z0-9_-]{16}$/.test(a.iv || "")) return null;
+  var o = { k: a.k, id: a.id, key: a.key, iv: a.iv, s: num(a.s, 200 * 1048576),
+            n: String(a.n || "").replace(/[\u0000-\u001f\\\/]/g, "").slice(0, 120),
+            m: /^[\w.+-]{1,40}\/[\w.+-]{1,60}$/.test(a.m || "") ? a.m : "" };
+  if (a.k === "img") {
+    o.w = num(a.w, 20000); o.h = num(a.h, 20000);
+    if (typeof a.th === "string" && a.th.length <= 4000 &&
+        /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+\/=]+$/.test(a.th)) o.th = a.th;
+  }
+  return o;
+}
+/* What goes over the wire - never the local bookkeeping. */
+function attWire(a){
+  if (a.k === "loc") return { k: "loc", lat: a.lat, lon: a.lon, acc: a.acc };
+  var o = { k: a.k, id: a.id, key: a.key, iv: a.iv, s: a.s, n: a.n, m: a.m };
+  if (a.k === "img") { o.w = a.w; o.h = a.h; if (a.th) o.th = a.th; }
+  return o;
+}
+function attBlocked(a){ return !!(a && a.k === "file" && MEDIA_BLOCK.test(a.n || "")); }
+
+/* ------------------------------------------------ this phone's copies */
+var mediaDbP = null;
+function mediaDb(){
+  if (!mediaDbP) mediaDbP = new Promise(function(res, rej){
+    var r;
+    try { r = indexedDB.open("fmn-media", 1); } catch (e) { rej(e); return; }
+    r.onupgradeneeded = function(){ r.result.createObjectStore("b"); };
+    r.onsuccess = function(){ res(r.result); };
+    r.onerror = function(){ rej(r.error); };
+  });
+  return mediaDbP;
+}
+function mediaTx(mode, fn){
+  return mediaDb().then(function(db){
+    return new Promise(function(res){
+      var req;
+      try {
+        var tx = db.transaction("b", mode);
+        req = fn(tx.objectStore("b"));
+        tx.oncomplete = function(){ res(req ? req.result : true); };
+        tx.onerror = tx.onabort = function(){ res(null); };
+      } catch (e) { res(null); }
+    });
+  }).catch(function(){ return null; });
+}
+function mediaIndex(){
+  if (!mediaIdx) {
+    try { mediaIdx = JSON.parse(localStorage.getItem("fmn-media-idx") || "{}") || {}; }
+    catch (e) { mediaIdx = {}; }
+  }
+  return mediaIdx;
+}
+var mediaIdxTimer = null;
+function mediaIdxSave(){
+  if (mediaIdxTimer) return;
+  mediaIdxTimer = setTimeout(function(){
+    mediaIdxTimer = null;
+    try { localStorage.setItem("fmn-media-idx", JSON.stringify(mediaIndex())); } catch (e) {}
+  }, 400);
+}
+function mediaHave(id){ return !!mediaIndex()[id]; }
+function mediaUsed(){ var n = 0, x = mediaIndex(); for (var k in x) n += x[k][0] || 0; return n; }
+function mediaPut(id, blob){
+  return mediaTx("readwrite", function(st){ st.put(blob, id); }).then(function(ok){
+    if (!ok) return false;
+    mediaIndex()[id] = [blob.size, Date.now()];
+    mediaIdxSave();
+    if (mediaUsed() > MEDIA_CAP) mediaTrim();
+    return true;
+  });
+}
+function mediaGet(id){
+  if (!mediaHave(id)) return Promise.resolve(null);
+  return mediaTx("readonly", function(st){ return st.get(id); }).then(function(b){
+    var e = mediaIndex()[id];
+    if (!b) { if (e) { delete mediaIndex()[id]; mediaIdxSave(); } return null; }
+    if (e && Date.now() - e[1] > 3600000) { e[1] = Date.now(); mediaIdxSave(); }
+    return b;
+  });
+}
+function mediaDrop(ids){
+  ids = ids.filter(mediaHave);
+  if (!ids.length) return Promise.resolve(true);
+  ids.forEach(function(id){
+    delete mediaIndex()[id];
+    if (mediaUrls[id]) { try { URL.revokeObjectURL(mediaUrls[id]); } catch (e) {} delete mediaUrls[id]; }
+  });
+  mediaIdxSave();
+  return mediaTx("readwrite", function(st){ ids.forEach(function(id){ st.delete(id); }); });
+}
+/* Pictures and files still waiting to be sent: never removed to make room. */
+function mediaPinned(){
+  var pin = {}, s = chatStore();
+  Object.keys(s.by).forEach(function(p){
+    (s.by[p] || []).forEach(function(m){ if (m.d === "out" && m.a && m.a.id && !m.a.up) pin[m.a.id] = 1; });
+  });
+  return pin;
+}
+function mediaTrim(){
+  var x = mediaIndex(), pin = mediaPinned(), total = mediaUsed();
+  var ids = Object.keys(x).filter(function(id){ return !pin[id]; })
+    .sort(function(a, b){ return x[a][1] - x[b][1]; });
+  var out = [];
+  while (total > MEDIA_CAP * 0.8 && ids.length) { var id = ids.shift(); total -= x[id][0] || 0; out.push(id); }
+  if (out.length) mediaDrop(out);
+}
+
+/* --------------------------------------------------------- encryption */
+function mediaKey(a, use){
+  return crypto.subtle.importKey("raw", b64uDec(a.key), { name: "AES-GCM" }, false, [use]);
+}
+function mediaSeal(a, blob){
+  return Promise.all([blobBuf(blob), mediaKey(a, "encrypt")]).then(function(r){
+    return crypto.subtle.encrypt({ name: "AES-GCM", iv: b64uDec(a.iv) }, r[1], r[0]);
+  });
+}
+function mediaUnseal(a, buf){
+  return mediaKey(a, "decrypt").then(function(k){
+    return crypto.subtle.decrypt({ name: "AES-GCM", iv: b64uDec(a.iv) }, k, buf);
+  });
+}
+
+/* ------------------------------------------ network and auto-download */
+/* What this phone says about its network. iPhones say nothing, so they
+   count as mobile data - the careful choice. */
+function netKind(){
+  if (navigator.onLine === false) return "none";
+  var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (c) {
+    if (c.saveData) return "saver";
+    if (c.type === "wifi" || c.type === "ethernet") return "wifi";
+    if (c.type === "none") return "none";
+    if (c.type === "cellular" || c.type === "wimax" || c.type === "bluetooth") return "cell";
+    if (/2g/.test(c.effectiveType || "")) return "cell";
+  }
+  return isPhone() ? "cell" : "wifi";
+}
+var MEDIA_PREF_KEY = "fmn-media-auto";
+function mediaPrefs(){
+  var d = { pw: true, pm: true, fw: true, fm: false };
+  try {
+    var o = JSON.parse(localStorage.getItem(MEDIA_PREF_KEY) || "null");
+    if (o) Object.keys(d).forEach(function(k){ if (typeof o[k] === "boolean") d[k] = o[k]; });
+  } catch (e) {}
+  return d;
+}
+function mediaAutoOk(a, at){
+  if (!a || (a.k !== "img" && a.k !== "file") || a.gone || attBlocked(a) || !mediaReady()) return false;
+  if (Date.now() - (at || 0) > MEDIA_AUTO_DAYS * 86400000) return false;
+  var n = netKind();
+  if (n === "none" || n === "saver") return false;
+  var p = mediaPrefs(), w = n === "wifi";
+  return a.k === "img" ? (w ? p.pw : p.pm) : (w ? p.fw : p.fm);
+}
+
+/* --------------------------------------------------- the transfer line
+   Two at a time; one during a call. Downloads nobody asked for wait for
+   the call to end. */
+var mq = [], mqActive = 0, mqTimer = null;
+function inCallNow(){ return !!((call && call.pc) || (group && group.state === "live")); }
+function mqPush(job){ mq.push(job); mqRun(); }
+function mqRun(){
+  var busy = inCallNow(), max = busy ? 1 : 2;
+  while (mqActive < max && mq.length) {
+    var at = 0;
+    if (busy) {
+      at = -1;
+      for (var i = 0; i < mq.length; i++) if (!mq[i].auto) { at = i; break; }
+      if (at === -1) {
+        if (!mqTimer) mqTimer = setTimeout(function(){ mqTimer = null; mqRun(); }, 5000);
+        return;
+      }
+    }
+    var job = mq.splice(at, 1)[0];
+    mqActive++;
+    var done = function(){ mqActive--; mqRun(); };
+    Promise.resolve().then(job.run).then(done, done);
+  }
+}
+
+/* ------------------------------------------------------------ sending */
+function mediaLimit(kind){ var c = mediaCaps(); return c ? (kind === "img" ? c.photo : c.file) : 0; }
+
+function canvasBlob(c, type, q){
+  return new Promise(function(res){
+    try { c.toBlob(function(b){ res(b); }, type, q); } catch (e) { res(null); }
+  });
+}
+function decodeImg(file){
+  if (window.createImageBitmap) {
+    return createImageBitmap(file, { imageOrientation: "from-image" })
+      .catch(function(){ return createImageBitmap(file); })
+      .then(function(b){ return { img: b, w: b.width, h: b.height, done: function(){ try { b.close(); } catch (e) {} } }; })
+      .catch(function(){ return decodeImgEl(file); });
+  }
+  return decodeImgEl(file);
+}
+function decodeImgEl(file){
+  return new Promise(function(res, rej){
+    var u = URL.createObjectURL(file), im = new Image();
+    im.onload = function(){ res({ img: im, w: im.naturalWidth, h: im.naturalHeight,
+                                  done: function(){ URL.revokeObjectURL(u); } }); };
+    im.onerror = function(){ URL.revokeObjectURL(u); rej(new Error("decode")); };
+    im.src = u;
+  });
+}
+/* A photo made ready to send: smaller, as JPEG (which also leaves the
+   picture's hidden details behind), plus its tiny preview. A GIF keeps
+   its animation and goes as it is. */
+function imgPrep(file, hd){
+  var gif = /gif/i.test(file.type);
+  return decodeImg(file).then(function(src){
+    var w0 = src.w, h0 = src.h;
+    if (!w0 || !h0) { src.done(); throw new Error("decode"); }
+    var t = document.createElement("canvas");
+    var ts = Math.min(1, 64 / Math.max(w0, h0));
+    t.width = Math.max(1, Math.round(w0 * ts)); t.height = Math.max(1, Math.round(h0 * ts));
+    var tx = t.getContext("2d");
+    tx.fillStyle = "#1a2636"; tx.fillRect(0, 0, t.width, t.height);
+    tx.drawImage(src.img, 0, 0, t.width, t.height);
+    var th = "";
+    try { th = t.toDataURL("image/jpeg", 0.5); } catch (e) {}
+    if (th.length > 4000) th = "";
+    t.width = t.height = 0;
+    if (gif) { src.done(); return { blob: file, w: w0, h: h0, th: th, type: "image/gif" }; }
+    var max = hd ? 3072 : 1600, q = hd ? 0.9 : 0.8;
+    var s = Math.min(1, max / Math.max(w0, h0));
+    var w = Math.round(w0 * s), h = Math.round(h0 * s);
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    var x = c.getContext("2d");
+    x.fillStyle = "#ffffff"; x.fillRect(0, 0, w, h);
+    x.imageSmoothingQuality = "high";
+    x.drawImage(src.img, 0, 0, w, h);
+    src.done();
+    return canvasBlob(c, "image/jpeg", q).then(function(b){
+      c.width = c.height = 0;              /* phones run out of canvas memory */
+      if (!b) throw new Error("encode");
+      return { blob: b, w: w, h: h, th: th, type: "image/jpeg" };
+    });
+  });
+}
+
+function chatNewOut(pid, text, a){
+  var m = { c: "c" + rand(14), d: "out", t: text || "", at: Date.now(), st: "sending" };
+  if (a) m.a = a;
+  if (chatReply && chatReply.pid === pid) {
+    m.re = { c: chatReply.re.c, f: chatReply.re.f, t: chatReply.re.t };
+    chatReplyCancel();
+  }
+  chatInsert(chatList(pid), m);
+  chatSave(); chatChanged(pid, true);
+  return m;
+}
+
+/* Pictures and files picked to send: each becomes a message at once
+   (so the conversation shows it straight away), then is prepared and
+   sent one after another - one big photo at a time in memory. */
+function chatSendFiles(pid, items, caption, hd){
+  if (!mediaReady()) { toast("Pictures and files aren't set up on this family server yet"); return; }
+  var chain = Promise.resolve();
+  items.forEach(function(it, i){
+    var f = it.file, img = it.kind === "img";
+    var a = { k: img ? "img" : "file", id: randB64(16), key: randB64(32), iv: randB64(12),
+              n: String(f.name || "").replace(/[\u0000-\u001f\\\/]/g, "").slice(0, 120),
+              m: f.type || "", s: f.size || 0 };
+    if (img) { a.w = it.w || 0; a.h = it.h || 0; }
+    var m = chatNewOut(pid, i === 0 ? caption : "", a);
+    m.prep = 1;
+    chain = chain.then(function(){
+      return (img ? imgPrep(f, hd) : Promise.resolve({ blob: f })).then(function(r){
+        if (!chatFind(pid, m.c)) return;                 /* cancelled meanwhile */
+        a.s = r.blob.size;
+        if (img) { a.w = r.w; a.h = r.h; a.m = r.type; if (r.th) a.th = r.th; }
+        if (a.s > mediaLimit(a.k)) {
+          m.st = "failed"; m.why = "Too big to send — the limit is " + fmtSize(mediaLimit(a.k));
+          delete m.prep; chatSave(); chatChanged(pid); return;
+        }
+        return mediaPut(a.id, r.blob).then(function(ok){
+          delete m.prep;
+          if (!ok) { m.st = "failed"; m.why = "This phone has no room to keep it"; chatSave(); chatChanged(pid); return; }
+          chatSave(); chatChanged(pid);
+          chatDeliver(pid, m);
+        });
+      }).catch(function(){
+        delete m.prep;
+        m.st = "failed";
+        m.why = img ? "Couldn't read this picture — try sending it as a file" : "Couldn't read this file";
+        chatSave(); chatChanged(pid);
+      });
+    });
+  });
+}
+
+/* The encrypted bytes, to the family server - then the message itself. */
+function mediaUpload(pid, m){
+  var a = m.a;
+  if (chatBusy[m.c]) return;
+  chatBusy[m.c] = 1;
+  m.st = "sending";
+  mqPush({ run: function(){
+    if (!chatFind(pid, m.c)) { delete chatBusy[m.c]; return; }
+    return mediaGet(a.id).then(function(blob){
+      if (!blob) throw { lost: 1 };
+      return mediaSeal(a, blob);
+    }).then(function(buf){
+      return new Promise(function(res){
+        var x = new XMLHttpRequest();
+        mediaXhr[m.c] = x;
+        x.open("PUT", fsBase() + "/blob/" + a.id);
+        x.setRequestHeader("X-Me", state.me);
+        x.setRequestHeader("X-Sec", mySec());
+        x.setRequestHeader("X-Kind", a.k);
+        x.timeout = 10 * 60 * 1000;
+        x.upload.onprogress = function(e){ if (e.lengthComputable) mediaSetProg(a.id, e.loaded / e.total); };
+        x.onload = function(){ var r = null; try { r = JSON.parse(x.responseText); } catch (e) {} res({ st: x.status, r: r }); };
+        x.onerror = x.ontimeout = function(){ res({ st: 0 }); };
+        x.onabort = function(){ res({ st: -1 }); };
+        mediaSetProg(a.id, 0);
+        x.send(buf);
+      });
+    }).then(function(o){
+      delete mediaXhr[m.c]; delete chatBusy[m.c]; delete mediaProg[a.id];
+      if (o.st === -1) return;                               /* cancelled */
+      if (o.st === 200 && o.r && o.r.ok) { a.up = 1; chatSave(); chatDeliver(pid, m); return; }
+      m.st = "failed";
+      if (o.st === 413) m.why = "Too big to send — the limit is " + fmtSize(o.r && o.r.max || mediaLimit(a.k));
+      else if (o.st === 429) m.why = "You've reached today's sending limit — try again tomorrow";
+      else if (o.st === 401 || o.st === 403) m.why = "The family server refused it";
+      else if (o.st === 501) m.why = "This family server can't take pictures or files";
+      chatSave(); chatChanged(pid);
+    }, function(e){
+      delete mediaXhr[m.c]; delete chatBusy[m.c]; delete mediaProg[a.id];
+      m.st = "failed";
+      if (e && e.lost) m.why = "The file is no longer on this phone — send it again";
+      chatSave(); chatChanged(pid);
+    });
+  } });
+  chatChanged(pid);
+}
+/* Stops a picture or file that has not gone yet, and takes the message
+   back - nobody received it. */
+function mediaCancel(pid, cid){
+  var m = chatFind(pid, cid);
+  if (!m || m.d !== "out" || !m.a || m.a.up) return;
+  var x = mediaXhr[cid];
+  if (x) { try { x.abort(); } catch (e) {} }
+  var list = chatList(pid), i = list.indexOf(m);
+  if (i !== -1) list.splice(i, 1);
+  delete chatBusy[cid];
+  mediaDrop([m.a.id]);
+  chatSave(); chatChanged(pid);
+}
+
+/* -------------------------------------------------------- downloading */
+function mediaFetch(pid, m, auto){
+  var a = m && m.a;
+  if (!a || !a.id || a.gone || attBlocked(a) || !mediaReady()) return Promise.resolve(false);
+  var id = a.id;
+  if (mediaHave(id)) return Promise.resolve(true);
+  if (mediaJobs[id]) return mediaJobs[id];
+  delete mediaErr[id];
+  mediaJobs[id] = new Promise(function(res){
+    mqPush({ auto: !!auto, run: function(){
+      mediaSetProg(id, 0);
+      return fetch(fsBase() + "/blob/" + id, { headers: { "X-Me": state.me, "X-Sec": mySec() }, cache: "no-store" })
+        .then(function(r){
+          if (r.status === 404 || r.status === 410) throw { gone: 1 };
+          if (!r.ok) throw { st: r.status };
+          var total = Number(r.headers.get("content-length")) || (a.s + 16);
+          return mediaRead(r, total, function(p){ mediaSetProg(id, p); });
+        })
+        .then(function(buf){ return mediaUnseal(a, buf); })
+        .then(function(plain){
+          var type = a.k === "img" ? (/^image\/(jpeg|png|gif|webp)$/.test(a.m) ? a.m : "image/jpeg")
+                                   : (MEDIA_SAFE_TYPE.test(a.m) ? a.m : "application/octet-stream");
+          return mediaPut(id, new Blob([plain], { type: type }));
+        })
+        .then(function(ok){
+          delete mediaJobs[id]; delete mediaProg[id];
+          if (!ok) { mediaErr[id] = 1; toast("This phone has no room left for it"); }
+          mediaPaintId(id); res(!!ok);
+        }, function(e){
+          delete mediaJobs[id]; delete mediaProg[id];
+          if (e && e.gone) { a.gone = 1; chatSave(); chatChanged(pid); }
+          else { mediaErr[id] = 1; if (!auto) toast("Couldn't download it — check the connection and tap to try again"); }
+          mediaPaintId(id); res(false);
+        });
+    } });
+  });
+  mediaPaintId(id);
+  return mediaJobs[id];
+}
+function mediaRead(r, total, onp){
+  if (!r.body || !r.body.getReader) return r.arrayBuffer();
+  var rd = r.body.getReader(), parts = [], got = 0;
+  function pump(){
+    return rd.read().then(function(x){
+      if (x.done) {
+        var out = new Uint8Array(got), o = 0;
+        parts.forEach(function(p){ out.set(p, o); o += p.length; });
+        return out.buffer;
+      }
+      parts.push(x.value); got += x.value.length;
+      onp(Math.min(1, got / total));
+      return pump();
+    });
+  }
+  return pump();
+}
+
+/* -------------------------------------------------------- on screen */
+/* Progress is drawn straight onto the bubble, once a frame at most -
+   the conversation itself is not redrawn for it. */
+var mediaDirty = {}, mediaDirtyOn = false;
+function mediaSetProg(id, p){ mediaProg[id] = p; mediaPaintSoon(id); }
+function mediaPaintSoon(id){
+  mediaDirty[id] = 1;
+  if (mediaDirtyOn) return;
+  mediaDirtyOn = true;
+  chatRaf(function(){
+    mediaDirtyOn = false;
+    var ids = Object.keys(mediaDirty); mediaDirty = {};
+    ids.forEach(mediaPaintId);
+  });
+}
+function mediaBoxes(id){
+  var body = $("chatBody");
+  if (!body || !chatOpenId) return [];
+  return Array.prototype.slice.call(body.querySelectorAll('[data-m="' + id + '"]'));
+}
+function mediaPaintId(id){
+  mediaBoxes(id).forEach(function(box){
+    var cid = box.getAttribute("data-mc"), m = chatOpenId ? chatFind(chatOpenId, cid) : null;
+    if (m) mediaState(box, m);
+  });
+}
+
+var ICO_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>';
+var ICO_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>';
+var ICO_SAVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8 10.5l4 4 4-4"/><path d="M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>';
+var ICO_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 7.5 12 4l4 3.5"/><path d="M7 11H6a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 18 11h-1"/></svg>';
+var ICO_PIN = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5a7 7 0 0 0-7 7c0 5 7 12 7 12s7-7 7-12a7 7 0 0 0-7-7Zm0 9.6a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2Z"/></svg>';
+var ICO_PHOTO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 15.5-5-5L6 19.5"/></svg>';
+var ICO_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.6-2.2h5.4L16.3 7h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z"/><circle cx="12" cy="12.8" r="3.3"/></svg>';
+var ICO_FILE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V7.5Z"/><path d="M14 3.5v4h4"/></svg>';
+
+function imgBox(w, h){
+  var maxW = 240, maxH = 300, minW = 120;
+  if (!w || !h) return [maxW, 180];
+  var dw = Math.min(maxW, w), dh = dw * h / w;
+  if (dh > maxH) { dh = maxH; dw = dh * w / h; }
+  if (dw < minW) { dw = minW; dh = Math.min(maxH, dw * h / w); }
+  return [Math.round(dw), Math.round(dh)];
+}
+function fileExt(name){
+  var m = String(name || "").match(/\.([A-Za-z0-9]{1,5})$/);
+  return m ? m[1].toUpperCase() : "FILE";
+}
+
+/* A picture, file or location inside a bubble. */
+function chatMediaEl(m){
+  var a = m.a;
+  if (a.k === "loc") {
+    var l = document.createElement("div");
+    l.className = "mloc"; l.setAttribute("role", "button");
+    var li = document.createElement("span"); li.className = "lic"; li.innerHTML = ICO_PIN;
+    var lt = document.createElement("span"); lt.className = "ltx";
+    var lb = document.createElement("b"); lb.textContent = "Location";
+    var ls = document.createElement("small");
+    ls.textContent = a.acc ? "Accurate to about " + fmtDist(a.acc) : a.lat.toFixed(5) + ", " + a.lon.toFixed(5);
+    lt.appendChild(lb); lt.appendChild(ls);
+    var lg = document.createElement("span"); lg.className = "lgo"; lg.textContent = "Open in Maps";
+    l.appendChild(li); l.appendChild(lt); l.appendChild(lg);
+    return l;
+  }
+  var box = document.createElement("div");
+  box.setAttribute("data-m", a.id);
+  box.setAttribute("data-mc", m.c);
+  if (a.k === "img") {
+    box.className = "mimg";
+    var sz = imgBox(a.w, a.h);
+    box.style.width = sz[0] + "px"; box.style.height = sz[1] + "px";
+    if (a.th) { var th = document.createElement("img"); th.className = "th"; th.alt = ""; th.src = a.th; box.appendChild(th); }
+    var full = document.createElement("img");
+    full.className = "full"; full.alt = "Photo"; full.decoding = "async";
+    box.appendChild(full);
+    var sizeTag = document.createElement("span"); sizeTag.className = "msz";
+    box.appendChild(sizeTag);
+  } else {
+    box.className = "mfile";
+    var ic = document.createElement("span"); ic.className = "fic"; ic.textContent = fileExt(a.n);
+    var tx = document.createElement("span"); tx.className = "ftx";
+    var nm = document.createElement("b"); nm.textContent = a.n || "File";
+    var sm = document.createElement("small"); sm.className = "fsm";
+    tx.appendChild(nm); tx.appendChild(sm);
+    box.appendChild(ic); box.appendChild(tx);
+  }
+  var st = document.createElement("button");
+  st.className = "mst"; st.type = "button";
+  box.appendChild(st);
+  mediaState(box, m);
+  if (a.k === "img") mediaWatch(box);
+  return box;
+}
+function fmtDist(mtr){ return mtr < 1000 ? Math.max(1, Math.round(mtr)) + " m" : (mtr / 1000).toFixed(mtr < 10000 ? 1 : 0) + " km"; }
+
+/* Which of its states an attachment is in, drawn onto its box. */
+function mediaState(box, m){
+  var a = m.a, id = a.id, st = box.querySelector(".mst");
+  var have = mediaHave(id), p = mediaProg[id];
+  var up = m.d === "out" && !a.up && m.st !== "failed";
+  var retry = m.d === "out" && !a.up && m.st === "failed";
+  var mode = m.prep ? "prep" : up ? "up" : retry ? "retry" : a.gone && !have ? "gone" : attBlocked(a) ? "blocked"
+           : p != null || mediaJobs[id] ? "run" : have ? "ok" : "need";
+  if (mode === "retry" && m.why) mode = have ? "ok" : "gone";
+  if (box._mode === mode && mode !== "run" && mode !== "up") return;
+  box._mode = mode;
+  if (mode !== "ok") box.classList.remove("ok");
+  st.className = "mst " + mode;
+  st.style.setProperty("--p", String(Math.max(0.03, p || 0)));
+  st.disabled = mode === "gone" || mode === "blocked" || mode === "prep";
+  var label = { prep: "Preparing", up: "Cancel sending", retry: "Send again", run: "Downloading", need: "Download",
+                ok: a.k === "img" ? "View photo" : "Save file", gone: "No longer available",
+                blocked: "Blocked file type" }[mode];
+  st.setAttribute("aria-label", label);
+  st.setAttribute("data-act", mode === "up" ? "cancel" : mode === "retry" ? "retry" : mode === "need" ? "get" : mode === "ok" ? "open" : "");
+  st.innerHTML = mode === "up" ? ICO_X : mode === "retry" ? ICO_RETRY : mode === "need" ? ICO_DOWN : mode === "ok" && a.k === "file" ? ICO_SAVE : "";
+  if (a.k === "img") {
+    var tag = box.querySelector(".msz");
+    tag.textContent = mode === "need" ? fmtSize(a.s) : mode === "gone" ? "No longer available" : "";
+    if (mode === "ok" && box._near) mediaShow(box);
+  } else {
+    var sm = box.querySelector(".fsm");
+    sm.textContent = mode === "gone" ? "No longer available"
+      : mode === "blocked" ? "Blocked — this kind of file can harm a device"
+      : fmtSize(a.s) + " · " + fileExt(a.n) + (mode === "up" || mode === "run" ? " · " + Math.round((p || 0) * 100) + "%" : "");
+  }
+}
+
+/* Full pictures are read from this phone's copy only when they come near
+   the screen - a long conversation does not load every photo in it. */
+var mediaIO = null;
+function mediaWatch(box){
+  if (!("IntersectionObserver" in window)) { box._near = true; mediaShow(box); return; }
+  if (!mediaIO) mediaIO = new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if (!e.isIntersecting) return;
+      mediaIO.unobserve(e.target);
+      e.target._near = true;
+      mediaShow(e.target);
+    });
+  }, { root: $("chatBody"), rootMargin: "600px 0px" });
+  mediaIO.observe(box);
+}
+function mediaShow(box){
+  var id = box.getAttribute("data-m");
+  if (!mediaHave(id) || box._showing) return;
+  box._showing = true;
+  mediaURL(id).then(function(u){
+    box._showing = false;
+    var f = box.querySelector("img.full");
+    if (!u || !f) return;
+    if (f.getAttribute("src") !== u) {
+      f.onload = function(){ box.classList.add("ok"); };
+      f.src = u;
+    } else box.classList.add("ok");
+  });
+}
+function mediaURL(id){
+  if (mediaUrls[id]) return Promise.resolve(mediaUrls[id]);
+  return mediaGet(id).then(function(b){
+    if (!b) return null;
+    return mediaUrls[id] || (mediaUrls[id] = URL.createObjectURL(b));
+  });
+}
+/* The conversation closed: its pictures leave memory. */
+function mediaRelease(){
+  if (mediaIO) { try { mediaIO.disconnect(); } catch (e) {} mediaIO = null; }
+  if (viewer) return;                      /* still on screen there */
+  Object.keys(mediaUrls).forEach(function(id){ try { URL.revokeObjectURL(mediaUrls[id]); } catch (e) {} });
+  mediaUrls = {};
+}
+
+/* A tap on an attachment. */
+function mediaTap(pid, cid, act){
+  var m = chatFind(pid, cid);
+  if (!m || !m.a) return;
+  var a = m.a;
+  if (a.k === "loc") { openMaps(a); return; }
+  if (act === "cancel") { mediaCancel(pid, cid); return; }
+  if (act === "retry") { chatRetryOne(pid, cid); return; }
+  if (m.prep || a.gone || attBlocked(a)) return;
+  if (mediaHave(a.id)) { if (a.k === "img") viewerOpen(pid, m); else mediaSave(m); return; }
+  if (m.d === "out" && !a.up) return;
+  mediaFetch(pid, m, false);
+}
+
+/* --------------------------------------------------- saving to the phone */
+function mediaName(m){
+  var a = m.a, n = String(a.n || "").replace(/[\u0000-\u001f\\\/:*?"<>|]/g, "_").slice(0, 120);
+  if (a.k === "img" && (!n || /^image\.\w+$/i.test(n))) {
+    var d = new Date(m.at), z = function(x){ return (x < 10 ? "0" : "") + x; };
+    n = "Photo " + d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()) + " " + z(d.getHours()) + z(d.getMinutes());
+  }
+  if (a.k === "img") {
+    var ext = /gif/.test(a.m) ? ".gif" : /png/.test(a.m) ? ".png" : /webp/.test(a.m) ? ".webp" : ".jpg";
+    n = n.replace(/\.(jpe?g|png|gif|webp|heic|heif)$/i, "") + ext;
+  }
+  return n || "file";
+}
+/* On an iPhone the share sheet is the way into Photos ("Save Image") and
+   Files; elsewhere the file is downloaded. */
+function mediaSave(m, share){
+  var a = m.a;
+  if (!a || attBlocked(a)) return;
+  mediaGet(a.id).then(function(b){
+    if (!b) { toast("Download it first"); return; }
+    var name = mediaName(m), file = null;
+    try { file = new File([b], name, { type: b.type || "application/octet-stream" }); } catch (e) {}
+    var canShare = file && navigator.canShare && navigator.share && (function(){ try { return navigator.canShare({ files: [file] }); } catch (e) { return false; } })();
+    if (canShare && (share || isIOS())) {
+      navigator.share({ files: [file] }).catch(function(e){
+        if (e && e.name === "AbortError") return;
+        if (!share) mediaDownload(b, name);
+      });
+      return;
+    }
+    if (share) { toast("This browser can't share files — saving instead"); }
+    mediaDownload(b, name);
+  });
+}
+function mediaDownload(b, name){
+  var safe = MEDIA_SAFE_TYPE.test(b.type || "");
+  var u = URL.createObjectURL(safe ? b : new Blob([b], { type: "application/octet-stream" }));
+  var x = document.createElement("a");
+  x.href = u; x.download = name; x.rel = "noopener"; x.style.display = "none";
+  document.body.appendChild(x); x.click(); x.remove();
+  setTimeout(function(){ URL.revokeObjectURL(u); }, 60000);
+  toast(isAndroid() ? "Saved to Downloads" : "Saved");
+}
+
+/* ------------------------------------------------------------ location */
+function mapsUrl(a){
+  var q = a.lat.toFixed(5) + "," + a.lon.toFixed(5);
+  return isIOS() ? "https://maps.apple.com/?q=" + q + "&ll=" + q
+                 : "https://www.google.com/maps/search/?api=1&query=" + q;
+}
+function openMaps(a){
+  var w = null;
+  try { w = window.open(mapsUrl(a), "_blank", "noopener"); } catch (e) {}
+  if (!w) location.href = mapsUrl(a);
+}
+/* Only when you ask, only once: the position is found, shown to you, and
+   sent only when you tap Send. Nothing keeps it or updates it after. */
+var locPos = null, locFor = null;
+function locAsk(pid){
+  if (!("geolocation" in navigator)) { toast("This browser can't find your location"); return; }
+  locPos = null; locFor = pid;
+  $("locTitle").textContent = "Share your location with " + nameOf(pid) + "?";
+  $("locSub").textContent = "Sends where you are right now, once. It isn't updated or tracked " +
+    "afterwards, and nothing is sent until you tap Send.";
+  $("locState").textContent = ""; $("locState").className = "locst";
+  $("locGo").textContent = "Find my location"; $("locGo").disabled = false;
+  $("locGo").onclick = locFind;
+  openSheet("locSheet");
+}
+function locFind(){
+  var go = $("locGo"), stEl = $("locState"), pid = locFor;
+  go.disabled = true; go.textContent = "Finding you…";
+  stEl.textContent = ""; stEl.className = "locst";
+  navigator.geolocation.getCurrentPosition(function(p){
+    if (locFor !== pid || !$("locSheet").classList.contains("on")) return;
+    locPos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy || 0 };
+    stEl.className = "locst ok";
+    stEl.textContent = "Found you — accurate to about " + fmtDist(locPos.acc) +
+      (locPos.acc > 200 ? ". It may be more exact outdoors or with Wi-Fi on." : ".");
+    go.disabled = false; go.textContent = "Send location";
+    go.onclick = function(){
+      var pos = locPos; locPos = null;
+      closeSheet("locSheet");
+      if (!pos || !pid || !memberById(pid)) return;
+      var m = chatNewOut(pid, "", { k: "loc", lat: Math.round(pos.lat * 1e5) / 1e5,
+                                    lon: Math.round(pos.lon * 1e5) / 1e5, acc: Math.round(pos.acc) });
+      chatDeliver(pid, m);
+    };
+  }, function(err){
+    if (locFor !== pid) return;
+    stEl.className = "locst bad";
+    stEl.textContent = err && err.code === 1
+      ? "Location is turned off for this app. Allow it in your browser's or phone's settings, then try again."
+      : "Couldn't find your location. Try again — outdoors or with Wi-Fi on usually helps.";
+    go.disabled = false; go.textContent = "Try again"; go.onclick = locFind;
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 });
+}
+
+/* ---------------------------------------------------- choosing files */
+var attPick = null;          /* { pid, items: [{file, kind, url, big}] } */
+function attOpen(pid, files, asFiles){
+  if (!pid || !files || !files.length) return;
+  if (!mediaReady()) { toast("Pictures and files aren't set up on this family server yet"); return; }
+  attClose(true);
+  var items = [], skipped = 0, blocked = 0;
+  Array.prototype.slice.call(files, 0, MEDIA_BATCH).forEach(function(f){
+    if (MEDIA_BLOCK.test(f.name || "")) { blocked++; return; }
+    var img = !asFiles && /^image\/(jpeg|png|gif|webp|heic|heif|avif|bmp)$/i.test(f.type || "");
+    var it = { file: f, kind: img ? "img" : "file" };
+    /* A photo is made smaller before it goes; only a GIF or a file is
+       judged by its size as it is now. */
+    var lim = mediaLimit(it.kind);
+    it.big = (it.kind === "file" || /gif/i.test(f.type)) && f.size > lim;
+    if (img) { try { it.url = URL.createObjectURL(f); } catch (e) {} }
+    items.push(it);
+  });
+  if (files.length > MEDIA_BATCH) skipped = files.length - MEDIA_BATCH;
+  if (!items.length) { toast(blocked ? "Programs and web pages can't be sent" : "Nothing to send"); return; }
+  attPick = { pid: pid, items: items };
+  var grid = $("attGrid"); grid.innerHTML = "";
+  var photos = 0, ok = 0;
+  items.forEach(function(it){
+    var t = document.createElement("div");
+    t.className = "atile" + (it.kind === "img" ? " pic" : "") + (it.big ? " big" : "");
+    if (it.kind === "img" && it.url) {
+      var im = document.createElement("img"); im.alt = ""; im.decoding = "async"; im.src = it.url;
+      t.appendChild(im); photos++;
+    } else {
+      var ic = document.createElement("span"); ic.className = "fic"; ic.textContent = fileExt(it.file.name);
+      var nm = document.createElement("span"); nm.className = "anm"; nm.textContent = it.file.name || "File";
+      t.appendChild(ic); t.appendChild(nm);
+    }
+    var sz = document.createElement("span"); sz.className = "asz";
+    sz.textContent = it.big ? "Too big (limit " + fmtSize(mediaLimit(it.kind)) + ")" : fmtSize(it.file.size);
+    t.appendChild(sz);
+    grid.appendChild(t);
+    if (!it.big) ok++;
+  });
+  $("attTitle").textContent = "Send to " + nameOf(pid);
+  var notes = [];
+  if (skipped) notes.push("Only the first " + MEDIA_BATCH + " are sent at once.");
+  if (blocked) notes.push("Programs and web pages were left out.");
+  $("attNote").textContent = notes.join(" ");
+  $("attHdRow").style.display = photos ? "" : "none";
+  $("attHd").checked = false;
+  $("attCap").value = $("chatInput").value;
+  $("attGo").disabled = !ok;
+  $("attGo").textContent = ok ? "Send" + (ok > 1 ? " " + ok : "") : "Nothing can be sent";
+  $("attGo").onclick = function(){
+    var p = attPick;
+    if (!p) return;
+    var go = p.items.filter(function(it){ return !it.big; });
+    var cap = $("attCap").value.replace(/^\s+|\s+$/g, "").slice(0, CHAT_MAX);
+    var hd = $("attHd").checked;
+    if ($("attCap").value === $("chatInput").value) { $("chatInput").value = ""; chatGrow(); }
+    attClose();
+    chatSendFiles(p.pid, go, cap, hd);
+  };
+  openSheet("attSheet");
+}
+function attClose(quiet){
+  if (attPick) attPick.items.forEach(function(it){ if (it.url) { try { URL.revokeObjectURL(it.url); } catch (e) {} } });
+  attPick = null;
+  if ($("attGrid")) $("attGrid").innerHTML = "";
+  if (!quiet) closeSheet("attSheet");
+}
+
+/* The + beside the typing box. */
+function attMenu(btn, focus){
+  var pid = chatOpenId;
+  if (!pid) return;
+  var items = [];
+  if (mediaReady()) {
+    items.push({ label: "Photos", icon: ICO_PHOTO, run: function(){ attInput("attPhotos"); } });
+    if (isPhone()) items.push({ label: "Camera", icon: ICO_CAM, run: function(){ attInput("attCamera"); } });
+    items.push({ label: "File", icon: ICO_FILE, run: function(){ attInput("attFiles"); } });
+  }
+  if (fsCaps.loc) items.push({ label: "Location", icon: ICO_PIN, run: function(){ locAsk(pid); } });
+  if (!items.length) { toast("The family server needs updating before photos, files and locations can be sent"); return; }
+  cmenuOpen(btn.getBoundingClientRect(), items, { anchor: btn, focus: focus });
+}
+function attInput(id){
+  var i = $(id);
+  i.value = "";
+  i.click();
+}
+
+/* ---------------------------------------------------------- the viewer */
+var viewer = null;           /* { pid, cid, url } */
+function viewerOpen(pid, m){
+  mediaURL(m.a.id).then(function(u){
+    if (!u) { toast("This photo is no longer on this phone"); return; }
+    var v = $("mview");
+    viewer = { pid: pid, cid: m.c };
+    $("mvImg").src = u;
+    $("mvWho").textContent = m.d === "out" ? "You" : nameOf(pid);
+    $("mvWhen").textContent = dayLabel(m.at) + ", " + timeOf(m.at);
+    $("mvCap").textContent = m.t || "";
+    $("mvCap").hidden = !m.t;
+    $("mvShare").hidden = !(navigator.share && navigator.canShare);
+    $("mvWrap").classList.remove("zoom");
+    v.hidden = false;
+    try { history.pushState({ fmnView: 1 }, ""); } catch (e) {}
+    try { $("mvClose").focus({ preventScroll: true }); } catch (e) {}
+  });
+}
+function viewerClose(fromHistory){
+  if (!viewer) return;
+  viewer = null;
+  $("mview").hidden = true;
+  $("mvImg").removeAttribute("src");
+  if (!fromHistory && history.state && history.state.fmnView) { try { history.back(); } catch (e) {} }
+  if (!chatOpenId) mediaRelease();
+}
+
+/* ------------------------------------------------------ settings page */
+function paintMediaSettings(){
+  var p = mediaPrefs();
+  $("mapw").checked = p.pw; $("mapm").checked = p.pm; $("mafw").checked = p.fw; $("mafm").checked = p.fm;
+  var n = netKind();
+  var c = navigator.connection;
+  $("mediaNet").textContent = n === "saver" ? "Data Saver is on, so nothing downloads by itself."
+    : (c && c.type) ? "Right now this phone is on " + (n === "wifi" ? "Wi-Fi" : n === "none" ? "no network" : "mobile data") + "."
+    : isPhone() ? "This phone doesn't say which network it's on, so the mobile data choices are used."
+    : "";
+  $("mediaUse").textContent = "Pictures and files kept on this phone: " + fmtSize(mediaUsed()) +
+    " (at most " + fmtSize(MEDIA_CAP) + " — the oldest go first).";
+  var cap = mediaCaps();
+  $("mediaLim").textContent = !cap ? "Pictures and files aren't set up on this family server — locations still work."
+    : "Photos up to " + fmtSize(cap.photo) + " (they're made smaller before sending) and files up to " +
+      fmtSize(cap.file) + ". The family server keeps them " + cap.keep + " days for anyone who hasn't downloaded them yet.";
+}
+function mediaNavValue(){
+  var p = mediaPrefs();
+  var ph = p.pw && p.pm ? "always" : p.pw ? "on Wi-Fi" : p.pm ? "on mobile data" : "when tapped";
+  var fi = p.fw && p.fm ? "always" : p.fw ? "on Wi-Fi" : p.fm ? "on mobile data" : "when tapped";
+  return "Photos download " + ph + ", files " + fi;
+}
+(function(){
+  [["mapw", "pw"], ["mapm", "pm"], ["mafw", "fw"], ["mafm", "fm"]].forEach(function(x){
+    var el = $(x[0]);
+    if (!el) return;
+    el.onchange = function(){
+      var p = mediaPrefs(); p[x[1]] = el.checked;
+      try { localStorage.setItem(MEDIA_PREF_KEY, JSON.stringify(p)); } catch (e) {}
+    };
+  });
+  var free = $("mediaFree");
+  if (free) free.onclick = function(){
+    var n = mediaUsed();
+    if (!n) { toast("Nothing to free up"); return; }
+    if (!confirm("Remove " + fmtSize(n) + " of pictures and files from this phone?\n\n" +
+                 "Your messages stay. Anything still on the family server can be downloaded again.")) return;
+    var pin = mediaPinned();
+    mediaDrop(Object.keys(mediaIndex()).filter(function(id){ return !pin[id]; })).then(function(){
+      paintMediaSettings();
+      if (chatOpenId) { chatCache = { pid: null, map: {} }; chatPaint(false); }
+      toast("Freed up " + fmtSize(n - mediaUsed()));
+    });
+  };
+
+  /* The viewer's buttons. */
+  var wrap = $("mvWrap");
+  $("mvClose").onclick = function(){ viewerClose(false); };
+  $("mvSave").onclick = function(){ if (viewer) { var m = chatFind(viewer.pid, viewer.cid); if (m) mediaSave(m, false); } };
+  $("mvShare").onclick = function(){ if (viewer) { var m = chatFind(viewer.pid, viewer.cid); if (m) mediaSave(m, true); } };
+  var lastTap = 0;
+  wrap.addEventListener("click", function(e){
+    var now = Date.now();
+    if (now - lastTap < 320) {
+      /* Double tap: closer, and back. */
+      var z = !wrap.classList.contains("zoom");
+      var r = wrap.getBoundingClientRect();
+      var fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      wrap.classList.toggle("zoom", z);
+      if (z) { wrap.scrollLeft = fx * (wrap.scrollWidth - r.width); wrap.scrollTop = fy * (wrap.scrollHeight - r.height); }
+      lastTap = 0;
+    } else lastTap = now;
+  });
+  document.addEventListener("keydown", function(e){ if (viewer && e.key === "Escape") { e.preventDefault(); viewerClose(false); } });
+
+  /* The sheets' own closing. */
+  var as = $("attSheet");
+  as.addEventListener("click", function(e){ if (e.target === as) attClose(true); });
+  $("attCancel").onclick = function(){ attClose(); };
+  $("locCancel").onclick = function(){ locPos = null; closeSheet("locSheet"); };
+  $("locSheet").addEventListener("click", function(e){ if (e.target === $("locSheet")) locPos = null; });
+
+  /* Picking. */
+  ["attPhotos", "attCamera", "attFiles"].forEach(function(id){
+    $(id).onchange = function(){
+      var files = this.files;
+      if (chatOpenId && files && files.length) attOpen(chatOpenId, files, id === "attFiles");
+    };
+  });
+  var ab = $("chatAtt");
+  ["pointerdown", "mousedown"].forEach(function(ev){ ab.addEventListener(ev, function(e){ e.preventDefault(); }); });
+  ab.onclick = function(e){
+    if (cmenuLast && cmenuLast.anchor === ab && Date.now() - cmenuLast.skipClick < 600) return;
+    attMenu(ab, e.detail === 0);
+  };
+  /* Pasting or dropping a picture or file into a conversation. */
+  $("chatInput").addEventListener("paste", function(e){
+    var files = e.clipboardData && e.clipboardData.files;
+    if (!chatOpenId || !files || !files.length || !mediaReady()) return;
+    e.preventDefault();
+    attOpen(chatOpenId, files, false);
+  });
+  var ch = $("chat");
+  ch.addEventListener("dragover", function(e){
+    if (!chatOpenId || !e.dataTransfer || Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") === -1) return;
+    e.preventDefault(); ch.classList.add("drop");
+  });
+  ch.addEventListener("dragleave", function(e){ if (e.target === ch || !ch.contains(e.relatedTarget)) ch.classList.remove("drop"); });
+  ch.addEventListener("drop", function(e){
+    ch.classList.remove("drop");
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (!chatOpenId || !files || !files.length) return;
+    e.preventDefault();
+    attOpen(chatOpenId, files, false);
+  });
+})();
+
 
 /* ------------------------------------------------------------ sheets */
 
@@ -7370,8 +8964,8 @@ function openSetup(){
 var setPageNow = "home";
 var PAGE_TITLES = { home: "Settings", setup: "Set up your family", profile: "You",
   family: "Family", invite: "Invite someone", calls: "Calls on this phone",
-  ringtone: "Ringtone", status: "Your status", admin: "Family admin",
-  usage: "Usage and call quality", connection: "Connection and relay" };
+  ringtone: "Sounds", status: "Your status", admin: "Family admin",
+  usage: "Usage and call quality", connection: "Connection and relay", media: "Chats and media" };
 function setPage(name){
   setPageNow = name;
   Array.prototype.forEach.call(document.querySelectorAll("#setupSheet [data-pages]"), function(el){
@@ -7395,6 +8989,7 @@ function setPage(name){
        again, if the last try found no connection). */
     try { paintInvites(); } catch (e) {}
   }
+  if (name === "media") { try { paintMediaSettings(); } catch (e) {} }
   if (name === "usage") {
     /* Both parts drawn fresh: a phone's report may have arrived since. */
     try { paintOverview(); } catch (e) {}
@@ -7443,7 +9038,10 @@ function paintSetNav(){
   row("calls", "Calls on this phone", callsOk ? "On" : fsPushState === "needhome" ? "Add to Home Screen first"
       : fsPushState === "blocked" ? "Blocked — tap to fix" : "Off — tap to turn on",
       { icon: ICON.phone, warn: !callsOk });
-  row("ringtone", "Ringtone", (TONES[toneName()] || TONES.classic).name, { icon: ICON.bell });
+  var sp = sndPrefs();
+  row("ringtone", "Sounds", "Calls: " + (TONES[toneName()] || TONES.classic).name + " · Messages: " +
+      (sp.nt === "none" ? "Silent" : TONES[sp.nt].name), { icon: ICON.bell });
+  row("media", "Chats and media", mediaNavValue(), { icon: ICO_PHOTO });
   row("status", "Your status", state.presOff ? "Hidden" : "Shown to the people you're in touch with", { icon: ICON.eye || ICON.group });
   if (admin || !state.admin || handing)
     row("admin", "Family admin", admin ? ((state.admins || []).length ? "Co-admins: " + state.admins.map(function(id){ return String(nameOf(id)).split(/\s+/)[0]; }).join(", ") + " · recovery link" : "Add a co-admin · recovery link") : handing ? "Finish taking over" : "Nobody manages this family yet", { icon: ICON.key || ICON.share });
@@ -8333,24 +9931,66 @@ function prepareInvites(ids){
 function paintTones(){
   var box = $("toneList");
   if (!box) return;
-  box.innerHTML = "";
-  var current = toneName();
-  TONE_ORDER.forEach(function(key){
-    var b = document.createElement("button");
-    b.className = "toneopt" + (key === current ? " sel" : "");
-    b.setAttribute("aria-pressed", key === current ? "true" : "false");
-    b.innerHTML = '<span class="tp" aria-hidden="true">' + ICON.bell + "</span><span></span>";
-    b.lastChild.textContent = TONES[key].name;
-    b.onclick = function(){
-      if (!state) { toast("Save your family first"); return; }
-      state.tone = key; save();
-      paintTones();
-      previewTone(key);
-    };
-    box.appendChild(b);
+  var p = sndPrefs();
+  function grid(el, order, current, pick){
+    el.innerHTML = "";
+    order.forEach(function(key){
+      var b = document.createElement("button");
+      b.className = "toneopt" + (key === current ? " sel" : "") + (key === "none" ? " none" : "");
+      b.setAttribute("aria-pressed", key === current ? "true" : "false");
+      b.innerHTML = '<span class="tp" aria-hidden="true">' + (key === "none" ? "" : ICON.bell) + "</span><span></span>";
+      b.lastChild.textContent = key === "none" ? "Silent" : TONES[key].name;
+      b.onclick = function(){ pick(key); };
+      el.appendChild(b);
+    });
+  }
+  grid(box, TONE_ORDER, toneName(), function(key){
+    if (!state) { toast("Save your family first"); return; }
+    state.tone = key; save();
+    paintTones();
+    previewTone(key);
   });
+  grid($("noteList"), NOTE_ORDER, p.nt, function(key){
+    sndSet("nt", key);
+    notePrimed = false;
+    paintTones();
+    stopTone();
+    if (key !== "none") playNote(key, sndPrefs().nv);
+  });
+  $("ringVol").value = Math.round(p.rv * 10);
+  $("noteVol").value = Math.round(p.nv * 10);
+  $("ringVib").checked = p.rvib;
+  $("noteVib").checked = p.nvib;
+  $("noteOpen").checked = p.nopen;
+  $("noteVol").disabled = p.nt === "none";
+  $("sndClosedNote").textContent = (isIOS()
+      ? "The iPhone plays its own notification sound for the app — it doesn't let web apps use their own sounds there. "
+      : "Your phone plays its own notification sound for the app — phones don't let web apps use their own sounds there. ") +
+    "A call keeps alerting every few seconds, with a long vibration, until you answer or it ends; " +
+    "everything else alerts once" + (isIOS() ? "" : ", with a short vibration") + "." +
+    (p.nt === "none" ? " With Silent chosen, those notifications arrive without sound." : "");
 }
-
+(function(){
+  function vol(id, key, isRing){
+    var el = $(id);
+    if (!el) return;
+    el.onchange = function(){
+      var v = Math.max(1, Math.min(10, Number(el.value) || 7)) / 10;
+      sndSet(key, v);
+      if (isRing) previewTone(toneName());
+      else { var p = sndPrefs(); if (p.nt !== "none") playNote(p.nt, v); }
+    };
+  }
+  vol("ringVol", "rv", true);
+  vol("noteVol", "nv", false);
+  [["ringVib", "rvib"], ["noteVib", "nvib"], ["noteOpen", "nopen"]].forEach(function(x){
+    var el = $(x[0]);
+    if (el) el.onchange = function(){
+      sndSet(x[1], el.checked);
+      if (el.checked && x[0] !== "noteOpen") { try { navigator.vibrate && navigator.vibrate(x[0] === "ringVib" ? [400, 200, 400] : [100, 70, 100]); } catch (e) {} }
+    };
+  });
+})();
 
 /* Whether this phone can ring with the page closed. Said in Settings,
    where the fix is, rather than as a banner across the home screen -
@@ -8704,7 +10344,7 @@ function takeJoinReq(req){
                        by: req.by || null, at: req.at || Date.now(), legacy: !!req.legacy };
   if (approveIntent === req.id) { approveIntent = null; approveJoin(req.id); return; }
   paintMain();
-  if (isNew) toast(name + " wants to join — Approve or Reject at the top");
+  if (isNew) { toast(name + " wants to join — Approve or Reject at the top"); notifySound("info"); }
 }
 
 function approveJoin(id){

@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-10-20b";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-10-20d";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var CALL_KINDS = { call: 1, group: 1 };
@@ -167,13 +167,26 @@ self.addEventListener("push", function (e) {
   e.waitUntil(handlePush(d));
 });
 
+/* The person's sound settings (from the app - see sndToHelper there):
+   note  false = the notification sound is set to Silent
+   nvib  vibrate for notifications      rvib  vibrate for calls
+   Kept in memory too, so a burst of rings doesn't read it every time. */
+var SND = null;
+function savedSound() {
+  if (SND) return Promise.resolve(SND);
+  return caches.open(CFG).then(function (c) { return c.match("sound"); })
+    .then(function (r) { return r ? r.json() : null; })
+    .then(function (o) { SND = o || { note: true, nvib: true, rvib: true }; return SND; })
+    .catch(function () { return { note: true, nvib: true, rvib: true }; });
+}
+
 function handlePush(d) {
   var kind = d.kind || "buzz";
   var tag = d.tag || null;
   var ringing = !!CALL_KINDS[kind];
   var cfg = null, quietCall = false;
 
-  return Promise.all([savedCfg(), ringing ? isSilenced(tag) : false]).then(function (got) {
+  return Promise.all([savedCfg(), ringing ? isSilenced(tag) : false, savedSound()]).then(function (got) {
     cfg = got[0]; quietCall = got[1];
     return self.clients.matchAll({ type: "window", includeUncontrolled: true });
   }).then(function (list) {
@@ -272,7 +285,16 @@ function showRing(d, kind, tag) {
   });
 }
 
+/* Two kinds of alert, never mixed up. A call: stays up, alerts again
+   with every ring (the server re-sends it every few seconds until it is
+   answered, declined or gives up), and a long vibration. Everything
+   else - message, missed call, buzz, join request: alerts once, one
+   short vibration, the same for all of them. The sound itself is the
+   phone's own; phones don't let a web app choose it. */
+var CALL_VIB = [700, 300, 700, 300, 700, 300, 700];
+var NOTE_VIB = [100, 70, 100];
 function options(d, kind, quiet) {
+  var snd = SND || { note: true, nvib: true, rvib: true };
   var url = d.url || "./";
   var answer = d.answer || (d.ans != null && d.url ? d.url + d.ans : null);
   var o = {
@@ -281,32 +303,27 @@ function options(d, kind, quiet) {
             cb: d.cb || null, jr: d.jr || null, rej: d.rej || null },
     timestamp: d.ts || Date.now()
   };
+  var call = !!CALL_KINDS[kind];
+  /* Silent chosen for notifications: arrives without a sound. Never for
+     a call - a call must be heard. */
+  if (!call && !snd.note) quiet = true;
   if (d.tag) { o.tag = d.tag; o.renotify = !quiet; }
   if (quiet) o.silent = true;
-  if (CALL_KINDS[kind]) {
+  if (!quiet && (call ? snd.rvib : snd.nvib)) o.vibrate = call ? CALL_VIB : NOTE_VIB;
+  if (call) {
     o.requireInteraction = true;
-    if (!quiet) o.vibrate = [700, 300, 700, 300, 700, 300, 700];
     o.actions = [];
     if (answer) o.actions.push({ action: "answer", title: kind === "group" ? "Join" : "Answer" });
     if (d.dec) o.actions.push({ action: "decline", title: "Decline" });
   } else if (kind === "approve") {
     /* Somebody wants to join: stays until the admin decides. */
     o.requireInteraction = true;
-    o.vibrate = [300, 150, 300];
     o.actions = [{ action: "approve", title: "Approve" }];
     if (d.rej) o.actions.push({ action: "reject", title: "Reject" });
-  } else if (kind === "info") {
-    o.vibrate = [200];
   } else if (kind === "missed") {
-    o.vibrate = [200, 120, 200];
     if (d.cb) o.actions = [{ action: "callback", title: "Call back" }];
   } else if (kind === "msg") {
-    /* A message: one short tick. */
-    o.vibrate = [90];
     o.data.from = d.from || null;
-  } else {
-    /* A buzz: two quick taps - "look at me", clearly not a call. */
-    o.vibrate = [220, 110, 220];
   }
   return o;
 }
@@ -412,11 +429,17 @@ self.addEventListener("message", function (e) {
                                                         sec: m.sec || null,
                                                         skew: typeof m.skew === "number" ? m.skew : 0 })));
     }));
+  } else if (m.t === "sound" && m.p) {
+    SND = { note: m.p.note !== false, nvib: m.p.nvib !== false, rvib: m.p.rvib !== false };
+    e.waitUntil(caches.open(CFG).then(function (c) {
+      return c.put("sound", new Response(JSON.stringify(SND)));
+    }).catch(function () {}));
   } else if (m.t === "silence" && m.tag) {
     /* The app answered, declined or ended this call itself. */
     e.waitUntil(Promise.all([markSilenced(m.tag), closeCall(m.tag)]));
   } else if (m.t === "forget") {
     /* This phone was removed from the family: stop acting for anyone. */
+    SND = null;
     e.waitUntil(caches.delete(CFG));
   } else if (m.t === "audible" && m.tag) {
     if (m.on) audible[m.tag] = 1; else delete audible[m.tag];
