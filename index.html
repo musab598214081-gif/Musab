@@ -1374,16 +1374,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.7.0";
+var APP_VERSION = "1.7.1";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "A ringtone only for calls, one short sound for everything else — both adjustable in Settings → Sounds";
+var WHATS_NEW   = "Easier to add to your Home Screen, plus separate sounds for calls and messages (Settings → Sounds)";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-20d";
+var VERSION  = "2026-10-20e";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -6175,6 +6175,7 @@ function paintMain(){
   }
   paintJoinReqs(main);
   paintSetupCard(main);
+  paintInstallCard(main);
   if (big) {
     paintPanel(main);
     paintPushWarn();
@@ -9791,7 +9792,7 @@ function ensureInvite(id, force){
 function inviteText(m){
   var from = state && state.me ? String(nameOf(state.me)).split(/\s+/)[0] : "";
   return (from ? from + " invited you" : "You're invited") +
-    " to our family on Family Notifier — private calls just for the family. Tap to join:";
+    " to our family on Family Notifier — private calls just for the family. Tap to join, then add it to your Home Screen when it asks:";
 }
 
 /* Send opens the phone's share sheet. On a computer that sheet often
@@ -10958,6 +10959,110 @@ function paintRemoved(main){
   };
   card.appendChild(p); card.appendChild(b);
   main.appendChild(card);
+}
+
+/* ------------------------------------------------- the Home Screen
+ *
+ * No web page can put itself on a phone's Home Screen - the phone always
+ * asks the person first. What the app can do is make it one tap where the
+ * phone allows that (Android and computers: the phone's own "Install"
+ * box), and show exactly where to tap where it doesn't (iPhone: that is
+ * the "One more step on iPhone" card, which also turns on calls).
+ *
+ * The manifest is written into this page, and its start address could
+ * not be read from there - so Chrome did not count the app as
+ * installable and never offered to install it. It is given the page's
+ * real address here (not on iPhones, which keep adding the page exactly
+ * as it is open, link and all). */
+(function(){
+  try {
+    if (isIOS()) return;
+    var ln = document.querySelector('link[rel="manifest"]');
+    if (!ln) return;
+    var href = ln.getAttribute("href") || "", i = href.indexOf(",");
+    if (href.indexOf("data:") !== 0 || i === -1) return;
+    var man = JSON.parse(decodeURIComponent(href.slice(i + 1)));
+    var here = location.origin + location.pathname;
+    man.start_url = here;
+    man.id = location.pathname;
+    man.scope = here.replace(/[^\/]*$/, "");
+    ln.setAttribute("href", "data:application/manifest+json," + encodeURIComponent(JSON.stringify(man)));
+  } catch (e) {}
+})();
+
+var installEvt = null;
+window.addEventListener("beforeinstallprompt", function(e){
+  e.preventDefault();                   /* offered on our card, not at a random moment */
+  installEvt = e;
+  if (state && state.me) paintInstallCard();
+});
+window.addEventListener("appinstalled", function(){
+  installEvt = null;
+  try { localStorage.setItem("fmn-installed", "1"); } catch (e) {}
+  paintInstallCard();
+});
+function installDismissed(){
+  try {
+    if (localStorage.getItem("fmn-installed")) return true;
+    return Date.now() - (Number(localStorage.getItem("fmn-install-no")) || 0) < 14 * 86400000;
+  } catch (e) { return false; }
+}
+function paintInstallCard(main){
+  var old = $("installCard");
+  var box = old || document.createElement("div");
+  if (!old) {
+    if (!main) return;
+    box.id = "installCard"; box.className = "onb";
+    main.appendChild(box);
+  }
+  box.innerHTML = "";
+  /* On an iPhone the setup card already walks through it. */
+  var show = !!(state && state.me && !state.joining && !isStandalone() && !installDismissed() &&
+                !isIOS() && (installEvt || isAndroid()));
+  if (!show) { box.style.display = "none"; return; }
+  box.style.display = "";
+  var phone = isPhone();
+  var h = document.createElement("h3");
+  h.textContent = phone ? "Add Family Notifier to your Home Screen" : "Install Family Notifier";
+  var p = document.createElement("p");
+  p.textContent = phone
+    ? "It then opens in one tap like any other app, and calls and messages reach you more reliably."
+    : "It then opens in its own window, and calls and messages reach you more reliably.";
+  box.appendChild(h); box.appendChild(p);
+  if (installEvt) {
+    var go = document.createElement("button");
+    go.className = "btn";
+    go.textContent = phone ? "Add to Home Screen" : "Install";
+    go.onclick = function(){
+      var ev = installEvt;
+      if (!ev) return;
+      try {
+        ev.prompt();
+        Promise.resolve(ev.userChoice).then(function(r){
+          installEvt = null;
+          if (r && r.outcome === "accepted") { try { localStorage.setItem("fmn-installed", "1"); } catch (e) {} }
+          paintInstallCard();
+        }).catch(function(){});
+      } catch (e) {}
+    };
+    box.appendChild(go);
+  } else {
+    /* The browser didn't offer its own box (Firefox, or not yet): where to tap. */
+    var ol = document.createElement("ol");
+    ["Tap your browser's menu (⋮ or ≡, usually at the top or bottom right)",
+     "Tap Add to Home screen or Install app",
+     "Tap Add or Install to confirm"]
+      .forEach(function(t){ var li = document.createElement("li"); li.textContent = t; ol.appendChild(li); });
+    box.appendChild(ol);
+  }
+  var no = document.createElement("button");
+  no.className = "btn ghost";
+  no.textContent = "Not now";
+  no.onclick = function(){
+    try { localStorage.setItem("fmn-install-no", String(Date.now())); } catch (e) {}
+    paintInstallCard();
+  };
+  box.appendChild(no);
 }
 
 /* "Get calls on this phone": the one thing each person must do on
