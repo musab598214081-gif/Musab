@@ -20,9 +20,10 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-10-20i";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-10-27a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
+var FONTS = "fmn-fonts-v1";   /* the app's font, kept here between launches */
 var CALL_KINDS = { call: 1, group: 1 };
 var UA = self.navigator.userAgent || "";
 var IS_APPLE = /iPhone|iPad|iPod|Macintosh/.test(UA) && !/Chrome|Chromium|Edg|Firefox/.test(UA);
@@ -134,6 +135,22 @@ self.addEventListener("activate", function (e) {
  * network for the whole page before it can even start connecting. */
 self.addEventListener("fetch", function (e) {
   var req = e.request;
+  /* The font: from the copy kept here at once, refreshed in the
+     background - later launches never wait on the font server, and an
+     offline launch doesn't hang on it. */
+  if (req.method === "GET" && /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(req.url)) {
+    e.respondWith(caches.open(FONTS).then(function (c) {
+      return c.match(req).then(function (hit) {
+        var fresh = fetch(req).then(function (res) {
+          if (res && (res.ok || res.type === "opaque")) c.put(req, res.clone()).catch(function () {});
+          return res;
+        });
+        if (hit) { e.waitUntil(fresh.catch(function () {})); return hit; }
+        return fresh;
+      });
+    }).catch(function () { return fetch(req); }));
+    return;
+  }
   if (req.method !== "GET" || req.mode !== "navigate") return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
@@ -195,6 +212,7 @@ var AR_NOTE = [
   [/^Call declined$/, "رُفضت المكالمة"], [/^Declined$/, "مرفوضة"],
   [/^Tap to answer$/, "اضغط للرد"], [/^wants your attention$/, "يريد انتباهك"],
   [/^\u{1F4F7} Photo/u, "\u{1F4F7} صورة"], [/^\u{1F4CD} Location/u, "\u{1F4CD} الموقع"],
+  [/^\u{1F3A4} Voice message/u, "\u{1F3A4} رسالة صوتية"],
   [/^Call me$/, "اتصل بي"], [/^Come here please$/, "تعال هنا من فضلك"], [/^Dinner is ready$/, "العشاء جاهز"],
   [/^Are you OK\?$/, "هل أنت بخير؟"], [/^I'm on my way$/, "أنا في الطريق"], [/^Ring me when free$/, "اتصل بي عندما تتفرغ"],
   [/^This is how messages and other notifications look and sound\.$/, "هكذا تبدو الرسائل والإشعارات الأخرى وتُسمع."]
@@ -202,7 +220,10 @@ var AR_NOTE = [
 var AR_ACT = { Answer: "رد", Join: "انضمام", Decline: "رفض", "Call back": "معاودة الاتصال",
                Approve: "موافقة", Reject: "رفض" };
 function tr(text) {
-  if (LANG !== "ar" || !text) return text;
+  if (!text) return text;
+  /* A voice message named by an older family server, shown as one. */
+  text = String(text).replace(/\u{1F4CE} Voice message (\d+:\d\d)\.(webm|m4a|ogg)/gu, "\u{1F3A4} Voice message · $1");
+  if (LANG !== "ar") return text;
   return String(text).split("\n").map(function (line) {
     for (var i = 0; i < AR_NOTE.length; i++) if (AR_NOTE[i][0].test(line)) return line.replace(AR_NOTE[i][0], AR_NOTE[i][1]);
     return line;
