@@ -4853,7 +4853,10 @@ function unlockAudio(){
          over at once (see outGuard), and back again when it resumes. */
       try { audioCtx.addEventListener("statechange", outGuard); } catch (e) {}
     }
-    if (audioCtx.state === "suspended" || audioCtx.state === "interrupted") audioCtx.resume();
+    if (audioCtx.state === "suspended" || audioCtx.state === "interrupted") {
+      var pr = audioCtx.resume();
+      if (pr && pr.catch) pr.catch(function(){});
+    }
   } catch (e) {}
 }
 
@@ -5120,7 +5123,7 @@ function tone(opts){
     Promise.resolve(p).then(function(){
       if (!on) return;
       ringPrimed = true;
-      if (opts.incoming) reportAudible(opts.tag, true);
+      if (opts.incoming) { reportAudible(opts.tag, true); guardRing(); }
     }, function(){
       if (!on) return;
       ringLoud = false;
@@ -5180,6 +5183,36 @@ function tone(opts){
     clearInterval(vib);
     if (navigator.vibrate) { try { navigator.vibrate(0); } catch (e) {} }
   });
+
+  /* The ring must keep sounding. While this screen says it is ringing
+     out loud, the family server stops re-sending the call's
+     notification - so if the phone quietly pauses the sound (another
+     app taking the audio, an alarm, a system sound), the call would ring
+     in silence. Checked every 1.5 s: a paused ring is started again, and
+     if it cannot be, the server is told at once so the notifications
+     take over again - and the page's own audio engine tries too. */
+  function guardRing(){
+    var fails = 0;
+    var iv = setInterval(function(){
+      if (!on || !ringLoud) { clearInterval(iv); return; }
+      var el2 = ringElement();
+      if (!el2.paused && !el2.ended && !el2.muted) { fails = 0; return; }
+      var q = null;
+      try { el2.loop = true; el2.muted = false; q = el2.play(); } catch (e) { q = Promise.reject(e); }
+      Promise.resolve(q).then(function(){ fails = 0; }, function(){
+        if (!on) return;
+        if (++fails === 1) {
+          clearInterval(iv);          /* handed over: never two rings at once */
+          reportAudible(opts.tag, false);
+          if (audioCtx && audioCtx.state === "running") {
+            var src2 = engineRing(key, true);
+            if (src2) stops.push(function(){ try { src2.stop(); src2.disconnect(); } catch (e) {} });
+          } else stops.push(ringBlocked(opts));
+        }
+      });
+    }, 1500);
+    stops.push(function(){ clearInterval(iv); });
+  }
 
   toneStop = function(){
     on = false;

@@ -219,7 +219,16 @@ function handlePush(d) {
       }
       return showRing(d, kind, tag);
     }
-    if (kind === "missed") badgeAdd();
+    if (kind === "missed") {
+      badgeAdd();
+      /* The rings of this call are shown under their own labels (see
+         showRing), so "Missed call" did not replace them: "Alice is
+         calling you", with a live Answer button, stayed on the phone
+         for good next to it. Every notification of the call goes first. */
+      if (tag) return markSilenced(tag).then(function () { return closeCall(tag); }).then(function () {
+        return self.registration.showNotification(d.title || "Missed call", options(d, kind, false));
+      });
+    }
     return self.registration.showNotification(d.title || "Family Notifier", options(d, kind, false));
   });
 }
@@ -306,12 +315,21 @@ function options(d, kind, quiet) {
    notification goes. Where the browser needs something shown for every
    push, a quiet note takes its place instead. */
 function cancel(tag, d, front) {
-  return Promise.all([tag ? closeCall(tag) : self.registration.getNotifications().then(function (ns) {
-    ns.forEach(function (n) { n.close(); }); }), markSilenced(tag)]).then(function () {
+  var here = false;
+  return (tag ? isSilenced(tag) : Promise.resolve(false)).then(function (s) {
+    here = s;                         /* answered or declined on THIS phone */
+    return Promise.all([tag ? closeCall(tag) : self.registration.getNotifications().then(function (ns) {
+      ns.forEach(function (n) { n.close(); }); }), markSilenced(tag)]);
+  }).then(function () {
     if (front && !IS_APPLE) return;
     return self.registration.showNotification(d.title || "Call ended", {
       body: d.body || "", tag: tag || undefined, silent: true, renotify: false,
       data: { url: "./", kind: "cancel" }
+    }).then(function () {
+      /* "Picked up on another device" is wrong on the phone that picked
+         it up: shown (the browser insists) and taken away at once. */
+      if (!here) return;
+      return new Promise(function (r) { setTimeout(r, 300); }).then(function () { return closeCall(tag); });
     });
   });
 }
