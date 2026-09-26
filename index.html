@@ -758,6 +758,22 @@
   #cmenu button:active{background:rgba(255,255,255,.1)}
   #cmenu button.danger{color:#FF8589}
   #cmenu svg{width:19px;height:19px;flex:0 0 auto}
+  /* ---- Blocking ---- */
+  .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
+  .cblk[hidden]{display:none}
+  .cblk p{flex:1;margin:0;font-size:14px;color:var(--mist);line-height:1.4}
+  .cblk .btn{width:auto;margin:0;padding:10px 18px;flex:0 0 auto}
+  .person.blocked .qa{opacity:.35}
+  .person.blocked .sub{color:var(--mist);font-style:italic}
+  .blkrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--seam)}
+  .blkrow:last-child{border-bottom:0}
+  .blkrow b{flex:1;font-weight:600}
+  .blkrow .cav{width:36px;height:36px}
+  .blkrow button{background:transparent;border:1px solid var(--seam);color:var(--paper);border-radius:12px;
+    padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+  .blknone{color:var(--mist);font-size:14px;margin:6px 0}
+
   /* ---- Pictures, files and locations ---- */
   .attbtn{width:44px;height:44px;flex:0 0 auto;border-radius:50%;border:0;background:transparent;
     color:var(--mist);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-right:-4px}
@@ -1103,6 +1119,13 @@
     <button class="btn ghost" id="micAllow">Allow the microphone now</button>
     </div>
 
+    <div id="blockBlock" data-pages="blocked">
+    <p class="sub">Someone you block can't call, buzz or message you, and neither of you
+      sees the other's status. They aren't told. To block someone, open their chat and
+      tap ⋮ → Block.</p>
+    <div id="blockList"></div>
+    </div>
+
     <div id="mediaBlock" data-pages="media">
     <div class="sectiontitle">Download automatically</div>
     <p class="sub" id="mediaNet"></p>
@@ -1281,7 +1304,12 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
   </div>
-  <div class="cfoot">
+  <!-- In place of the typing box while this person is blocked. -->
+  <div class="cblk" id="chatBlocked" hidden>
+    <p id="chatBlockedTx"></p>
+    <button class="btn ghost" id="chatUnblock">Unblock</button>
+  </div>
+  <div class="cfoot" id="chatFoot">
     <button class="attbtn" id="chatAtt" aria-label="Send a photo, file or location" aria-haspopup="menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     </button>
@@ -1343,6 +1371,15 @@
      message (long-press, or right-click on a computer). -->
 <div id="cmenu" role="menu" hidden></div>
 
+<div class="sheet" id="blkSheet">
+  <div class="sheetbody">
+    <h2 id="blkTitle">Block?</h2>
+    <p class="sub" id="blkSub"></p>
+    <button class="btn danger strong" id="blkGo">Block</button>
+    <button class="btn ghost" data-close="blkSheet">Cancel</button>
+  </div>
+</div>
+
 <div class="sheet" id="clrSheet">
   <div class="sheetbody">
     <h2 id="clrTitle">Clear this chat?</h2>
@@ -1374,16 +1411,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.7.1";
+var APP_VERSION = "1.8.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Easier to add to your Home Screen, plus separate sounds for calls and messages (Settings → Sounds)";
+var WHATS_NEW   = "Block someone from their chat (⋮ → Block) — no calls, buzzes or messages between you";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-20e";
+var VERSION  = "2026-10-20f";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1465,7 +1502,7 @@ function snapshot(){
            turn2: state.turn2 || null, route: state.route || null,
            server: state.server || null, token: state.token || null,
            fs: state.fs || null,
-           tone: state.tone || "classic", snd: state.snd || null,
+           tone: state.tone || "classic", snd: state.snd || null, blocked: state.blocked || [],
            pending: state.pending || [], presOff: !!state.presOff, tzOff: !!state.tzOff,
            missedIds: state.missedIds || [], grpSeen: state.grpSeen || {},
            admin: state.admin || null, admins: state.admins || [],
@@ -1940,6 +1977,7 @@ function fsFrame(f){
     /* Marked as received, so a buzz kept for this phone while its
        connection was down is not delivered - or logged - twice. */
     fsSetSince(f.time);
+    if (f.from && isBlocked(f.from)) return;
     dispatch({ event: "message", id: f.id, time: Math.floor(f.time / 1000),
                topic: ringTopic(state.me), title: f.title, message: f.body,
                kind: f.kind || null, tag: f.tag || null }, false);
@@ -1948,6 +1986,9 @@ function fsFrame(f){
   } else if (f.k === "pres") {
     fsTakePres(f); paintPresence();
   } else if (f.k === "presall") {
+    /* The whole list of who you can see: anyone no longer on it (they
+       blocked you, or you them) drops back to no status at all. */
+    PRES = {};
     (f.list || []).forEach(fsTakePres); paintPresence();
     /* How far this phone's clock is from the server's - for the
        notification helper, which judges whether a call is still ringing
@@ -1970,6 +2011,8 @@ function fsFrame(f){
     takeRot(f.text, f.sig);
   } else if (f.k === "auth" && f.ok === false) {
     takeAuthFail();
+  } else if (f.k === "blocks") {
+    blockTake(f.list);
   } else if (f.k === "caps") {
     /* media: pictures and files, with their limits (null: not set up on
        this server). A server that says anything about media at all also
@@ -3865,6 +3908,7 @@ function flushIce(peerId){
 }
 
 function startCall(peerId){
+  if (blockGuard(peerId, "call")) return;
   if (call) { toast("Already on a call"); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toast("This browser cannot make calls — open the page in Safari or Chrome");
@@ -4073,6 +4117,7 @@ function onSignal(msg){
     return;
   }
 
+  if (msg.t === "offer" && msg.from && isBlocked(msg.from)) return;
   if (msg.t === "offer") {
     /* Both of you pressed call at the same moment. Each phone was
        "calling", so each told the other it was busy and nobody got
@@ -6490,6 +6535,9 @@ function paintCardNotes(){
     var last = lastWith(card.getAttribute("data-who"));
     sub.className = "sub" + (last && last.missed ? " missed" : last && last.unread ? " unread" : "");
     sub.textContent = last ? last.text : "Tap to chat, call or buzz";
+    var bid = card.getAttribute("data-id");
+    card.classList.toggle("blocked", !!(bid && isBlocked(bid)));
+    if (bid && isBlocked(bid)) { sub.className = "sub"; sub.textContent = "Blocked"; }
     var dot = card.querySelector(".dot"), bd = dot && dot.querySelector(".badge");
     if (bd) bd.remove();
     if (dot && last && last.count) {
@@ -6968,7 +7016,7 @@ function noteUrl(memberId){
 /* ------------------------------------------------------------ sending */
 function chatSend(pid, text){
   text = String(text || "").replace(/^\s+|\s+$/g, "");
-  if (!pid || !text) return;
+  if (!pid || !text || blockGuard(pid, "message")) return;
   if (text.length > CHAT_MAX) text = text.slice(0, CHAT_MAX);
   chatDeliver(pid, chatNewOut(pid, text, null));
 }
@@ -7031,6 +7079,7 @@ function chatTake(f){
   var mine = f.from === state.me;
   var pid = mine ? f.to : f.from;
   if (!pid || pid === state.me || !memberById(pid)) return;
+  if (!mine && isBlocked(pid)) return;
   /* Cleared on this phone: a copy sent again stays cleared. */
   var gone = chatStore().gone[pid];
   if (gone && gone[f.cid]) return;
@@ -7212,6 +7261,7 @@ function openChat(id){
   $("chatName").textContent = m.name;
   chatPaintSub();
   $("chatInput").value = ""; chatGrow();
+  chatBlockPaint();
   $("chat").classList.add("on");
   $("chat").setAttribute("aria-hidden", "false");
   /* The phone's Back button closes the conversation, not the app. */
@@ -7250,6 +7300,7 @@ function chatPaintSub(){
   if (!chatOpenId) return;
   var st = presenceOf(chatOpenId), tt = theirTime(chatOpenId);
   var sub = $("chatSub");
+  if (isBlocked(chatOpenId)) { sub.textContent = "Blocked"; sub.className = ""; return; }
   sub.textContent = st.text + (tt ? " · " + (tt.night ? "\u263E " : "") + tt.short : "");
   sub.className = st.k;
 }
@@ -7447,7 +7498,7 @@ function chatEvent(pid, r){
 function chatQuick(){
   var q = $("chatQuick");
   if (!q) return;
-  var empty = !$("chatInput").value;
+  var empty = !$("chatInput").value && !isBlocked(chatOpenId);
   q.style.display = empty ? "" : "none";
   if (q.childNodes.length) return;
   QUICK.forEach(function(text){
@@ -7463,7 +7514,7 @@ function chatGrow(){
   if (!i) return;
   i.style.height = "auto";
   i.style.height = Math.min(i.scrollHeight, 132) + "px";
-  var q = $("chatQuick"); if (q) q.style.display = i.value ? "none" : "";
+  var q = $("chatQuick"); if (q) q.style.display = i.value || isBlocked(chatOpenId) ? "none" : "";
 }
 
 function chatCall(pid){
@@ -7721,8 +7772,10 @@ function chatClear(pid){
   more.onclick = function(e){
     if (!chatOpenId) return;
     if (cmenuLast && cmenuLast.anchor === more && Date.now() - cmenuLast.skipClick < 600) return;
-    var pid = chatOpenId;
+    var pid = chatOpenId, blocked = isBlocked(pid);
     cmenuOpen(more.getBoundingClientRect(), [
+      blocked ? { label: "Unblock " + nameOf(pid), icon: ICO_BLOCK, run: function(){ blockSet(pid, false); } }
+              : { label: "Block " + nameOf(pid), icon: ICO_BLOCK, danger: true, run: function(){ blockAsk(pid); } },
       { label: "Clear chat", icon: ICO_CLEAR, danger: true, run: function(){ chatClearAsk(pid); } }
     ], { right: true, anchor: more, focus: e.detail === 0 });
   };
@@ -8187,6 +8240,7 @@ function imgPrep(file, hd){
 }
 
 function chatNewOut(pid, text, a){
+  if (blockGuard(pid, "message")) return null;
   var m = { c: "c" + rand(14), d: "out", t: text || "", at: Date.now(), st: "sending" };
   if (a) m.a = a;
   if (chatReply && chatReply.pid === pid) {
@@ -8211,6 +8265,7 @@ function chatSendFiles(pid, items, caption, hd){
               m: f.type || "", s: f.size || 0 };
     if (img) { a.w = it.w || 0; a.h = it.h || 0; }
     var m = chatNewOut(pid, i === 0 ? caption : "", a);
+    if (!m) return;
     m.prep = 1;
     chain = chain.then(function(){
       return (img ? imgPrep(f, hd) : Promise.resolve({ blob: f })).then(function(r){
@@ -8627,7 +8682,7 @@ function locFind(){
       if (!pos || !pid || !memberById(pid)) return;
       var m = chatNewOut(pid, "", { k: "loc", lat: Math.round(pos.lat * 1e5) / 1e5,
                                     lon: Math.round(pos.lon * 1e5) / 1e5, acc: Math.round(pos.acc) });
-      chatDeliver(pid, m);
+      if (m) chatDeliver(pid, m);
     };
   }, function(err){
     if (locFor !== pid) return;
@@ -8865,6 +8920,123 @@ function mediaNavValue(){
 })();
 
 
+/* ==================================================================== *
+ * Blocking
+ *
+ * Anyone can block anyone else, for themselves - from the person's chat
+ * (⋮ → Block). Between the two of them, from then on: no calls, no
+ * buzzes, no messages, no read ticks, and neither sees the other's
+ * status. The person blocked isn't told: what they send looks sent and
+ * goes nowhere. The family server keeps the list and enforces it (see
+ * block() in family-server.js), so it holds on every phone and version;
+ * this phone also ignores anything from a blocked person by itself.
+ * Family business is untouched: the admin's updates still arrive, and a
+ * group call someone else starts can still have you both in it.
+ * ==================================================================== */
+var ICO_BLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg>';
+
+function isBlocked(id){ return !!(id && state && state.blocked && state.blocked.indexOf(id) !== -1); }
+
+/* Stops a call, buzz or message to someone you blocked - with the way
+   back said plainly. */
+function blockGuard(id, what){
+  if (!isBlocked(id)) return false;
+  toast("You blocked " + nameOf(id) + " — unblock them to " + what + " them");
+  return true;
+}
+
+function blockTake(list){
+  if (!state) return;
+  var l = Array.isArray(list) ? list.filter(function(id){ return /^[A-Za-z0-9]{3,16}$/.test(id); }) : [];
+  var before = JSON.stringify(state.blocked || []);
+  state.blocked = l;
+  if (before !== JSON.stringify(l)) save();
+  blockChanged();
+}
+function blockChanged(){
+  try { paintCardNotes(); } catch (e) {}
+  chatBlockPaint();
+  if ($("setupSheet") && $("setupSheet").classList.contains("on")) {
+    if (setPageNow === "blocked") paintBlocked();
+    if (setPageNow === "home") paintSetNav();
+  }
+}
+
+function blockAsk(pid){
+  var n = nameOf(pid);
+  $("blkTitle").textContent = "Block " + n + "?";
+  $("blkSub").textContent = n + " won't be able to call, buzz or message you, and neither of you will see the " +
+    "other's status. " + n + " isn't told. You can both still be in a group call someone else starts. " +
+    "Unblock any time from this chat or Settings → Blocked people.";
+  $("blkGo").onclick = function(){ closeSheet("blkSheet"); blockSet(pid, true); };
+  openSheet("blkSheet");
+}
+
+function blockSet(pid, on){
+  var btn = $("blkGo"); if (btn) btn.disabled = true;
+  return fsRequest({ k: "block", who: pid, on: !!on }, 10000).then(function(r){
+    if (btn) btn.disabled = false;
+    if (!r || !r.ok || !Array.isArray(r.list)) {
+      toast(r && r.status === 400 ? "The family server needs updating before you can block anyone"
+                                  : "Couldn't reach the family server — try again");
+      return false;
+    }
+    blockTake(r.list);
+    if (on) {
+      /* Anything going on with them stops now. */
+      if (call && call.peer === pid) hangUp(call.state === "incoming" ? "declined" : "ended");
+      if (chatReply && chatReply.pid === pid) chatReplyCancel();
+      toast(nameOf(pid) + " is blocked");
+    } else toast(nameOf(pid) + " is unblocked");
+    return true;
+  });
+}
+
+/* The conversation of someone blocked: a line saying so, and Unblock, in
+   place of the typing box. */
+function chatBlockPaint(){
+  var bar = $("chatBlocked");
+  if (!bar) return;
+  var b = !!(chatOpenId && isBlocked(chatOpenId));
+  bar.hidden = !b;
+  $("chatFoot").style.display = b ? "none" : "";
+  if (b) {
+    $("chatQuick").style.display = "none";
+    if (chatReply) chatReplyCancel();
+    $("chatBlockedTx").textContent = "You blocked " + nameOf(chatOpenId) + ". Unblock to call or message them.";
+  } else if (chatOpenId) chatGrow();
+  $("chatCall").style.opacity = $("chatBuzz").style.opacity = b ? ".35" : "";
+  chatPaintSub();
+}
+
+function paintBlocked(){
+  var box = $("blockList");
+  if (!box) return;
+  box.innerHTML = "";
+  var list = ((state && state.blocked) || []).filter(function(id){ return memberById(id); });
+  if (!list.length) {
+    var p = document.createElement("p"); p.className = "blknone";
+    p.textContent = "You haven't blocked anyone.";
+    box.appendChild(p); return;
+  }
+  list.forEach(function(id){
+    var m = memberById(id);
+    var row = document.createElement("div"); row.className = "blkrow";
+    var av = document.createElement("span"); av.className = "cav";
+    av.style.background = m.colour; av.textContent = initials(m.name);
+    var nm = document.createElement("b"); nm.textContent = m.name;
+    var ub = document.createElement("button"); ub.textContent = "Unblock";
+    ub.onclick = function(){ ub.disabled = true; blockSet(id, false).then(function(){ ub.disabled = false; }); };
+    row.appendChild(av); row.appendChild(nm); row.appendChild(ub);
+    box.appendChild(row);
+  });
+}
+
+(function(){
+  var ub = $("chatUnblock");
+  if (ub) ub.onclick = function(){ if (chatOpenId) blockSet(chatOpenId, false); };
+})();
+
 /* ------------------------------------------------------------ sheets */
 
 var pendingId = null;
@@ -8897,6 +9069,7 @@ function openActSheet(id){
 }
 
 function openMsgSheet(){
+  if (blockGuard(pendingId, "buzz")) return;
   $("msgTitle").textContent = "Buzz " + nameOf(pendingId);
   var list = $("msgList"); list.innerHTML = "";
   QUICK.forEach(function(q){
@@ -8966,7 +9139,8 @@ var setPageNow = "home";
 var PAGE_TITLES = { home: "Settings", setup: "Set up your family", profile: "You",
   family: "Family", invite: "Invite someone", calls: "Calls on this phone",
   ringtone: "Sounds", status: "Your status", admin: "Family admin",
-  usage: "Usage and call quality", connection: "Connection and relay", media: "Chats and media" };
+  usage: "Usage and call quality", connection: "Connection and relay", media: "Chats and media",
+  blocked: "Blocked people" };
 function setPage(name){
   setPageNow = name;
   Array.prototype.forEach.call(document.querySelectorAll("#setupSheet [data-pages]"), function(el){
@@ -8991,6 +9165,7 @@ function setPage(name){
     try { paintInvites(); } catch (e) {}
   }
   if (name === "media") { try { paintMediaSettings(); } catch (e) {} }
+  if (name === "blocked") { try { paintBlocked(); } catch (e) {} }
   if (name === "usage") {
     /* Both parts drawn fresh: a phone's report may have arrived since. */
     try { paintOverview(); } catch (e) {}
@@ -9043,6 +9218,8 @@ function paintSetNav(){
   row("ringtone", "Sounds", "Calls: " + (TONES[toneName()] || TONES.classic).name + " · Messages: " +
       (sp.nt === "none" ? "Silent" : TONES[sp.nt].name), { icon: ICON.bell });
   row("media", "Chats and media", mediaNavValue(), { icon: ICO_PHOTO });
+  var nb = (state.blocked || []).filter(function(id){ return memberById(id); }).length;
+  row("blocked", "Blocked people", nb ? nb + (nb > 1 ? " people" : " person") : "Nobody", { icon: ICO_BLOCK });
   row("status", "Your status", state.presOff ? "Hidden" : "Shown to the people you're in touch with", { icon: ICON.eye || ICON.group });
   if (admin || !state.admin || handing)
     row("admin", "Family admin", admin ? ((state.admins || []).length ? "Co-admins: " + state.admins.map(function(id){ return String(nameOf(id)).split(/\s+/)[0]; }).join(", ") + " · recovery link" : "Add a co-admin · recovery link") : handing ? "Finish taking over" : "Nobody manages this family yet", { icon: ICON.key || ICON.share });
@@ -12196,7 +12373,7 @@ function openGroupPicker(mode, preset){
     ? "Pick who to call. Everyone hears everyone, up to " + groupMax() + " people."
     : "Their phones ring now. Everyone already on the call stays on it.";
   var list = $("grpList"); list.innerHTML = "";
-  var cands = others().filter(function(m){ return !busy[m.id]; });
+  var cands = others().filter(function(m){ return !busy[m.id] && !isBlocked(m.id); });
   if (!cands.length) {
     var p = document.createElement("p"); p.className = "hint";
     p.textContent = mode === "new" ? "Add more people to the family in Settings first."
