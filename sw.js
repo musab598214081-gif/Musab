@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-10-20h";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-10-20i";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var CALL_KINDS = { call: 1, group: 1 };
@@ -167,17 +167,61 @@ self.addEventListener("push", function (e) {
   e.waitUntil(handlePush(d));
 });
 
-/* The person's sound settings (from the app - see sndToHelper there):
-   note  false = the notification sound is set to Silent
-   nvib  vibrate for notifications      rvib  vibrate for calls
-   Kept in memory too, so a burst of rings doesn't read it every time. */
-var SND = null;
-function savedSound() {
-  if (SND) return Promise.resolve(SND);
-  return caches.open(CFG).then(function (c) { return c.match("sound"); })
-    .then(function (r) { return r ? r.json() : null; })
-    .then(function (o) { SND = o || { note: true, nvib: true, rvib: true }; return SND; })
-    .catch(function () { return { note: true, nvib: true, rvib: true }; });
+/* The app's language (see setLang there): notifications shown while the
+   app is closed are written in it too. Kept in memory as well, so a
+   burst of rings doesn't read it every time. */
+var LANG = null;
+function savedLang() {
+  if (LANG) return Promise.resolve(LANG);
+  return caches.open(CFG).then(function (c) { return c.match("lang"); })
+    .then(function (r) { return r ? r.text() : "en"; })
+    .then(function (v) { LANG = v === "ar" ? "ar" : "en"; return LANG; })
+    .catch(function () { return "en"; });
+}
+/* The words a notification can carry, in Arabic. What people wrote is
+   left exactly as it is; only these app phrases change. */
+var AR_NOTE = [
+  [/^(.+?) is calling you.*$/, "$1 يتصل بك"],
+  [/^(.+?) is buzzing you$/, "$1 ينبّهك"],
+  [/^(.+?) tried to call you$/, "$1 حاول الاتصال بك"],
+  [/^(.+?) is asking you into a group call$/, "$1 يدعوك إلى مكالمة جماعية"],
+  [/^(.+?) wants to join$/, "$1 يريد الانضمام"],
+  [/^\((\d+) new messages\)$/, "($1 رسائل جديدة)"],
+  [/^Missed call$/, "مكالمة فائتة"], [/^Missed group call$/, "مكالمة جماعية فائتة"],
+  [/^Group call$/, "مكالمة جماعية"], [/^New message$/, "رسالة جديدة"],
+  [/^Incoming call$/, "مكالمة واردة"], [/^Call ended$/, "انتهت المكالمة"],
+  [/^Call picked up$/, "تم الرد على المكالمة"], [/^Picked up on another device$/, "تم الرد من جهاز آخر"],
+  [/^Call answered$/, "تم الرد على المكالمة"], [/^Answered on another device$/, "تم الرد من جهاز آخر"],
+  [/^Call declined$/, "رُفضت المكالمة"], [/^Declined$/, "مرفوضة"],
+  [/^Tap to answer$/, "اضغط للرد"], [/^wants your attention$/, "يريد انتباهك"],
+  [/^\u{1F4F7} Photo/u, "\u{1F4F7} صورة"], [/^\u{1F4CD} Location/u, "\u{1F4CD} الموقع"],
+  [/^Call me$/, "اتصل بي"], [/^Come here please$/, "تعال هنا من فضلك"], [/^Dinner is ready$/, "العشاء جاهز"],
+  [/^Are you OK\?$/, "هل أنت بخير؟"], [/^I'm on my way$/, "أنا في الطريق"], [/^Ring me when free$/, "اتصل بي عندما تتفرغ"],
+  [/^This is how messages and other notifications look and sound\.$/, "هكذا تبدو الرسائل والإشعارات الأخرى وتُسمع."]
+];
+var AR_ACT = { Answer: "رد", Join: "انضمام", Decline: "رفض", "Call back": "معاودة الاتصال",
+               Approve: "موافقة", Reject: "رفض" };
+function tr(text) {
+  if (LANG !== "ar" || !text) return text;
+  return String(text).split("\n").map(function (line) {
+    for (var i = 0; i < AR_NOTE.length; i++) if (AR_NOTE[i][0].test(line)) return line.replace(AR_NOTE[i][0], AR_NOTE[i][1]);
+    return line;
+  }).join("\n");
+}
+
+/* Shown and taken away at once, without a sound - for a push that
+   arrives while the app is open and in use (the app shows it itself).
+   Apple insists every push shows something; elsewhere nothing is needed
+   while the app is in front. */
+function quietShow(d, kind) {
+  if (!IS_APPLE) return Promise.resolve();
+  var o = options(Object.assign({}, d, { tag: "fmn-quiet" }), kind, true);
+  o.renotify = false; o.requireInteraction = false; o.actions = [];
+  return self.registration.showNotification(tr(d.title || "Family Notifier"), o)
+    .then(function () { return new Promise(function (r) { setTimeout(r, 250); }); })
+    .then(function () { return self.registration.getNotifications({ tag: "fmn-quiet" }); })
+    .then(function (ns) { ns.forEach(function (n) { n.close(); }); })
+    .catch(function () {});
 }
 
 function handlePush(d) {
@@ -186,7 +230,7 @@ function handlePush(d) {
   var ringing = !!CALL_KINDS[kind];
   var cfg = null, quietCall = false;
 
-  return Promise.all([savedCfg(), ringing ? isSilenced(tag) : false, savedSound()]).then(function (got) {
+  return Promise.all([savedCfg(), ringing ? isSilenced(tag) : false, savedLang()]).then(function (got) {
     cfg = got[0]; quietCall = got[1];
     return self.clients.matchAll({ type: "window", includeUncontrolled: true });
   }).then(function (list) {
@@ -200,7 +244,7 @@ function handlePush(d) {
     var front = list.some(function (c) { return c.visibilityState === "visible" && c.focused; });
 
     if (kind === "cancel") return cancel(tag, d, front);
-    if (kind === "msg") return showMessage(d, front);
+    if (kind === "msg") return front ? quietShow(d, kind) : showMessage(d, front);
 
     /* A call that arrives long after it was sent (the phone was offline)
        is not ringing any more. "Long after" by the SERVER's clock: the
@@ -216,9 +260,10 @@ function handlePush(d) {
       ringing = false;
     }
 
-    /* A repeat ring while the app is on screen and ringing out loud by
-       itself. (Apple needs every push to show something, so not there.) */
-    if (ringing && d.n > 0 && front && !IS_APPLE && tag && audible[tag]) return;
+    /* The app is on screen and ringing out loud by itself: its ringtone is
+       the one sound - no notification sound on top of it, first ring or
+       repeat, on any phone. */
+    if (ringing && front && tag && audible[tag]) return quietShow(d, kind);
 
     if (ringing && tag) {
       /* Already picked up (or declined) here: nothing to ring. The
@@ -239,10 +284,15 @@ function handlePush(d) {
          calling you", with a live Answer button, stayed on the phone
          for good next to it. Every notification of the call goes first. */
       if (tag) return markSilenced(tag).then(function () { return closeCall(tag); }).then(function () {
-        return self.registration.showNotification(d.title || "Missed call", options(d, kind, false));
+        if (front) return quietShow(d, kind);        /* the app shows it itself */
+        return self.registration.showNotification(tr(d.title || "Missed call"), options(d, kind, false));
       });
+      if (front) return quietShow(d, kind);
     }
-    return self.registration.showNotification(d.title || "Family Notifier", options(d, kind, false));
+    /* Anything else while the app is open and in use (a buzz, a join
+       request): the app shows it - no sound. A test is always shown. */
+    if (front && !ringing && kind !== "test") return quietShow(d, kind);
+    return self.registration.showNotification(tr(d.title || "Family Notifier"), options(d, kind, false));
   });
 }
 
@@ -260,9 +310,9 @@ function showMessage(d, front) {
     var lines = (prev && prev.lines ? prev.lines : []).concat([String(d.body || "")]).slice(-4);
     var o = options(Object.assign({}, d, { tag: tag }), "msg", false);
     o.data.n = n; o.data.lines = lines;
-    o.body = n > 1 ? lines.join("\n") + "\n(" + n + " new messages)" : String(d.body || "");
+    o.body = tr(n > 1 ? lines.join("\n") + "\n(" + n + " new messages)" : String(d.body || ""));
     return badgeAdd().then(function () {
-      return self.registration.showNotification(d.title || "New message", o);
+      return self.registration.showNotification(tr(d.title || "New message"), o);
     });
   });
 }
@@ -278,7 +328,7 @@ function showRing(d, kind, tag) {
   var now = tag + "~" + (n % 2), before = tag + "~" + ((n + 1) % 2);
   var o = options(Object.assign({}, d, { tag: now }), kind, false);
   o.data.tag = tag;                                   /* the call, whichever label */
-  return self.registration.showNotification(d.title || "Family Notifier", o).then(function () {
+  return self.registration.showNotification(tr(d.title || "Family Notifier"), o).then(function () {
     return self.registration.getNotifications().then(function (ns) {
       ns.forEach(function (x) { if (x.tag === before || x.tag === tag) x.close(); });
     });
@@ -294,22 +344,20 @@ function showRing(d, kind, tag) {
 var CALL_VIB = [700, 300, 700, 300, 700, 300, 700];
 var NOTE_VIB = [100, 70, 100];
 function options(d, kind, quiet) {
-  var snd = SND || { note: true, nvib: true, rvib: true };
   var url = d.url || "./";
   var answer = d.answer || (d.ans != null && d.url ? d.url + d.ans : null);
   var o = {
-    body: d.body || "",
+    body: tr(d.body || ""),
     data: { url: url, answer: answer, dec: d.dec || null, kind: kind, tag: d.tag || null,
             cb: d.cb || null, jr: d.jr || null, rej: d.rej || null },
     timestamp: d.ts || Date.now()
   };
   var call = !!CALL_KINDS[kind];
-  /* Silent chosen for notifications: arrives without a sound. Never for
-     a call - a call must be heard. */
-  if (!call && !snd.note) quiet = true;
   if (d.tag) { o.tag = d.tag; o.renotify = !quiet; }
   if (quiet) o.silent = true;
-  if (!quiet && (call ? snd.rvib : snd.nvib)) o.vibrate = call ? CALL_VIB : NOTE_VIB;
+  /* Followed only by older Android phones: since Android 8 the phone's own
+     setting for the app decides the sound and the vibration. */
+  if (!quiet) o.vibrate = call ? CALL_VIB : NOTE_VIB;
   if (call) {
     o.requireInteraction = true;
     o.actions = [];
@@ -325,6 +373,7 @@ function options(d, kind, quiet) {
   } else if (kind === "msg") {
     o.data.from = d.from || null;
   }
+  if (o.actions && LANG === "ar") o.actions.forEach(function (a) { a.title = AR_ACT[a.title] || a.title; });
   return o;
 }
 
@@ -339,8 +388,8 @@ function cancel(tag, d, front) {
       ns.forEach(function (n) { n.close(); }); }), markSilenced(tag)]);
   }).then(function () {
     if (front && !IS_APPLE) return;
-    return self.registration.showNotification(d.title || "Call ended", {
-      body: d.body || "", tag: tag || undefined, silent: true, renotify: false,
+    return self.registration.showNotification(tr(d.title || "Call ended"), {
+      body: tr(d.body || ""), tag: tag || undefined, silent: true, renotify: false,
       data: { url: "./", kind: "cancel" }
     }).then(function () {
       /* "Picked up on another device" is wrong on the phone that picked
@@ -429,17 +478,14 @@ self.addEventListener("message", function (e) {
                                                         sec: m.sec || null,
                                                         skew: typeof m.skew === "number" ? m.skew : 0 })));
     }));
-  } else if (m.t === "sound" && m.p) {
-    SND = { note: m.p.note !== false, nvib: m.p.nvib !== false, rvib: m.p.rvib !== false };
-    e.waitUntil(caches.open(CFG).then(function (c) {
-      return c.put("sound", new Response(JSON.stringify(SND)));
-    }).catch(function () {}));
+  } else if (m.t === "lang") {
+    LANG = m.v === "ar" ? "ar" : "en";
+    e.waitUntil(caches.open(CFG).then(function (c) { return c.put("lang", new Response(LANG)); }).catch(function () {}));
   } else if (m.t === "silence" && m.tag) {
     /* The app answered, declined or ended this call itself. */
     e.waitUntil(Promise.all([markSilenced(m.tag), closeCall(m.tag)]));
   } else if (m.t === "forget") {
     /* This phone was removed from the family: stop acting for anyone. */
-    SND = null;
     e.waitUntil(caches.delete(CFG));
   } else if (m.t === "audible" && m.tag) {
     if (m.on) audible[m.tag] = 1; else delete audible[m.tag];

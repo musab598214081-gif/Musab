@@ -313,6 +313,8 @@
   #toneList,.tonegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   input.vol{width:100%;accent-color:var(--brass);height:28px;margin:0}
   .toneopt.none .tp{background:transparent;border:1px dashed var(--seam)}
+  .sndsteps{margin:4px 0 6px;padding-left:20px;color:var(--paper);font-size:14px;line-height:1.7}
+  [dir=rtl] .sndsteps{padding-left:0;padding-right:20px}
   .toneopt{display:flex;align-items:center;gap:10px;padding:14px 12px;border-radius:14px;
     background:var(--night);border:1px solid var(--seam);color:var(--paper);font:inherit;
     font-size:15px;cursor:pointer;text-align:left}
@@ -758,6 +760,63 @@
   #cmenu button:active{background:rgba(255,255,255,.1)}
   #cmenu button.danger{color:#FF8589}
   #cmenu svg{width:19px;height:19px;flex:0 0 auto}
+  /* ---- Arabic: the whole layout right to left ----
+     Rows, flex layouts and text flow follow the page's direction by
+     themselves; these are the places set by side. */
+  [dir=rtl] header .bell{margin-right:0;margin-left:12px}
+  [dir=rtl] .setdot{right:auto;left:6px}
+  [dir=rtl] .person,[dir=rtl] .utable th,[dir=rtl] .utable td,[dir=rtl] .msgopt,[dir=rtl] .navrow,
+  [dir=rtl] .toneopt,[dir=rtl] .seesline,[dir=rtl] .pick,[dir=rtl] .grpbtn,[dir=rtl] #cmenu button{text-align:right}
+  [dir=rtl] .person .dot{margin-right:0;margin-left:14px}
+  [dir=rtl] .person .go{margin-left:0;margin-right:8px}
+  [dir=rtl] .pdot{right:auto;left:-1px}
+  [dir=rtl] .person .badge{left:auto;right:-3px}
+  [dir=rtl] .memberrow .cbtn,[dir=rtl] .memberrow input,[dir=rtl] .memberrow .mdot{margin-right:0;margin-left:8px}
+  [dir=rtl] .log .tm{margin-left:0;margin-right:10px}
+  [dir=rtl] .hfoot .clr{margin-left:0;margin-right:auto}
+  [dir=rtl] .row .btn + .btn{margin-left:0;margin-right:10px}
+  [dir=rtl] .req .row .btn + .btn{margin-right:0}
+  [dir=rtl] .minis .mini{margin-right:0;margin-left:-5px}
+  [dir=rtl] .minis .mini:last-child{margin-left:0}
+  [dir=rtl] .resetlist,[dir=rtl] .onb ol{padding-left:0;padding-right:20px}
+  [dir=rtl] .tile .moon{left:auto;right:-4px}
+  [dir=rtl] .pressum .pd{margin-right:0;margin-left:6px}
+  [dir=rtl] .hometabs .badge{margin-left:0;margin-right:2px}
+  [dir=rtl] .tile .badge{right:auto;left:-5px}
+  [dir=rtl] .tile.psel .av::after{right:auto;left:-4px}
+  [dir=rtl] .grpbtn .ic{margin-right:0;margin-left:14px}
+  [dir=rtl] .status .led{margin-right:0;margin-left:8px}
+  /* The conversation: theirs on the right, yours on the left. */
+  [dir=rtl] .bub.in{margin-left:auto !important;margin-right:0 !important;
+    border-bottom-left-radius:16px;border-bottom-right-radius:6px}
+  [dir=rtl] .bub.out{margin-left:0 !important;margin-right:auto !important;
+    border-bottom-right-radius:16px;border-bottom-left-radius:6px}
+  @media (min-width:700px){
+    [dir=rtl] .bub.in{margin-left:auto !important;margin-right:max(0px,calc((100% - 640px)/2)) !important}
+    [dir=rtl] .bub.out{margin-right:auto !important;margin-left:max(0px,calc((100% - 640px)/2)) !important}
+  }
+  [dir=rtl] .bub .bm{float:left;margin:6px 10px -2px 0}
+  [dir=rtl] .bub.media > .bm{margin-right:0;margin-left:6px}
+  [dir=rtl] .bub.photo.nocap > .bm{right:auto;left:10px;margin:0}
+  [dir=rtl] .cbk{margin-left:0;margin-right:4px}
+  [dir=rtl] #chat .chead .cmorebtn{margin-left:0;margin-right:-2px}
+  [dir=rtl] .cdown{right:auto;left:14px}
+  [dir=rtl] .cdown.new::after{right:auto;left:2px}
+  [dir=rtl] .bub.swiping::before,[dir=rtl] .bub.snap::before{left:auto;right:-34px;transform:scale(calc(.6 + var(--sw,0) * .4)) scaleX(-1)}
+  [dir=rtl] .bq,[dir=rtl] .crq{border-left:0;border-right:3px solid var(--q,var(--brass))}
+  [dir=rtl] .bq{padding:5px 9px 5px 8px}
+  [dir=rtl] .bub.in .brep{right:auto;left:-38px}
+  [dir=rtl] .bub.out .brep{left:auto;right:-38px}
+  [dir=rtl] .attbtn{margin-right:0;margin-left:-4px}
+  [dir=rtl] .msz{left:auto;right:8px}
+  [dir=rtl] .stbar span{left:auto;right:0}
+  [dir=rtl] .strow b{text-align:left}
+  /* Arrows that point a way turn round. */
+  [dir=rtl] #chatBack svg,[dir=rtl] #setBack svg,[dir=rtl] #mvClose svg,[dir=rtl] .navch svg,
+  [dir=rtl] #chatSend svg,[dir=rtl] .brep svg{transform:scaleX(-1)}
+  /* Arabic reads better a touch larger and looser. */
+  [dir=rtl] body{line-height:1.5}
+
   /* ---- Storage (admin) ---- */
   .stbar{position:relative;height:14px;border-radius:7px;background:var(--night);overflow:visible;
     border:1px solid var(--seam);margin:6px 0 10px}
@@ -935,7 +994,7 @@
     <div class="avatar" id="ringAvatar">?</div></div>
   <p class="from" id="ringFrom">Someone</p>
   <p class="kind" id="ringKind">is buzzing you</p>
-  <p class="what" id="ringWhat">wants your attention</p>
+  <p class="what" id="ringWhat" translate="no">wants your attention</p>
   <button id="ringOk">Got it</button>
 </div>
 
@@ -1134,6 +1193,11 @@
     <button class="btn ghost" id="micAllow">Allow the microphone now</button>
     </div>
 
+    <div id="langBlock" data-pages="language">
+    <p class="sub">The language of the app on this phone. It opens again in the one you choose.</p>
+    <div class="tonegrid" id="langList"></div>
+    </div>
+
     <div id="blockBlock" data-pages="blocked">
     <p class="sub">Someone you block can't call, buzz or message you, and neither of you
       sees the other's status. They aren't told. To block someone, open their chat and
@@ -1159,29 +1223,29 @@
     </div>
 
     <div id="toneBlock" data-pages="ringtone">
-    <p class="sub">Two sounds, never mixed up: the ringtone is only for
-      someone calling you, and one short sound is for everything else. These
-      are your own settings on this phone — they don't change what anyone
-      else hears.</p>
+    <p class="sub">The ringtone is only for someone calling you. Messages, photos, missed
+      calls and buzzes are quiet while you're using the app — you see them on screen.
+      These are your own settings on this phone.</p>
 
     <div class="sectiontitle">Incoming calls</div>
     <p class="sub">Rings until you answer or decline, or the caller gives up. Tap one to hear it.</p>
     <div id="toneList" class="tonegrid"></div>
     <label for="ringVol">Ringtone volume</label>
     <input type="range" id="ringVol" class="vol" min="2" max="10" step="1">
-    <label class="chk"><input type="checkbox" id="ringVib"><span>Vibrate when a call comes in</span></label>
+    <label class="chk" id="ringVibRow"><input type="checkbox" id="ringVib"><span>Vibrate when a call comes in</span></label>
 
-    <div class="sectiontitle">Messages and everything else</div>
-    <p class="sub">One short sound for messages, photos, files, locations, missed
-      calls, buzzes and other alerts. Tap one to hear it.</p>
-    <div id="noteList" class="tonegrid"></div>
-    <label for="noteVol">Notification volume</label>
-    <input type="range" id="noteVol" class="vol" min="1" max="10" step="1">
-    <label class="chk"><input type="checkbox" id="noteVib"><span>Vibrate for notifications</span></label>
-    <label class="chk"><input type="checkbox" id="noteOpen"><span>Play a soft sound for messages in the chat you have open</span></label>
+    <div class="sectiontitle">Messages and other notifications</div>
+    <label class="chk"><input type="checkbox" id="noteFg"><span>Play a short sound for new messages while the app is open</span></label>
+    <div id="noteFgOpts">
+      <div id="noteList" class="tonegrid"></div>
+      <label for="noteVol">Sound volume</label>
+      <input type="range" id="noteVol" class="vol" min="1" max="10" step="1">
+    </div>
 
-    <div class="sectiontitle">With the app closed or the phone locked</div>
+    <div class="sectiontitle">With the app closed or in the background</div>
     <p class="sub" id="sndClosedNote"></p>
+    <ol class="sndsteps" id="sndSteps"></ol>
+    <button class="btn ghost" id="sndTest">Show a test notification</button>
     </div>
 
     <div id="presBlock" style="display:none" data-pages="status">
@@ -1307,7 +1371,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
     </button>
     <span class="cav" id="chatAv">?</span>
-    <div class="cwho"><b id="chatName">—</b><small id="chatSub"></small></div>
+    <div class="cwho"><b id="chatName" translate="no">—</b><small id="chatSub"></small></div>
     <button class="qa buzz" id="chatBuzz" aria-label="Buzz">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16h12c-1.1-1.2-1.7-2.8-1.7-4.9V9.5a4.3 4.3 0 0 0-8.6 0v1.6C7.7 13.2 7.1 14.8 6 16Z"/><path d="M10.2 19a2 2 0 0 0 3.6 0"/></svg>
     </button>
@@ -1327,7 +1391,7 @@
   <div class="cquick" id="chatQuick"></div>
   <!-- Shown while you are replying to one message. -->
   <div class="crep" id="chatReply" hidden>
-    <div class="crq" id="chatReplyQ"><b id="chatReplyWho"></b><span id="chatReplyText"></span></div>
+    <div class="crq" id="chatReplyQ"><b id="chatReplyWho"></b><span id="chatReplyText" translate="no"></span></div>
     <button class="iconbtn" id="chatReplyX" aria-label="Cancel reply">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
@@ -1393,7 +1457,7 @@
     </button>
   </div>
   <div class="mvwrap" id="mvWrap"><img id="mvImg" alt="Photo"></div>
-  <p class="mvcap" id="mvCap" hidden></p>
+  <p class="mvcap" id="mvCap" translate="no" hidden></p>
 </div>
 <!-- The small menu of a conversation (the ⋮ at the top) and of one
      message (long-press, or right-click on a computer). -->
@@ -1421,6 +1485,1144 @@
 
 <script>
 "use strict";
+/* ==================================================================== *
+ * Languages - English (the default) and Arabic
+ *
+ * The app is written in English. With Arabic chosen (Settings ->
+ * Language), everything it puts on screen is shown in Arabic as it
+ * appears, and the whole layout runs right to left. It works on the
+ * screen itself rather than on every place the app writes text, so no
+ * screen, message or button can be missed or fall out of step:
+ *   - a text that is a known sentence is swapped whole;
+ *   - a text built from parts ("Missed call from" + a name) has each
+ *     known part swapped, and times like "5 min ago" are rewritten;
+ *   - what people wrote - messages, names, file names, quotes - is
+ *     marked translate="no" and never touched.
+ * Only what is shown changes: the app keeps working in English
+ * underneath, so nothing it compares or sends is affected. English
+ * pays nothing for any of this - none of it runs.
+ *
+ * The choice is kept on this phone (and with the family settings, which
+ * survive the browser tidying up) and applied before the first screen
+ * is drawn; changing it reloads the app once.
+ * ==================================================================== */
+var AR = {};
+var LANG = "en";
+try { if (localStorage.getItem("fmn-lang") === "ar") LANG = "ar"; } catch (e) {}
+Object.assign(AR, {
+"Family Notifier": "Family Notifier",
+"Settings": "الإعدادات",
+"Close Settings": "إغلاق الإعدادات",
+"Back": "رجوع",
+"Back to Settings": "العودة إلى الإعدادات",
+"Close": "إغلاق",
+"Cancel": "إلغاء",
+"Save": "حفظ",
+"Saved": "تم الحفظ",
+"Send": "إرسال",
+"Sent": "تم الإرسال",
+"Sending": "جارٍ الإرسال",
+"Delivered": "تم التسليم",
+"Read": "مقروءة",
+"Not sent": "لم تُرسل",
+"Done": "تم",
+"Copy": "نسخ",
+"Copied": "تم النسخ",
+"Share": "مشاركة",
+"Show": "إظهار",
+"Hide": "إخفاء",
+"Remove": "إزالة",
+"Add": "إضافة",
+"Test": "تجربة",
+"Update": "تحديث",
+"Clear": "مسح",
+"Join": "انضمام",
+"Leave": "مغادرة",
+"Answer": "رد",
+"Decline": "رفض",
+"End": "إنهاء",
+"Mute": "كتم",
+"Unmute": "إلغاء الكتم",
+"Muted": "مكتوم",
+"Speaker": "مكبر الصوت",
+"Approve": "موافقة",
+"Reject": "رفض",
+"Try again": "حاول مرة أخرى",
+"Not now": "ليس الآن",
+"Got it": "حسنًا",
+"One moment…": "لحظة من فضلك…",
+"Someone": "شخص ما",
+"You": "أنت",
+"They": "هم",
+"Everyone": "الجميع",
+"Nobody": "لا أحد",
+"Person": "شخص",
+"Name": "الاسم",
+"Colour": "اللون",
+"Email": "البريد الإلكتروني",
+"Welcome": "أهلًا بك",
+"Welcome back, ": "مرحبًا بعودتك، ",
+"Good morning": "صباح الخير",
+"Good afternoon": "مساء الخير",
+"Good evening": "مساء الخير",
+"Good night": "تصبح على خير",
+"Today": "اليوم",
+"Yesterday": "أمس",
+"yesterday": "أمس",
+"just now": "الآن",
+"Online": "متصل",
+"Online now": "متصل الآن",
+"Offline": "غير متصل",
+"Offline · last seen ": "غير متصل · آخر ظهور ",
+"Away": "بعيد",
+"Blocked": "محظور",
+"Hidden": "مخفي",
+"Recent": "الأخيرة",
+"Calls": "المكالمات",
+"Buzzes": "التنبيهات",
+"Missed": "فائتة",
+"All": "الكل",
+"This phone": "هذا الهاتف",
+"Tap to chat, call or buzz": "اضغط للمحادثة أو الاتصال أو التنبيه",
+"Your calls show up here.": "تظهر مكالماتك هنا.",
+"Buzzes you send and get show up here.": "تظهر هنا التنبيهات التي ترسلها وتستقبلها.",
+"Nothing today or yesterday.": "لا شيء اليوم أو أمس.",
+"Show earlier (": "عرض الأقدم (",
+"Show less": "عرض أقل",
+"Find someone": "ابحث عن شخص",
+"Close search": "إغلاق البحث",
+"Everyone online": "الجميع متصلون",
+"Nobody is online right now": "لا أحد متصل الآن",
+"Nobody has the app open right now — a call still rings their phone": "لا أحد يفتح التطبيق الآن — المكالمة ستظل ترن على هواتفهم",
+"Ready for calls": "جاهز للمكالمات",
+"Not connected to ": "غير متصل بـ ",
+" — check Settings → Connection": " — راجع الإعدادات ← الاتصال",
+"Nobody else here yet. Add your family in Settings, then send each of them their link.": "لا يوجد أحد هنا بعد. أضف عائلتك من الإعدادات، ثم أرسل لكل شخص رابطه.",
+"Nobody to call yet. ": "لا يوجد من تتصل به بعد. ",
+" decides who you can reach.": " يحدد من يمكنك التواصل معه.",
+"You are ": "أنت ",
+"Getting your family…": "جارٍ جلب عائلتك…",
+"Sync and check for updates": "المزامنة والتحقق من التحديثات",
+"A new version is ready": "إصدار جديد جاهز",
+"An update is ready": "يوجد تحديث جاهز",
+"Up to date · ": "محدّث · ",
+" · family synced": " · تمت مزامنة العائلة",
+"Family synced · couldn't check for updates": "تمت مزامنة العائلة · تعذر التحقق من التحديثات",
+"Couldn't check for updates": "تعذر التحقق من التحديثات",
+"Finish the call first — then Update": "أنهِ المكالمة أولًا — ثم حدّث",
+"Updated to ": "تم التحديث إلى ",
+"Arabic language (Settings → Language), and no notification sounds while you use the app": "اللغة العربية (الإعدادات ← اللغة)، ولا أصوات إشعارات أثناء استخدامك للتطبيق",
+" · Developed by ": " · تطوير ",
+"· Developed by": "· تطوير",
+"Group call": "مكالمة جماعية",
+"Group call — call several people at once": "مكالمة جماعية — اتصل بعدة أشخاص معًا",
+"Pick who to call.": "اختر من تريد الاتصال بهم.",
+"Pick who to call. Everyone hears everyone, up to ": "اختر من تريد الاتصال بهم. الجميع يسمعون بعضهم، حتى ",
+" people at most": " أشخاص كحد أقصى",
+"Pick who to add": "اختر من تريد إضافته",
+"Pick at least one person": "اختر شخصًا واحدًا على الأقل",
+"Add to the call": "أضف إلى المكالمة",
+"Everyone you can call is already on it.": "كل من يمكنك الاتصال بهم موجودون في المكالمة بالفعل.",
+"Add at least one other person": "أضف شخصًا آخر على الأقل",
+"Add more people to the family in Settings first.": "أضف المزيد من الأشخاص إلى العائلة من الإعدادات أولًا.",
+"Add somebody to the family first.": "أضف شخصًا إلى العائلة أولًا.",
+
+"Call": "اتصال",
+"Call back": "معاودة الاتصال",
+"Call anyway": "اتصل على أي حال",
+"Buzz": "تنبيه",
+"Buzz instead": "أرسل تنبيهًا بدلًا من ذلك",
+"Buzz them instead": "أرسل لهم تنبيهًا بدلًا من ذلك",
+"Buzz ": "تنبيه ",
+"Buzzed you": "نبّهك",
+"You buzzed": "نبّهت",
+"Buzzed ": "تم تنبيه ",
+" is buzzing you": " ينبّهك",
+"is buzzing you": "ينبّهك",
+"wants your attention": "يريد انتباهك",
+"Pick what to say. Their phone buzzes straight away.": "اختر ما تريد قوله. سيُنبَّه هاتفه فورًا.",
+"Or type something": "أو اكتب شيئًا",
+"Your own message": "رسالتك الخاصة",
+"Type something first": "اكتب شيئًا أولًا",
+"Call me": "اتصل بي",
+"Come here please": "تعال هنا من فضلك",
+"Dinner is ready": "العشاء جاهز",
+"Are you OK?": "هل أنت بخير؟",
+"I'm on my way": "أنا في الطريق",
+"Ring me when free": "اتصل بي عندما تتفرغ",
+"Calling…": "جارٍ الاتصال…",
+"Connecting…": "جارٍ الربط…",
+"Reconnecting…": "جارٍ إعادة الاتصال…",
+"Incoming call": "مكالمة واردة",
+"Outgoing call": "مكالمة صادرة",
+" is calling": " يتصل",
+" is calling you": " يتصل بك",
+"Tap to answer": "اضغط للرد",
+"Missed call": "مكالمة فائتة",
+"Missed calls": "المكالمات الفائتة",
+"Missed call from ": "مكالمة فائتة من ",
+" — tap their name to call back": " — اضغط على الاسم لمعاودة الاتصال",
+"Missed group call": "مكالمة جماعية فائتة",
+"Missed group calls": "المكالمات الجماعية الفائتة",
+"Missed group call from ": "مكالمة جماعية فائتة من ",
+" missed call": " مكالمة فائتة",
+" missed calls": " مكالمات فائتة",
+" tried to call you": " حاول الاتصال بك",
+"Call ended": "انتهت المكالمة",
+"Call failed": "فشلت المكالمة",
+"Call dropped": "انقطعت المكالمة",
+"Call not sent": "لم تُرسل المكالمة",
+"The call has ended": "انتهت المكالمة",
+"That call has already ended": "انتهت تلك المكالمة بالفعل",
+"That call is full": "المكالمة ممتلئة",
+"Declined": "مرفوضة",
+"You declined": "رفضتَ",
+"No answer": "لا رد",
+"no answer": "لا رد",
+"Nobody answered": "لم يرد أحد",
+"Their phone rang but nobody picked up": "رنّ هاتفه لكن لم يرد أحد",
+"They were on another call": "كان في مكالمة أخرى",
+"They are on another call": "إنه في مكالمة أخرى",
+"Didn't connect": "لم يتم الاتصال",
+"Answered on another screen": "تم الرد من شاشة أخرى",
+"Group call · declined": "مكالمة جماعية · مرفوضة",
+"Group call · nobody answered": "مكالمة جماعية · لم يرد أحد",
+"Already on a call": "أنت في مكالمة بالفعل",
+"Could not start the call": "تعذر بدء المكالمة",
+"Could not answer": "تعذر الرد",
+"Could not reconnect": "تعذرت إعادة الاتصال",
+"Lost connection": "انقطع الاتصال",
+"The connection dropped — reconnecting": "انقطع الاتصال — جارٍ إعادة الاتصال",
+"Connected directly, phone to phone": "متصل مباشرة، من هاتف إلى هاتف",
+"Connected through Cloudflare": "متصل عبر Cloudflare",
+"Connected through the relay": "متصل عبر خادم الترحيل",
+"Your microphone is off": "الميكروفون مغلق",
+" muted their microphone": " كتم الميكروفون",
+" can't hear you — restarting your microphone": " لا يسمعك — جارٍ إعادة تشغيل الميكروفون",
+"Your microphone stopped — restarting it": "توقف الميكروفون — جارٍ إعادة تشغيله",
+"Microphone lost — check it is connected": "فُقد الميكروفون — تأكد من توصيله",
+"Tap anywhere to hear them": "اضغط في أي مكان لسماعه",
+"Tap anywhere to hear the ring": "اضغط في أي مكان لسماع الرنين",
+"Tap anywhere to hear everyone": "اضغط في أي مكان لسماع الجميع",
+"Asking for the microphone…": "جارٍ طلب الإذن باستخدام الميكروفون…",
+"Your browser should be asking to allow it": "من المفترض أن يطلب المتصفح الإذن الآن",
+"Your browser should be asking to allow the microphone": "من المفترض أن يطلب المتصفح الإذن باستخدام الميكروفون",
+"Waiting for the microphone — look for the Allow prompt in your browser": "بانتظار الميكروفون — ابحث عن طلب السماح في المتصفح",
+"Add people once the call has connected": "أضف أشخاصًا بعد أن تبدأ المكالمة",
+"Share screen": "مشاركة الشاشة",
+"Stop sharing": "إيقاف المشاركة",
+"Shared screen": "الشاشة المشتركة",
+" is sharing their screen · tap it to see it full screen": " يشارك شاشته · اضغط عليها لعرضها بملء الشاشة",
+"Share your screen once the call has connected": "شارك شاشتك بعد أن تبدأ المكالمة",
+" needs the latest version of the app to see your screen": " يحتاج أحدث إصدار من التطبيق لرؤية شاشتك",
+"Couldn't share the screen": "تعذرت مشاركة الشاشة",
+"Call quality": "جودة المكالمة",
+"It's night for them": "الوقت ليل عندهم",
+"It's night for ": "الوقت ليل عند ",
+"They may be asleep. Call anyway, or send a buzz they'll see when they wake up?": "قد يكونون نائمين. هل تتصل على أي حال، أم ترسل تنبيهًا يرونه عندما يستيقظون؟",
+" may be asleep. Call everyone anyway?": " قد يكون نائمًا. هل تتصل بالجميع على أي حال؟",
+"Waiting for others…": "بانتظار الآخرين…",
+"Everyone has left": "غادر الجميع",
+"Joining…": "جارٍ الانضمام…",
+"Joined": "انضم",
+"Left": "غادر",
+" is asking you into a group call": " يدعوك إلى مكالمة جماعية",
+"Also ringing: ": "يرن أيضًا: ",
+"Their phones ring now. Everyone already on the call stays on it.": "هواتفهم ترن الآن. يبقى كل من في المكالمة فيها.",
+"You left the call on another device": "غادرت المكالمة من جهاز آخر",
+"Joined on another device": "انضممت من جهاز آخر",
+"Couldn't connect the group call — check the connection and try again": "تعذر ربط المكالمة الجماعية — تحقق من الاتصال وحاول مرة أخرى",
+
+"Conversation": "المحادثة",
+"Message": "رسالة",
+"Messages, calls and buzzes with ": "الرسائل والمكالمات والتنبيهات مع ",
+" all show up here.": " تظهر كلها هنا.",
+"Reply": "رد",
+"Reply to ": "رد على ",
+"Cancel reply": "إلغاء الرد",
+". Show it": ". اعرضها",
+"More options": "خيارات أخرى",
+"Go to the latest message": "الانتقال إلى أحدث رسالة",
+"Send again": "إعادة الإرسال",
+"Not sent yet — it goes when you're back online. Tap to try now.": "لم تُرسل بعد — ستُرسل عند عودة الاتصال. اضغط للمحاولة الآن.",
+"The family server refused it": "رفضها خادم العائلة",
+"You can't message ": "لا يمكنك مراسلة ",
+"That message isn't in this chat any more": "لم تعد تلك الرسالة موجودة في هذه المحادثة",
+"Clear chat": "مسح المحادثة",
+"Clear this chat?": "مسح هذه المحادثة؟",
+"Clear chat with ": "مسح المحادثة مع ",
+"Chat cleared": "تم مسح المحادثة",
+"All messages, photos, files, calls and buzzes in this chat are removed from this phone. ": "ستُحذف كل الرسائل والصور والملفات والمكالمات والتنبيهات في هذه المحادثة من هذا الهاتف. ",
+" keeps their copy, and your call history stays in Recent.": " يحتفظ بنسخته، ويبقى سجل مكالماتك في «الأخيرة».",
+"Send a photo, file or location": "إرسال صورة أو ملف أو موقع",
+"Photos": "الصور",
+"Camera": "الكاميرا",
+"File": "ملف",
+"Files": "الملفات",
+"Photo": "صورة",
+"Location": "الموقع",
+"📷 Photo": "📷 صورة",
+"📍 Location": "📍 الموقع",
+"Send to ": "إرسال إلى ",
+"Add a message (optional)": "أضف رسالة (اختياري)",
+"HD photos — sharper, but about three times the data": "صور عالية الدقة — أوضح، لكنها تستهلك نحو ثلاثة أضعاف البيانات",
+"Nothing can be sent": "لا يمكن إرسال شيء",
+"Nothing to send": "لا يوجد ما يُرسل",
+"Only the first ": "فقط أول ",
+" are sent at once.": " تُرسل دفعة واحدة.",
+"Programs and web pages were left out.": "تم استبعاد البرامج وصفحات الويب.",
+"Programs and web pages can't be sent": "لا يمكن إرسال البرامج وصفحات الويب",
+"Too big (limit ": "كبير جدًا (الحد ",
+"Too big to send — the limit is ": "أكبر من المسموح — الحد هو ",
+"Preparing": "جارٍ التجهيز",
+"Downloading": "جارٍ التنزيل",
+"Download": "تنزيل",
+"Cancel sending": "إلغاء الإرسال",
+"View photo": "عرض الصورة",
+"Save file": "حفظ الملف",
+"Save to phone": "حفظ في الهاتف",
+"No longer available": "لم يعد متاحًا",
+"Blocked file type": "نوع ملف محظور",
+"Blocked — this kind of file can harm a device": "محظور — هذا النوع من الملفات قد يضر بالجهاز",
+"Download it first": "نزّله أولًا",
+"Downloaded — tap Save again to keep it": "تم التنزيل — اضغط «حفظ» مرة أخرى للاحتفاظ به",
+"Saved to Downloads": "تم الحفظ في التنزيلات",
+"This browser can't share files — saving instead": "هذا المتصفح لا يدعم مشاركة الملفات — سيتم الحفظ بدلًا من ذلك",
+"This photo is no longer on this phone": "لم تعد هذه الصورة على هذا الهاتف",
+"Couldn't download it — check the connection and tap to try again": "تعذر التنزيل — تحقق من الاتصال واضغط للمحاولة مرة أخرى",
+"This phone has no room left for it": "لا توجد مساحة كافية على هذا الهاتف",
+"This phone has no room to keep it": "لا توجد مساحة على هذا الهاتف لحفظه",
+"Couldn't read this picture — try sending it as a file": "تعذرت قراءة هذه الصورة — جرّب إرسالها كملف",
+"Couldn't read this file": "تعذرت قراءة هذا الملف",
+"This didn't finish preparing — send it again": "لم يكتمل التجهيز — أرسله مرة أخرى",
+"The file is no longer on this phone — send it again": "لم يعد الملف على هذا الهاتف — أرسله مرة أخرى",
+"You've reached today's sending limit — try again tomorrow": "وصلت إلى حد الإرسال اليومي — حاول مرة أخرى غدًا",
+"The family's photo storage is full — old files are removed after a while; try again later": "مساحة صور العائلة ممتلئة — تُحذف الملفات القديمة بعد فترة؛ حاول لاحقًا",
+"This family server can't take pictures or files": "خادم العائلة هذا لا يقبل الصور أو الملفات",
+"Pictures and files aren't set up on this family server": "الصور والملفات غير مفعّلة على خادم العائلة هذا",
+"Pictures and files aren't set up on this family server yet": "الصور والملفات غير مفعّلة على خادم العائلة بعد",
+"Pictures and files aren't set up on this family server — locations still work.": "الصور والملفات غير مفعّلة على خادم العائلة — مشاركة الموقع تعمل.",
+"The family server needs updating before photos, files and locations can be sent": "يجب تحديث خادم العائلة قبل إرسال الصور والملفات والمواقع",
+"Share your location?": "مشاركة موقعك؟",
+"Share your location with ": "مشاركة موقعك مع ",
+"Sends where you are right now, once. It isn't updated or tracked afterwards, and nothing is sent until you tap Send.": "يرسل مكانك الحالي مرة واحدة فقط. لا يتم تحديثه أو تتبعه بعد ذلك، ولا يُرسل شيء حتى تضغط «إرسال».",
+"Find my location": "تحديد موقعي",
+"Finding you…": "جارٍ تحديد موقعك…",
+"Send location": "إرسال الموقع",
+"Found you — accurate to about ": "تم تحديد موقعك — بدقة تقارب ",
+". It may be more exact outdoors or with Wi-Fi on.": ". قد يكون أدق في الخارج أو مع تشغيل Wi-Fi.",
+"Accurate to about ": "بدقة تقارب ",
+"Open in Maps": "فتح في الخرائط",
+"Copy coordinates": "نسخ الإحداثيات",
+"This browser can't find your location": "هذا المتصفح لا يستطيع تحديد موقعك",
+"Location is turned off for this app. Allow it in your browser's or phone's settings, then try again.": "خدمة الموقع متوقفة لهذا التطبيق. اسمح بها من إعدادات المتصفح أو الهاتف، ثم حاول مرة أخرى.",
+"Couldn't find your location. Try again — outdoors or with Wi-Fi on usually helps.": "تعذر تحديد موقعك. حاول مرة أخرى — يساعد عادةً الوجود في الخارج أو تشغيل Wi-Fi.",
+"Block": "حظر",
+"Block?": "حظر؟",
+"Block ": "حظر ",
+"Unblock": "إلغاء الحظر",
+"Unblock ": "إلغاء حظر ",
+" is blocked": " محظور الآن",
+" is unblocked": " لم يعد محظورًا",
+"You blocked ": "لقد حظرت ",
+". Unblock to call or message them.": ". ألغِ الحظر للاتصال به أو مراسلته.",
+" — unblock them to ": " — ألغِ الحظر لكي ",
+" won't be able to call, buzz or message you, and neither of you will see the ": " لن يتمكن من الاتصال بك أو تنبيهك أو مراسلتك، ولن يرى أيٌّ منكما ",
+"other's status. ": "حالة الآخر. ",
+" isn't told. You can both still be in a group call someone else starts. ": " لن يتم إبلاغه. يمكنكما البقاء معًا في مكالمة جماعية يبدؤها شخص آخر. ",
+"Unblock any time from this chat or Settings → Blocked people.": "يمكنك إلغاء الحظر في أي وقت من هذه المحادثة أو من الإعدادات ← الأشخاص المحظورون.",
+"Blocked people": "الأشخاص المحظورون",
+"You haven't blocked anyone.": "لم تحظر أحدًا.",
+"Someone you block can't call, buzz or message you, and neither of you sees the other's status. They aren't told. To block someone, open their chat and tap ⋮ → Block.": "من تحظره لا يمكنه الاتصال بك أو تنبيهك أو مراسلتك، ولا يرى أيٌّ منكما حالة الآخر. لن يتم إبلاغه. لحظر شخص، افتح محادثته واضغط ⋮ ← حظر.",
+"The family server needs updating before you can block anyone": "يجب تحديث خادم العائلة قبل أن تتمكن من حظر أي شخص",
+"Couldn't reach the family server — try again": "تعذر الوصول إلى خادم العائلة — حاول مرة أخرى",
+"Couldn't reach the family server — check the connection": "تعذر الوصول إلى خادم العائلة — تحقق من الاتصال",
+"Photo": "صورة",
+"Save to phone": "حفظ في الهاتف",
+"Download automatically": "التنزيل التلقائي",
+"Photos on Wi-Fi": "الصور عبر Wi-Fi",
+"Photos on mobile data": "الصور عبر بيانات الجوال",
+"Files on Wi-Fi": "الملفات عبر Wi-Fi",
+"Files on mobile data": "الملفات عبر بيانات الجوال",
+"Anything not downloaded shows a download button with its size, so you decide. Nothing downloads by itself during a call, so the call keeps the bandwidth, and nothing does while Data Saver is on.": "ما لم يُنزَّل يظهر معه زر تنزيل وحجمه، فتختار أنت. لا يُنزَّل شيء تلقائيًا أثناء المكالمة حتى تحتفظ المكالمة بالسرعة، ولا أثناء تفعيل توفير البيانات.",
+"Storage on this phone": "المساحة على هذا الهاتف",
+"Free up space": "تحرير مساحة",
+"Sizes": "الأحجام",
+"Chats and media": "المحادثات والوسائط",
+"Data Saver is on, so nothing downloads by itself.": "توفير البيانات مفعّل، لذا لا يُنزَّل شيء تلقائيًا.",
+"This phone doesn't say which network it's on, so the mobile data choices are used.": "هذا الهاتف لا يُظهر نوع الشبكة، لذا تُستخدم خيارات بيانات الجوال.",
+"Right now this phone is on ": "هذا الهاتف متصل الآن عبر ",
+"mobile data": "بيانات الجوال",
+"no network": "لا توجد شبكة",
+"Pictures and files kept on this phone: ": "الصور والملفات المحفوظة على هذا الهاتف: ",
+" (at most ": " (بحد أقصى ",
+" — the oldest go first).": " — تُحذف الأقدم أولًا).",
+"Photos up to ": "الصور حتى ",
+" (they're made smaller before sending) and files up to ": " (تُصغَّر قبل الإرسال) والملفات حتى ",
+". The family server keeps them ": ". يحتفظ بها خادم العائلة ",
+" days for anyone who hasn't downloaded them yet.": " يومًا لمن لم ينزّلها بعد.",
+"Nothing to free up": "لا يوجد ما يمكن تحريره",
+"Freed up ": "تم تحرير ",
+"Your messages stay. Anything still on the family server can be downloaded again.": "تبقى رسائلك. ويمكن تنزيل أي شيء لا يزال على خادم العائلة مرة أخرى.",
+"Photos download ": "تنزيل الصور ",
+"always": "دائمًا",
+"on Wi-Fi": "عبر Wi-Fi",
+"on mobile data": "عبر بيانات الجوال",
+"when tapped": "عند الضغط",
+", files ": "، والملفات ",
+"Photo and file storage": "مساحة الصور والملفات",
+"The Cloudflare R2 storage that holds pictures and files, against Cloudflare's free allowance. Only admins see this.": "مساحة Cloudflare R2 التي تحفظ الصور والملفات، مقارنة بالحصة المجانية من Cloudflare. يراها المشرفون فقط.",
+"Count again now": "إعادة الحساب الآن",
+"Storage used": "المساحة المستخدمة",
+"Storage used: ": "المساحة المستخدمة: ",
+" free allowance used (": " من الحصة المجانية مستخدمة (",
+"under 1": "أقل من 1",
+"Counting…": "جارٍ الحساب…",
+"This family": "هذه العائلة",
+"All families on this server": "كل العائلات على هذا الخادم",
+" files": " ملفات",
+" file": " ملف",
+" families": " عائلات",
+"New files stop at": "يتوقف قبول الملفات الجديدة عند",
+" (stays free)": " (يبقى مجانيًا)",
+" (over the free allowance)": " (أعلى من الحصة المجانية)",
+"No limit set": "لا يوجد حد",
+"Kept for": "مدة الاحتفاظ",
+" days, then deleted automatically": " يومًا، ثم تُحذف تلقائيًا",
+"Oldest file": "أقدم ملف",
+"Largest photo · file": "أكبر صورة · ملف",
+"Sent today, each person up to ": "المُرسَل اليوم، لكل شخص حتى ",
+"Nothing yet": "لا شيء بعد",
+"Counted": "آخر حساب",
+" (partly — very large)": " (جزئيًا — كبير جدًا)",
+"Storage has reached its limit, so new photos and files aren't being accepted. ": "وصلت المساحة إلى حدها، لذا لا تُقبل صور أو ملفات جديدة. ",
+"Room is made as old files are deleted after ": "تتوفر مساحة عند حذف الملفات القديمة بعد ",
+" days — or raise MEDIA_TOTAL_GB in Cloudflare ": " يومًا — أو ارفع قيمة MEDIA_TOTAL_GB في Cloudflare ",
+"(anything over ": "(ما يزيد على ",
+" is charged).": " يُحتسب بتكلفة).",
+"Storage is getting full. New files stop at ": "المساحة توشك على الامتلاء. يتوقف قبول الملفات الجديدة عند ",
+"; old ones are deleted after ": "؛ وتُحذف القديمة بعد ",
+"The family server needs updating to show this": "يجب تحديث خادم العائلة لعرض هذا"
+});
+
+Object.assign(AR, {
+"Set up your family": "إعداد عائلتك",
+"Do this once on one phone, then send each person their link.": "قم بذلك مرة واحدة على هاتف واحد، ثم أرسل لكل شخص رابطه.",
+"Your name": "اسمك",
+"Your colour": "لونك",
+"Your own link": "رابطك الخاص",
+"Your name, colour and your own link": "اسمك ولونك ورابطك الخاص",
+" · name, colour, your link": " · الاسم واللون والرابط",
+"Your name first": "اسمك أولًا",
+"Type your name first": "اكتب اسمك أولًا",
+"Put your own name in first": "اكتب اسمك أولًا",
+"Their name": "اسمه",
+"Type their name first": "اكتب اسمه أولًا",
+"+ Add a person": "+ إضافة شخص",
+"Family": "العائلة",
+"Family admin": "مشرف العائلة",
+"Admin": "مشرف",
+"Co-admin": "مشرف مساعد",
+"The admin": "المشرف",
+"the admin": "المشرف",
+"Admin · sees everyone": "مشرف · يرى الجميع",
+" people · add, invite, who sees whom": " أشخاص · إضافة، دعوة، من يرى من",
+"Invite someone": "دعوة شخص",
+"Invite the others": "دعوة الآخرين",
+"Send a link to someone new": "أرسل رابطًا لشخص جديد",
+"Tap someone to change their colour and who they can see.": "اضغط على شخص لتغيير لونه ومن يمكنه رؤيته.",
+"Changes save by themselves and reach everyone's phone straight away.": "تُحفظ التغييرات تلقائيًا وتصل إلى هواتف الجميع فورًا.",
+"Each person has their own link, which signs them in as that person. Send each one only to the person it's for.": "لكل شخص رابطه الخاص الذي يسجّل دخوله باسمه. أرسل كل رابط لصاحبه فقط.",
+"Get their invite link": "الحصول على رابط الدعوة",
+"Invite link": "رابط الدعوة",
+"Copy link": "نسخ الرابط",
+"Copy this link": "نسخ هذا الرابط",
+"Open link": "فتح الرابط",
+"Link for ": "رابط ",
+"Sent to ": "أُرسل إلى ",
+"Send this link to ": "أرسل هذا الرابط إلى ",
+", so send it only to them.": "، لذا أرسله إليه فقط.",
+" copied — paste it into a message to them": " تم النسخ — الصقه في رسالة إليه",
+" added — their invite link is ready under Invite the others": " أُضيف — رابط دعوته جاهز في «دعوة الآخرين»",
+"Type their name and send them the link. They join as soon as": "اكتب اسمه وأرسل له الرابط. سينضم بمجرد أن",
+"approves.": "يوافق.",
+"Everyone in the family": "كل أفراد العائلة",
+"Only people I choose": "فقط من أختارهم",
+"Sees everyone": "يرى الجميع",
+"Sees nobody yet": "لا يرى أحدًا بعد",
+"Sees only you": "يراك أنت فقط",
+"In touch with ": "على تواصل مع ",
+"Can see": "يمكنه رؤية",
+"You see everyone": "أنت ترى الجميع",
+"Colour updated on everyone's phone": "تم تحديث اللون على هواتف الجميع",
+"Name updated on everyone's phone": "تم تحديث الاسم على هواتف الجميع",
+"Family list updated": "تم تحديث قائمة العائلة",
+"Family updated by ": "حدّث العائلة ",
+"Remove this phone": "إزالة هذا الهاتف",
+"Remove this phone?": "إزالة هذا الهاتف؟",
+"Remove this phone from the family…": "إزالة هذا الهاتف من العائلة…",
+"Only for a phone that is being given away or set up afresh. You'll see exactly what happens first, and you can undo it for 7 days.": "فقط لهاتف سيُعطى لشخص آخر أو يُعاد إعداده. سترى أولًا ما سيحدث بالضبط، ويمكنك التراجع خلال 7 أيام.",
+"Copy my link": "نسخ رابطي",
+"Copy my own link": "نسخ رابطي الخاص",
+"Type your name to confirm": "اكتب اسمك للتأكيد",
+"Erase everything, no undo — I'm giving this phone away": "مسح كل شيء دون تراجع — سأعطي هذا الهاتف لشخص آخر",
+"Erase this phone": "مسح هذا الهاتف",
+"This phone has been erased": "تم مسح هذا الهاتف",
+"Bookmark this on this phone. It brings everything back — including who you are — if the browser ever forgets. Send it to nobody; it names you.": "احفظه في المفضلة على هذا الهاتف. يعيد كل شيء — بما في ذلك هويتك — إذا نسي المتصفح. لا ترسله لأحد؛ فهو يحمل اسمك.",
+"Your own link copied — bookmark it": "تم نسخ رابطك — احفظه في المفضلة",
+"Your link copied — keep it to come back later": "تم نسخ رابطك — احتفظ به للعودة لاحقًا",
+"Your Family Notifier link": "رابطك في Family Notifier",
+
+"Calls on this phone": "المكالمات على هذا الهاتف",
+"Turn on calls": "تفعيل المكالمات",
+"Turn on": "تفعيل",
+"Send a test notification": "إرسال إشعار تجريبي",
+"On": "مفعّل",
+"Off — tap to turn on": "متوقف — اضغط للتفعيل",
+"Blocked — tap to fix": "محظور — اضغط للإصلاح",
+"Add to Home Screen first": "أضفه إلى الشاشة الرئيسية أولًا",
+"On. Calls and buzzes reach this device even when the app is closed.": "مفعّل. تصل المكالمات والتنبيهات إلى هذا الجهاز حتى والتطبيق مغلق.",
+"Off. Calls only reach this device while the app is open. Tap the button to turn them on.": "متوقف. تصل المكالمات إلى هذا الجهاز فقط والتطبيق مفتوح. اضغط الزر لتفعيلها.",
+"Call notifications are on for this device": "إشعارات المكالمات مفعّلة على هذا الجهاز",
+"Turn on call notifications first": "فعّل إشعارات المكالمات أولًا",
+"Sent — the notification should appear in a moment": "تم الإرسال — سيظهر الإشعار بعد لحظات",
+"If this appeared, notifications work on this device": "إذا ظهر هذا، فالإشعارات تعمل على هذا الجهاز",
+"Couldn't turn on notifications": "تعذر تفعيل الإشعارات",
+"This device won't ring while the app is closed.": "لن يرن هذا الجهاز والتطبيق مغلق.",
+"Turn on call notifications so calls reach you even then.": "فعّل إشعارات المكالمات لتصلك المكالمات حتى في هذه الحالة.",
+"Get calls on this phone": "استقبال المكالمات على هذا الهاتف",
+"So this phone rings when someone calls, even with the app closed.": "ليرن هذا الهاتف عندما يتصل بك أحد، حتى والتطبيق مغلق.",
+"Notifications are blocked for this app, so calls can't ring it while it's closed. ": "الإشعارات محظورة لهذا التطبيق، لذا لن ترن المكالمات والتطبيق مغلق. ",
+"Allow notifications for this site in your phone's settings, then tap below.": "اسمح بالإشعارات لهذا الموقع من إعدادات هاتفك، ثم اضغط بالأسفل.",
+"One more step on iPhone": "خطوة أخيرة على iPhone",
+"An iPhone only rings for calls from the Home Screen app:": "لا يرن iPhone للمكالمات إلا من تطبيق الشاشة الرئيسية:",
+"Tap Copy my link below": "اضغط «نسخ رابطي» بالأسفل",
+"Tap the Share button, then Add to Home Screen": "اضغط زر المشاركة، ثم «إضافة إلى الشاشة الرئيسية»",
+"Open Family Notifier from your Home Screen — if it asks, tap Paste my link": "افتح Family Notifier من الشاشة الرئيسية — وإذا طلب ذلك، اضغط «لصق رابطي»",
+"Copied — now add the app to your Home Screen": "تم النسخ — أضف التطبيق الآن إلى الشاشة الرئيسية",
+"Add Family Notifier to your Home Screen": "أضف Family Notifier إلى الشاشة الرئيسية",
+"Install Family Notifier": "تثبيت Family Notifier",
+"It then opens in one tap like any other app, and calls and messages reach you more reliably.": "بعدها يفتح بلمسة واحدة مثل أي تطبيق، وتصلك المكالمات والرسائل بشكل أكثر موثوقية.",
+"It then opens in its own window, and calls and messages reach you more reliably.": "بعدها يفتح في نافذته الخاصة، وتصلك المكالمات والرسائل بشكل أكثر موثوقية.",
+"Add to Home Screen": "إضافة إلى الشاشة الرئيسية",
+"Install": "تثبيت",
+"Tap your browser's menu (⋮ or ≡, usually at the top or bottom right)": "اضغط قائمة المتصفح (⋮ أو ≡، عادةً في أعلى أو أسفل الشاشة)",
+"Tap Add to Home screen or Install app": "اضغط «إضافة إلى الشاشة الرئيسية» أو «تثبيت التطبيق»",
+"Tap Add or Install to confirm": "اضغط «إضافة» أو «تثبيت» للتأكيد",
+"On iPhone: add this page to your Home Screen, then open it from there": "على iPhone: أضف هذه الصفحة إلى الشاشة الرئيسية، ثم افتحها من هناك",
+"When your phone is on silent": "عندما يكون هاتفك على الوضع الصامت",
+"Microphone": "الميكروفون",
+"Allow the microphone now": "السماح بالميكروفون الآن",
+"Microphone allowed": "تم السماح بالميكروفون",
+"Allowed - calls start without asking.": "مسموح — تبدأ المكالمات دون سؤال.",
+"Blocked - calls can't use the microphone until it's allowed again.": "محظور — لا تستطيع المكالمات استخدام الميكروفون حتى يُسمح به مجددًا.",
+"The browser decides whether to ask when a call starts.": "يقرر المتصفح ما إذا كان سيسأل عند بدء المكالمة.",
+"This browser asks each time a call starts.": "هذا المتصفح يسأل عند بدء كل مكالمة.",
+"Safari may ask each time a call starts.": "قد يسأل Safari عند بدء كل مكالمة.",
+"Microphone permission was refused": "تم رفض إذن الميكروفون",
+"The microphone was refused — follow the steps shown to allow it": "تم رفض الميكروفون — اتبع الخطوات الظاهرة للسماح به",
+"No microphone found on this device": "لا يوجد ميكروفون على هذا الجهاز",
+"The microphone is busy in another app": "الميكروفون مستخدم في تطبيق آخر",
+"Couldn't reach the microphone": "تعذر الوصول إلى الميكروفون",
+"No answer to the microphone prompt": "لا رد على طلب الميكروفون",
+"Tired of the microphone question? Settings → Microphone shows how to stop it": "سئمت من سؤال الميكروفون؟ الإعدادات ← الميكروفون توضح كيفية إيقافه",
+
+"Sounds": "الأصوات",
+"Ringtone": "نغمة الرنين",
+"Incoming calls": "المكالمات الواردة",
+"Ringtone volume": "مستوى صوت الرنين",
+"Vibrate when a call comes in": "الاهتزاز عند ورود مكالمة",
+"Messages and everything else": "الرسائل وكل ما عدا ذلك",
+"Notification volume": "مستوى صوت الإشعارات",
+"Calls: ": "المكالمات: ",
+" · Messages: ": " · الرسائل: ",
+"Silent": "صامت",
+"Classic": "كلاسيكي",
+"Digital": "رقمي",
+"Chime": "جرس",
+"Urgent": "عاجل",
+"Soft": "هادئ",
+"Knock": "طرق",
+"Old phone": "هاتف قديم",
+"Rising": "متصاعد",
+"Ding": "دينغ",
+"Pop": "فقاعة",
+"Chord": "وتر",
+"Bubble": "قطرة",
+"Tick": "نقرة",
+
+"Your status": "حالتك",
+"Shown to the people you're in touch with": "ظاهرة لمن تتواصل معهم",
+"Show my status": "إظهار حالتي",
+"Hide my status": "إخفاء حالتي",
+"Hidden. Everyone you're in touch with sees you as Offline. You can still be called.": "مخفية. يراك كل من تتواصل معهم «غير متصل». ولا يزال بإمكانهم الاتصال بك.",
+"Offline doesn't stop calls reaching you.": "حالة «غير متصل» لا تمنع وصول المكالمات إليك.",
+"Your local time": "توقيتك المحلي",
+"Share my local time": "مشاركة توقيتي المحلي",
+"Stop sharing my local time": "إيقاف مشاركة توقيتي المحلي",
+"Not shared. Nobody sees what time it is for you, and nobody is warned before calling you at night.": "غير مُشارك. لا أحد يرى الوقت عندك، ولا يُنبَّه أحد قبل الاتصال بك ليلًا.",
+"your time": "توقيتك",
+"their time": "توقيته",
+"ahead of you": "متقدم عنك",
+"behind you": "متأخر عنك",
+
+"Language": "اللغة",
+"Usage and call quality": "الاستخدام وجودة المكالمات",
+"Calls, data and quality per person": "المكالمات والبيانات والجودة لكل شخص",
+"Family overview": "نظرة عامة على العائلة",
+"What each phone last told you. Only you see this.": "آخر ما أبلغك به كل هاتف. أنت فقط ترى هذا.",
+"Family usage": "استخدام العائلة",
+"Every phone reports its calls to you after each one. Kept on this phone separately from the family settings — Start over doesn't erase it.": "يبلغك كل هاتف عن مكالماته بعد كل مكالمة. يُحفظ على هذا الهاتف بشكل منفصل عن إعدادات العائلة — ولا يمحوه «البدء من جديد».",
+"Download as spreadsheet (CSV)": "تنزيل كجدول بيانات (CSV)",
+"No calls yet this month.": "لا مكالمات بعد هذا الشهر.",
+"Calls made": "المكالمات المُجراة",
+"Talk minutes": "دقائق المحادثة",
+"Month": "الشهر",
+"All time": "كل الوقت",
+"This month: ": "هذا الشهر: ",
+"This month on this phone: ": "هذا الشهر على هذا الهاتف: ",
+"Notifications on": "الإشعارات مفعّلة",
+"Notifications off": "الإشعارات متوقفة",
+"Page alerts blocked": "تنبيهات الصفحة محظورة",
+"Not on Home Screen": "ليس على الشاشة الرئيسية",
+"Needs updating — has ": "يحتاج إلى تحديث — لديه ",
+"an older version": "إصدار أقدم",
+"No report yet — opens with the next version": "لا تقرير بعد — يظهر مع الإصدار التالي",
+" · hasn't reported yet": " · لم يرسل تقريرًا بعد",
+" · reported ": " · أرسل تقريرًا ",
+"Connection and relay": "الاتصال والترحيل",
+"Works by itself — for troubleshooting": "يعمل تلقائيًا — لاستكشاف المشكلات",
+"Connection": "الاتصال",
+"Check connection": "فحص الاتصال",
+"Tap check to see whether this network reaches the family server.": "اضغط «فحص» لمعرفة ما إذا كانت هذه الشبكة تصل إلى خادم العائلة.",
+"Nothing here needs setting up. Every phone gets these settings from you automatically, in the background.": "لا شيء هنا يحتاج إلى إعداد. يحصل كل هاتف على هذه الإعدادات منك تلقائيًا في الخلفية.",
+"Checking the server…": "جارٍ فحص الخادم…",
+"Family server": "خادم العائلة",
+"Save family server": "حفظ خادم العائلة",
+"Relay server": "خادم الترحيل",
+"Save relay": "حفظ خادم الترحيل",
+"Test relays on this network": "اختبار خوادم الترحيل على هذه الشبكة",
+"Testing the relays…": "جارٍ اختبار خوادم الترحيل…",
+"How calls connect (the whole family)": "كيف تتصل المكالمات (للعائلة كلها)",
+"Automatically": "تلقائيًا",
+"Always through Cloudflare": "دائمًا عبر Cloudflare",
+"Calls on this network": "المكالمات على هذه الشبكة",
+"Additional relay (optional)": "خادم ترحيل إضافي (اختياري)",
+"Save additional relay": "حفظ خادم الترحيل الإضافي",
+"Relay link, or TURN server": "رابط الترحيل أو خادم TURN",
+"Cloudflare Worker link": "رابط Cloudflare Worker",
+"Username": "اسم المستخدم",
+"Credential": "كلمة المرور",
+"Main relay": "خادم الترحيل الرئيسي",
+"Recent with ": "الأخيرة مع ",
+"Calls and buzzes for ": "المكالمات والتنبيهات لـ ",
+
+"Welcome": "أهلًا بك",
+"Were you sent a link?": "هل أُرسل إليك رابط؟",
+"Paste the link here": "الصق الرابط هنا",
+"Paste my link": "لصق رابطي",
+"Paste the link first": "الصق الرابط أولًا",
+"Use this link": "استخدام هذا الرابط",
+"Opening your invitation.": "جارٍ فتح دعوتك.",
+"You're invited": "أنت مدعو",
+"You're in": "لقد انضممت",
+"You're in — welcome to the family": "لقد انضممت — أهلًا بك في العائلة",
+"You have been invited. Which one are you?": "لقد تمت دعوتك. من أنت منهم؟",
+"I'm not on this list": "لست في هذه القائمة",
+"Check your name and tap Join. Everything else sets itself up.": "تأكد من اسمك واضغط «انضمام». كل شيء آخر يُعدّ تلقائيًا.",
+"Everything else is set up for you.": "كل شيء آخر مُعدّ لك.",
+"Almost there, ": "اقتربت، ",
+"Waiting for ": "بانتظار ",
+" to approve": " للموافقة",
+" has been asked to let you in. You'll get a notification ": " طُلب منه السماح لك بالانضمام. سيصلك إشعار ",
+"the moment they do — you can close the app until then.": "فور موافقته — يمكنك إغلاق التطبيق حتى ذلك الحين.",
+"Not approved": "لم تتم الموافقة",
+" didn't approve this request": " لم يوافق على هذا الطلب",
+"If that was a mistake, ask them, then try again.": "إذا كان ذلك خطأ، اسأله ثم حاول مرة أخرى.",
+"This invitation has expired": "انتهت صلاحية هذه الدعوة",
+"Invitations last 30 days, and stop working when a new one is made. Ask whoever invited you to send it again.": "تبقى الدعوات صالحة 30 يومًا، وتتوقف عند إنشاء دعوة جديدة. اطلب ممن دعاك إرسالها مجددًا.",
+"That invite link looks damaged": "يبدو أن رابط الدعوة تالف",
+"Couldn't open the invitation": "تعذر فتح الدعوة",
+"Start a new family instead": "إنشاء عائلة جديدة بدلًا من ذلك",
+"Invited by ": "بدعوة من ",
+" invited you": " دعاك",
+"You were removed from the family": "تمت إزالتك من العائلة",
+"This phone is no longer part of the family, so it can't call or be called.": "لم يعد هذا الهاتف جزءًا من العائلة، لذا لا يمكنه الاتصال أو استقبال المكالمات.",
+" to add me again": " لإضافتي مرة أخرى",
+" wants to join": " يريد الانضمام",
+" wants to join — Approve or Reject at the top": " يريد الانضمام — وافق أو ارفض في الأعلى",
+" has joined": " انضم",
+" has been added": " أُضيف",
+" was not added": " لم يُضف",
+"If you approve, they'll see you": "إذا وافقت، سيتمكن من رؤيتك",
+"Not in this family": "ليس في هذه العائلة",
+"Signed out": "تم تسجيل الخروج",
+"This copy isn't signed in — see the message on screen": "هذه النسخة غير مسجّلة الدخول — راجع الرسالة على الشاشة",
+"This browser is refusing to save — turn off Private Browsing": "هذا المتصفح يرفض الحفظ — أوقف التصفح الخاص",
+"This browser cannot make calls — open the page in Safari or Chrome": "هذا المتصفح لا يستطيع إجراء مكالمات — افتح الصفحة في Safari أو Chrome",
+"This browser can't show notifications from a page": "هذا المتصفح لا يعرض إشعارات الصفحات",
+"Notifications are blocked for this site — allow them in the browser's settings": "الإشعارات محظورة لهذا الموقع — اسمح بها من إعدادات المتصفح",
+
+"Sunday": "الأحد",
+"Monday": "الاثنين",
+"Tuesday": "الثلاثاء",
+"Wednesday": "الأربعاء",
+"Thursday": "الخميس",
+"Friday": "الجمعة",
+"Saturday": "السبت",
+"Jan": "يناير",
+"Feb": "فبراير",
+"Mar": "مارس",
+"Apr": "أبريل",
+"May": "مايو",
+"Jun": "يونيو",
+"Jul": "يوليو",
+"Aug": "أغسطس",
+"Sep": "سبتمبر",
+"Oct": "أكتوبر",
+"Nov": "نوفمبر",
+"Dec": "ديسمبر",
+"Dubai": "دبي",
+"Riyadh": "الرياض",
+"Jeddah": "جدة",
+"Dammam": "الدمام",
+"Doha": "الدوحة",
+"Kuwait": "الكويت",
+"Bahrain": "البحرين",
+"Muscat": "مسقط",
+"Fujairah": "الفجيرة",
+"Cairo": "القاهرة",
+"Amman": "عمّان",
+"Baghdad": "بغداد",
+"Istanbul": "إسطنبول",
+"London": "لندن",
+"Paris": "باريس"
+});
+
+Object.assign(AR, {
+"Nobody manages this family yet": "لا أحد يدير هذه العائلة بعد",
+"Make this phone the family admin": "اجعل هذا الهاتف مشرف العائلة",
+"Make them a co-admin": "اجعله مشرفًا مساعدًا",
+"Make them the admin": "اجعله المشرف",
+"Add a co-admin · recovery link": "إضافة مشرف مساعد · رابط الاسترداد",
+" · recovery link": " · رابط الاسترداد",
+"Co-admins: ": "المشرفون المساعدون: ",
+"No co-admin yet.": "لا يوجد مشرف مساعد بعد.",
+" is now a co-admin": " أصبح مشرفًا مساعدًا",
+" is no longer a co-admin — the family key was replaced": " لم يعد مشرفًا مساعدًا — تم استبدال مفتاح العائلة",
+" will become a co-admin as soon as their phone is online": " سيصبح مشرفًا مساعدًا فور اتصال هاتفه",
+"You're now a co-admin of the family": "أصبحت مشرفًا مساعدًا للعائلة",
+"This device is a co-admin again": "هذا الجهاز مشرف مساعد مجددًا",
+"This device is now the family admin": "هذا الجهاز الآن مشرف العائلة",
+"You manage this family now": "أنت تدير هذه العائلة الآن",
+"You now manage this family — sent to everyone": "أنت تدير هذه العائلة الآن — تم الإرسال للجميع",
+"Managed by ": "يديرها ",
+"Finish taking over": "إتمام تولي الإدارة",
+"Hand over to someone else": "تسليم الإدارة لشخص آخر",
+"You're handing the family over to ": "أنت تسلّم إدارة العائلة إلى ",
+"Show the hand-over link again": "إظهار رابط التسليم مجددًا",
+"Done — I've sent it": "تم — لقد أرسلته",
+"Waiting for their phone to receive the key": "بانتظار استلام هاتفه للمفتاح",
+"Admin recovery link": "رابط استرداد الإدارة",
+"Copy recovery link": "نسخ رابط الاسترداد",
+"Copy my recovery link (needed)": "نسخ رابط الاسترداد الخاص بي (ضروري)",
+"Recovery link copied — keep it private": "تم نسخ رابط الاسترداد — احتفظ به سرًا",
+"Recovery link copied — keep it somewhere safe": "تم نسخ رابط الاسترداد — احتفظ به في مكان آمن",
+"Admin link copied": "تم نسخ رابط الإدارة",
+"Paste the admin link": "الصق رابط الإدارة",
+"That admin link does not belong to this family": "رابط الإدارة هذا لا يخص هذه العائلة",
+"Admin key lost for good?": "هل فُقد مفتاح الإدارة نهائيًا؟",
+"You stay the family's admin only if you keep your recovery link — it holds the admin key.": "تبقى مشرف العائلة فقط إذا احتفظت برابط الاسترداد — فهو يحمل مفتاح الإدارة.",
+"Copy it first — or hand the family over to someone else (Settings → Family admin).": "انسخه أولًا — أو سلّم إدارة العائلة لشخص آخر (الإعدادات ← مشرف العائلة).",
+"This browser cannot create the admin key": "هذا المتصفح لا يستطيع إنشاء مفتاح الإدارة",
+"An admin needs the page opened over https": "يحتاج المشرف إلى فتح الصفحة عبر https",
+"Reset ": "إعادة تعيين ",
+"'s sign-in": " — تسجيل الدخول",
+" is signed out — now send them their new link": " تم تسجيل خروجه — أرسل له الآن رابطه الجديد",
+"Remove ": "إزالة ",
+" removed from the family": " أُزيل من العائلة",
+" removed from this phone — you can undo this for 7 days": " أُزيل من هذا الهاتف — يمكنك التراجع خلال 7 أيام",
+"Undo — bring ": "تراجع — أعد ",
+" back": "",
+"Moved to the new family server — the others follow as their app opens": "تم الانتقال إلى خادم العائلة الجديد — سيتبعه الآخرون عند فتح التطبيق",
+"Sent to the family": "أُرسل إلى العائلة",
+"sent to the family": "أُرسل إلى العائلة",
+"Calls now connect automatically — sent to the family": "المكالمات تتصل الآن تلقائيًا — أُرسل إلى العائلة",
+"All calls now go through Cloudflare — sent to the family": "كل المكالمات تمر الآن عبر Cloudflare — أُرسل إلى العائلة",
+"Relay saved and working — sent to the family": "تم حفظ خادم الترحيل وهو يعمل — أُرسل إلى العائلة",
+"Relay saved — re-share the invite link": "تم حفظ خادم الترحيل — أعد مشاركة رابط الدعوة",
+"Relay cleared": "تم مسح خادم الترحيل",
+"Additional relay saved and working — sent to the family": "تم حفظ خادم الترحيل الإضافي وهو يعمل — أُرسل إلى العائلة",
+"Additional relay removed on this phone": "أُزيل خادم الترحيل الإضافي من هذا الهاتف",
+"Checking the relay link…": "جارٍ فحص رابط الترحيل…",
+"Checking the additional relay…": "جارٍ فحص خادم الترحيل الإضافي…",
+"Save a relay first": "احفظ خادم ترحيل أولًا",
+"Save first": "احفظ أولًا",
+"Set up the Cloudflare relay above first": "أعدّ خادم ترحيل Cloudflare بالأعلى أولًا",
+"Relay details look wrong — trying without": "بيانات خادم الترحيل تبدو خاطئة — جارٍ المحاولة دونها",
+"Relay server details are not valid — check Settings": "بيانات خادم الترحيل غير صالحة — راجع الإعدادات",
+"Saved, but a relay usually needs a username and credential too": "تم الحفظ، لكن خادم الترحيل يحتاج عادةً إلى اسم مستخدم وكلمة مرور أيضًا",
+"Saved, but the link did not answer — check it": "تم الحفظ، لكن الرابط لم يستجب — تحقق منه",
+"Saved, but the Worker is not working yet: ": "تم الحفظ، لكن Worker لا يعمل بعد: ",
+"Could not connect — the relay did not answer either": "تعذر الاتصال — لم يستجب خادم الترحيل أيضًا",
+"No route between the phones — add a relay server in Settings": "لا يوجد طريق بين الهاتفين — أضف خادم ترحيل من الإعدادات",
+"The relay didn't connect — trying every route": "لم يتصل خادم الترحيل — جارٍ تجربة كل الطرق",
+"No sound was getting through — switching to the relay": "لم يكن الصوت يصل — جارٍ التحويل إلى خادم الترحيل",
+"No sound through the relay either — try wifi": "لا صوت عبر خادم الترحيل أيضًا — جرّب Wi-Fi",
+"No sound is getting through — this network blocks direct calls. ": "الصوت لا يصل — هذه الشبكة تحظر المكالمات المباشرة. ",
+"Add a relay in Settings.": "أضف خادم ترحيل من الإعدادات.",
+" may hear you breaking up": " قد يسمع صوتك متقطعًا",
+"Working — the family server answered in ": "يعمل — استجاب خادم العائلة خلال ",
+"Cannot reach the family server (": "تعذر الوصول إلى خادم العائلة (",
+"). Try again in a moment.": "). حاول مرة أخرى بعد لحظة.",
+"Some office and school networks block it — try mobile data to confirm.": "بعض شبكات العمل والمدارس تحظره — جرّب بيانات الجوال للتأكد.",
+"Check the internet connection and try again.": "تحقق من اتصال الإنترنت وحاول مرة أخرى.",
+"Could not reach ": "تعذر الوصول إلى ",
+"Couldn't reach ": "تعذر الوصول إلى ",
+"Cannot reach ": "تعذر الوصول إلى ",
+" — this network is blocking it": " — هذه الشبكة تحظره",
+" — try again": " — حاول مرة أخرى",
+"The family server didn't accept it — check the connection and try again": "لم يقبله خادم العائلة — تحقق من الاتصال وحاول مرة أخرى",
+"The notification service didn't accept it — turn notifications off and on again": "لم تقبله خدمة الإشعارات — أوقف الإشعارات وفعّلها مجددًا",
+"Couldn't ring them — ": "تعذر رنين هاتفه — ",
+"Their phone will not ring — ": "لن يرن هاتفه — ",
+" hasn't turned on notifications — they'll only see it with the app open": " لم يفعّل الإشعارات — سيراها فقط عند فتح التطبيق",
+" hasn't turned on call notifications — they'll only ring with the app open": " لم يفعّل إشعارات المكالمات — سيرن هاتفه فقط والتطبيق مفتوح",
+") — it only rings if their app is open": ") — يرن فقط إذا كان تطبيقه مفتوحًا",
+"only rings if the app is open": "يرن فقط إذا كان التطبيق مفتوحًا",
+"This invitation has expired": "انتهت صلاحية هذه الدعوة",
+"Part of Settings failed: ": "تعذر عرض جزء من الإعدادات: ",
+"Save your family first": "احفظ عائلتك أولًا",
+"The family, ": "العائلة، ",
+"Everything comes back as it was — for ": "كل شيء يعود كما كان — لـ ",
+"This phone keeps its copy of the key until ": "يحتفظ هذا الهاتف بنسخته من المفتاح حتى ",
+"Nobody called “": "لا أحد باسم «",
+"” in your family.": "» في عائلتك.",
+"” to confirm": "» للتأكيد",
+"Type your name to confirm": "اكتب اسمك للتأكيد",
+"Hidden": "مخفي",
+"Shown": "ظاهر",
+"Photos": "الصور",
+"Turn on calls": "تفعيل المكالمات",
+"Sending…": "جارٍ الإرسال…",
+"Opus": "Opus",
+"Notification": "إشعار",
+"Incoming call": "مكالمة واردة",
+"New message": "رسالة جديدة",
+" new message": " رسالة جديدة",
+" new": " جديدة",
+"Phone — quieter, hold it to your ear": "الهاتف — صوت أخف، قرّبه من أذنك",
+"Playing in your headphones": "يعمل عبر سماعاتك",
+"voice call · ": "مكالمة صوتية · ",
+" poor of ": " ضعيفة من ",
+"no loss": "بلا فقد",
+"Poor": "ضعيفة",
+"Good": "جيدة",
+"Fair": "مقبولة"
+});
+
+Object.assign(AR, {
+"Language · اللغة": "اللغة · Language",
+"The language of the app on this phone. It opens again in the one you choose.": "لغة التطبيق على هذا الهاتف. سيُعاد فتحه باللغة التي تختارها.",
+"Change the language after the call": "غيّر اللغة بعد انتهاء المكالمة",
+"The ringtone is only for someone calling you. Messages, photos, missed calls and buzzes are quiet while you're using the app — you see them on screen. These are your own settings on this phone.": "نغمة الرنين للمكالمات الواردة فقط. الرسائل والصور والمكالمات الفائتة والتنبيهات تصل بهدوء أثناء استخدامك للتطبيق — تراها على الشاشة. هذه إعداداتك الخاصة على هذا الهاتف.",
+"Messages and other notifications": "الرسائل والإشعارات الأخرى",
+"Play a short sound for new messages while the app is open": "تشغيل صوت قصير للرسائل الجديدة والتطبيق مفتوح",
+"Sound volume": "مستوى الصوت",
+"With the app closed or in the background": "والتطبيق مغلق أو في الخلفية",
+"Show a test notification": "عرض إشعار تجريبي",
+"Silent while open": "صامت أثناء الاستخدام",
+"This is how messages and other notifications look and sound.": "هكذا تبدو الرسائل والإشعارات الأخرى وتُسمع.",
+"Sent — it should appear in a moment": "تم الإرسال — سيظهر بعد لحظات",
+"Your iPhone alerts with its standard notification sound — web apps can't choose their own sound there. A call keeps alerting every few seconds until you answer or it ends; everything else alerts once.": "ينبّهك iPhone بصوت الإشعار القياسي — لا تستطيع تطبيقات الويب اختيار صوت خاص بها هناك. تواصل المكالمة التنبيه كل بضع ثوانٍ حتى ترد أو تنتهي؛ وكل ما عدا ذلك ينبّه مرة واحدة.",
+"Open the iPhone's Settings app": "افتح تطبيق «الإعدادات» في iPhone",
+"Tap Notifications, then Family Notifier": "اضغط «الإشعارات»، ثم Family Notifier",
+"Turn Sounds on or off, and choose how alerts appear": "فعّل «الأصوات» أو أوقفها، واختر طريقة ظهور التنبيهات",
+"Android uses the sound and vibration set for this app in your phone's settings — every app's notifications work this way, and a web app can't override it. A call keeps alerting every few seconds until you answer or it ends; everything else alerts once.": "يستخدم Android الصوت والاهتزاز المحددين لهذا التطبيق في إعدادات هاتفك — هكذا تعمل إشعارات كل التطبيقات، ولا يستطيع تطبيق الويب تغيير ذلك. تواصل المكالمة التنبيه كل بضع ثوانٍ حتى ترد أو تنتهي؛ وكل ما عدا ذلك ينبّه مرة واحدة.",
+"Tap Show a test notification below": "اضغط «عرض إشعار تجريبي» بالأسفل",
+"When it appears, press and hold it, then tap the ⚙ settings icon": "عندما يظهر، اضغط عليه مطولًا، ثم اضغط رمز الإعدادات ⚙",
+"Choose the sound and vibration you want for Family Notifier": "اختر الصوت والاهتزاز اللذين تريدهما لـ Family Notifier",
+"Your computer shows the notification with its own sound. A call keeps alerting every few seconds until you answer or it ends; everything else alerts once.": "يعرض حاسوبك الإشعار بصوته الخاص. تواصل المكالمة التنبيه كل بضع ثوانٍ حتى ترد أو تنتهي؛ وكل ما عدا ذلك ينبّه مرة واحدة.",
+"With the app open, a call rings out loud even on silent. With it closed, an iPhone doesn't let any web app ring through silent — but it can vibrate for every ring: Settings → Sounds & Haptics → Haptics → Always Play. If you use a Focus (Sleep, Work), allow Family Notifier's notifications in it.": "والتطبيق مفتوح، ترن المكالمة بصوت مرتفع حتى في الوضع الصامت. والتطبيق مغلق، لا يسمح iPhone لأي تطبيق ويب بالرنين في الوضع الصامت — لكنه يستطيع الاهتزاز مع كل رنة: الإعدادات ← الأصوات والحس اللمسي ← الحس اللمسي ← التشغيل دائمًا. وإذا كنت تستخدم «التركيز» (النوم، العمل)، فاسمح بإشعارات Family Notifier فيه.",
+"With the app open, a call rings out loud. With it closed, calls and messages use the sound and vibration set for this app in your phone's settings. To let calls through Do Not Disturb: press and hold a call notification → Settings → turn on Override Do Not Disturb.": "والتطبيق مفتوح، ترن المكالمة بصوت مرتفع. والتطبيق مغلق، تستخدم المكالمات والرسائل الصوت والاهتزاز المحددين لهذا التطبيق في إعدادات هاتفك. للسماح بالمكالمات في وضع «عدم الإزعاج»: اضغط مطولًا على إشعار مكالمة ← الإعدادات ← فعّل «تجاوز عدم الإزعاج».",
+"Calls ring out loud while the app is open. On a computer, check that notifications for this site are allowed and not muted by Focus / Do Not Disturb.": "ترن المكالمات بصوت مرتفع والتطبيق مفتوح. على الحاسوب، تأكد من السماح بإشعارات هذا الموقع وأنها غير مكتومة بوضع التركيز / عدم الإزعاج.",
+
+"last seen ": "آخر ظهور ",
+"admin": "مشرف",
+"Co-admins": "المشرفون المساعدون",
+"Direct": "مباشر",
+"Talk": "المحادثة",
+"Relay data": "بيانات الترحيل",
+"January": "يناير", "February": "فبراير", "March": "مارس", "April": "أبريل", "June": "يونيو",
+"July": "يوليو", "August": "أغسطس", "September": "سبتمبر", "October": "أكتوبر", "November": "نوفمبر", "December": "ديسمبر",
+"You manage this family. The other phones can set up their own ringing and ringtone; everything shared is changed only by its admins.": "أنت تدير هذه العائلة. يمكن للهواتف الأخرى ضبط الرنين ونغمتها الخاصة؛ أما كل ما هو مشترك فلا يغيّره إلا المشرفون.",
+"A co-admin can step in when you're not available: approve newcomers, change who sees whom, reset a sign-in. They can't remove the family's admin. The key reaches their phone by itself, encrypted for that phone alone.": "يمكن للمشرف المساعد أن ينوب عنك عند غيابك: الموافقة على المنضمين الجدد، وتغيير من يرى من، وإعادة تعيين تسجيل الدخول. لا يستطيع إزالة مشرف العائلة. يصل المفتاح إلى هاتفه تلقائيًا، مشفرًا لذلك الهاتف وحده.",
+"A call counts for both people on it. Relay data is what the relays carried; the free allowances are Cloudflare 1,000 GB and Open Relay 20 GB a month.": "تُحتسب المكالمة لكلا الطرفين. بيانات الترحيل هي ما نقلته خوادم الترحيل؛ والحصص المجانية هي Cloudflare بسعة 1,000 GB وOpen Relay بسعة 20 GB شهريًا.",
+"The server that carries your family's calls, messages and status, and wakes closed phones. Leave it as it is unless you run your own (see the setup guide). A change travels in the invite links, and everyone moves with you.": "الخادم الذي ينقل مكالمات عائلتك ورسائلها وحالاتها، ويوقظ الهواتف المغلقة. اتركه كما هو ما لم تشغّل خادمك الخاص (راجع دليل الإعداد). ينتقل أي تغيير عبر روابط الدعوة، وينتقل الجميع معك.",
+"Call audio goes phone to phone. On some mobile networks the two phones cannot reach each other directly and need a relay in the middle. Free from": "ينتقل صوت المكالمة من هاتف إلى هاتف. في بعض شبكات الجوال لا يستطيع الهاتفان الوصول إلى بعضهما مباشرة ويحتاجان إلى خادم ترحيل في المنتصف. مجاني من",
+"Phone to phone when possible, a relay only when needed. Uses the least relay data.": "من هاتف إلى هاتف عند الإمكان، وخادم الترحيل عند الحاجة فقط. يستهلك أقل قدر من بيانات الترحيل.",
+"Steadiest audio, and no silent start on networks that block calls. If Cloudflare can't connect a call, it tries the other routes.": "أثبت جودة للصوت، ولا بداية صامتة على الشبكات التي تحظر المكالمات. إذا لم يستطع Cloudflare ربط المكالمة، تُجرَّب الطرق الأخرى.",
+"(1,000 GB a month free): deploy the small Worker file that came with this app, then paste its address here.": "(1,000 GB شهريًا مجانًا): انشر ملف Worker الصغير المرفق بهذا التطبيق، ثم الصق عنوانه هنا.",
+"(20 GB a month): sign up, create a TURN credential, and paste the": "(20 GB شهريًا): أنشئ حسابًا، وأنشئ بيانات TURN، والصق",
+"credentials link": "رابط بيانات الاعتماد",
+"- below. No username or password needed with the link.": "- بالأسفل. لا حاجة إلى اسم مستخدم أو كلمة مرور مع الرابط.",
+"it shows - the one ending in": "الذي يظهر - المنتهي بـ",
+"A second relay, used": "خادم ترحيل ثانٍ، يُستخدم",
+"together with": "مع",
+"the one above - the call takes whichever connects best, and if one is down or blocked the other carries it. Made for": "الخادم أعلاه - تأخذ المكالمة أيهما يتصل أفضل، وإذا توقف أحدهما أو حُظر حمل الآخر المكالمة. مصمم لـ",
+"Tap check to see whether this network allows the notification server.": "اضغط «فحص» لمعرفة ما إذا كانت هذه الشبكة تسمح بخادم الإشعارات.",
+"Shown. The people you're in touch with see Online while this app is open, Away when it's in the background, and Offline when it's closed.": "ظاهرة. يراك من تتواصل معهم «متصل» والتطبيق مفتوح، و«بعيد» وهو في الخلفية، و«غير متصل» وهو مغلق.",
+"Blocked. Notifications were refused for this site. Allow them in the browser's site settings (on iPhone: Settings → Notifications → this app), then tap the button again.": "محظورة. تم رفض الإشعارات لهذا الموقع. اسمح بها من إعدادات الموقع في المتصفح (على iPhone: الإعدادات ← الإشعارات ← هذا التطبيق)، ثم اضغط الزر مرة أخرى.",
+"Save this somewhere private, like a password manager. Opening it on a new phone makes that phone the admin, if this one is ever lost.": "احفظه في مكان خاص، مثل مدير كلمات المرور. فتحه على هاتف جديد يجعل ذلك الهاتف هو المشرف، إذا فُقد هذا الهاتف يومًا.",
+" (hidden — use Copy)": " (مخفي — استخدم «نسخ»)",
+"Download as spreadsheet (CSV)": "تنزيل كجدول بيانات (CSV)",
+"Always through Cloudflare": "دائمًا عبر Cloudflare",
+"Cloudflare Worker link": "رابط Cloudflare Worker",
+"Relay link, or TURN server": "رابط الترحيل أو خادم TURN",
+"The Cloudflare R2 storage that holds pictures and files, against Cloudflare's free allowance. Only admins see this.": "مساحة Cloudflare R2 التي تحفظ الصور والملفات، مقارنة بالحصة المجانية من Cloudflare. يراها المشرفون فقط.",
+"Photos on Wi-Fi": "الصور عبر Wi-Fi",
+"Files on Wi-Fi": "الملفات عبر Wi-Fi",
+"Photos download ": "تنزيل الصور: ",
+" people · add, invite, who sees whom": " أشخاص · إضافة، دعوة، من يرى من",
+"add, invite, who sees whom": "إضافة، دعوة، من يرى من",
+"their link": "رابطه",
+"Musab B.": "Musab B."
+});
+
+Object.assign(AR, {
+"Pictures and files kept on this phone": "الصور والملفات المحفوظة على هذا الهاتف",
+"the oldest go first).": "تُحذف الأقدم أولًا).",
+"Rings until you answer or decline, or the caller gives up. Tap one to hear it.": "ترن حتى ترد أو ترفض، أو يتوقف المتصل. اضغط على نغمة لسماعها.",
+"Up to date": "محدّث",
+"Messages": "الرسائل",
+"hasn't reported yet": "لم يرسل تقريرًا بعد",
+"check Settings → Connection": "راجع الإعدادات ← الاتصال",
+"name, colour, your link": "الاسم واللون والرابط",
+"Your name, colour and your own link": "اسمك ولونك ورابطك الخاص",
+"not set up yet": "لم يُعدّ بعد",
+"Open it on this phone and everything sets itself up. If this app opened empty (an iPhone Home Screen app starts empty), paste the link here instead.": "افتحه على هذا الهاتف وسيُعدّ كل شيء تلقائيًا. وإذا فُتح هذا التطبيق فارغًا (تطبيق الشاشة الرئيسية في iPhone يبدأ فارغًا)، فالصق الرابط هنا بدلًا من ذلك.",
+"Their phone stops getting calls and the family straight away. You can invite them again later.": "يتوقف هاتفه عن استقبال المكالمات وعن العائلة فورًا. يمكنك دعوته مرة أخرى لاحقًا.",
+"They're a co-admin: the family key will be replaced too.": "إنه مشرف مساعد: سيتم استبدال مفتاح العائلة أيضًا.",
+"They'll be able to approve newcomers, see everyone, change who sees whom and reset sign-ins. You can take it back at any time.": "سيتمكن من الموافقة على المنضمين الجدد، ورؤية الجميع، وتغيير من يرى من، وإعادة تعيين تسجيل الدخول. يمكنك سحب ذلك في أي وقت.",
+"Clear all calls from this phone's history?": "مسح كل المكالمات من سجل هذا الهاتف؟",
+"Clear all buzzes from this phone's history?": "مسح كل التنبيهات من سجل هذا الهاتف؟",
+"Only this list is cleared — nothing on anyone else's phone.": "تُمسح هذه القائمة فقط — ولا شيء على هواتف الآخرين.",
+"Only if nobody has the admin key any more - no hand-over link and no recovery link.": "فقط إذا لم يعد لدى أحد مفتاح الإدارة - لا رابط تسليم ولا رابط استرداد.",
+"This phone will stop following the admin. Do the same on every phone in the family, then make one of them the admin. Continue?": "سيتوقف هذا الهاتف عن اتباع المشرف. افعل الشيء نفسه على كل هاتف في العائلة، ثم اجعل أحدها المشرف. هل تتابع؟"
+});
+/*I18N_MORE*/
+
+var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
+var I18N_ATTRS = ["placeholder", "aria-label", "title", "alt"];
+/* Numbers and times, rewritten where they appear inside a text. */
+var I18N_RULES = [
+  [/\b(\d+) min ago\b/g, "منذ $1 د"],
+  [/\b(\d+) h ago\b/g, "منذ $1 س"],
+  [/\b(\d+) days ago\b/g, "منذ $1 أيام"],
+  [/\b(\d+) h (\d+) min\b/g, "$1 س $2 د"],
+  [/\b(\d+) min\b/g, "$1 د"],
+  [/\b(\d+) s\b/g, "$1 ث"],
+  [/\b1 person\b/g, "شخص واحد"],
+  [/\b(\d+) people\b/g, "$1 أشخاص"],
+  [/\b(\d+) missed calls\b/g, "$1 مكالمات فائتة"],
+  [/\b(\d+) new messages\b/g, "$1 رسائل جديدة"],
+  [/\b(\d+) new\b/g, "$1 جديدة"],
+  [/\b1 file\b/g, "ملف واحد"],
+  [/\b(\d+) files\b/g, "$1 ملفات"],
+  [/\b(\d+) families\b/g, "$1 عائلات"],
+  [/\b(\d+) days\b/g, "$1 يومًا"],
+  [/\b(\d{1,2}:\d{2}) ?AM\b/g, "$1 ص"],
+  [/\b(\d{1,2}:\d{2}) ?PM\b/g, "$1 م"]
+];
+/* Sentences where a name sits in the middle, reordered for Arabic. */
+var I18N_PATTERNS = [
+  [/^Copy (.+)'s link$/, "نسخ رابط $1"],
+  [/^Send (.+) their link$/, "إرسال رابط $1"],
+  [/^Colour and who they see for (.+)$/, "اللون ومن يراه: $1"],
+  [/^Colour for (.+)$/, "لون $1"],
+  [/^Reset (.+)'s sign-in\?/, "إعادة تعيين تسجيل دخول $1؟"],
+  [/^(.+)'s sign-in$/, "تسجيل دخول $1"],
+  [/^(.+)'s link$/, "رابط $1"],
+  [/^(.+)'s phone$/, "هاتف $1"],
+  [/^Link for (.+)$/, "رابط $1"],
+  [/^You blocked (.+) — unblock them to (call|message|buzz) them$/, function(m, who, what){
+    return "لقد حظرت " + who + " — ألغِ الحظر لكي " + ({ call: "تتصل به", message: "تراسله", buzz: "تنبّهه" })[what];
+  }],
+  [/^Shared with the people you're in touch with, so they see it's (.+) and are asked before calling you at night\. Your time zone is all they get — never your location\.$/,
+   "مُشارك مع من تتواصل معهم، فيرون أن الساعة عندك $1 ويُسألون قبل الاتصال بك ليلًا. لا يعرفون إلا منطقتك الزمنية — وليس موقعك أبدًا."],
+  [/^Photos up to (.+?) \(they're made smaller before sending\) and files up to (.+?)\. The family server keeps them (\d+) days for anyone who hasn't downloaded them yet\.$/,
+   "الصور حتى $1 (تُصغَّر قبل الإرسال) والملفات حتى $2. يحتفظ بها خادم العائلة $3 يومًا لمن لم ينزّلها بعد."],
+  [/^[Uu]pdated (?!to )(.+)$/, function(m, t){ return "حُدِّث " + i18nSeg(t); }],
+  [/^build (.+)$/, "الإصدار $1"],
+  [/^(.+) \(hidden — use Copy\)$/, "$1 (مخفي — استخدم «نسخ»)"],
+  [/^Remove (.+) from the family\?$/, "إزالة $1 من العائلة؟"],
+  [/^Reset (.+)'s sign-in\?$/, "إعادة تعيين تسجيل دخول $1؟"],
+  [/^Stop (.+) being a co-admin\?$/, "إيقاف $1 عن الإشراف المساعد؟"],
+  [/^Make (.+) a co-admin\?$/, "جعل $1 مشرفًا مساعدًا؟"],
+  [/^Make (.+) the admin\? This phone stops managing the family once you've sent them the link\.$/,
+   "جعل $1 المشرف؟ سيتوقف هذا الهاتف عن إدارة العائلة بمجرد إرسالك الرابط له."],
+  [/^Remove (.+) of pictures and files from this phone\?$/, "حذف $1 من الصور والملفات من هذا الهاتف؟"],
+  [/^The phone signed in as (.+) now is signed out\. Then send (.+) their new link — the phone that opens it becomes theirs\.$/,
+   "سيتم تسجيل خروج الهاتف المسجّل باسم $1 الآن. ثم أرسل إلى $2 رابطه الجديد — الهاتف الذي يفتحه يصبح له."],
+  [/^The family key is replaced, so the copy on their phone stops working\. (.+) stays in the family\.$/,
+   "سيتم استبدال مفتاح العائلة، فتتوقف النسخة على هاتفه عن العمل. يبقى $1 في العائلة."]
+];
+var i18nFragRe = null, i18nKeys = null, i18nMultiRe = null;
+function trNorm(s){ return String(s).replace(/\s+/g, " ").replace(/^ | $/g, ""); }
+function i18nBuild(){
+  Object.keys(AR).forEach(function(k){
+    var m = /^ (—|·) (.+)$/.exec(k), v = AR[k];
+    if (!m || AR[m[2].trim()] != null) return;
+    var mv = /^ ?(—|·) (.+)$/.exec(v);
+    AR[m[2].trim()] = mv ? mv[2].trim() : v.trim();
+  });
+  i18nKeys = Object.keys(AR).filter(function(k){ return k.length >= 3 && /[A-Za-z]/.test(k); })
+    .sort(function(a, b){ return b.length - a.length; });
+  var esc = function(k){ return k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); };
+  i18nFragRe = new RegExp(i18nKeys.map(esc).join("|"), "g");
+  /* Phrases of more than one word: the only ones swapped inside a long
+     sentence. A lone word there ("Leave", "Call") would leave the
+     sentence half in one language, half in the other. */
+  i18nMultiRe = new RegExp(i18nKeys.filter(function(k){ return / /.test(k.trim()) || /^ | $/.test(k); })
+    .map(esc).join("|"), "g");
+}
+function i18nSwap(seg, re){
+  return seg.replace(re, function(m, at, whole){
+    /* A known word only where it stands as a word, not inside another. */
+    if (i18nIsLetter(m.charAt(0)) && i18nIsLetter(whole.charAt(at - 1))) return m;
+    if (i18nIsLetter(m.charAt(m.length - 1)) && i18nIsLetter(whole.charAt(at + m.length))) return m;
+    return AR[m];
+  });
+}
+function i18nSeg(seg){
+  if (!/[A-Za-z]/.test(seg)) return seg;
+  var hit = AR[seg];
+  if (hit != null) return hit;
+  for (var i = 0; i < I18N_RULES.length; i++) seg = seg.replace(I18N_RULES[i][0], I18N_RULES[i][1]);
+  if (!i18nFragRe) i18nBuild();
+  return i18nSwap(seg, seg.split(" ").length <= 4 ? i18nFragRe : i18nMultiRe);
+}
+function i18nIsLetter(c){ return !!c && /[A-Za-z]/.test(c); }
+/* The Arabic for one piece of text, or null when there is nothing to change. */
+function trText(s){
+  var k = trNorm(s);
+  if (!k || !/[A-Za-z]/.test(k)) return null;
+  var hit = AR[k];
+  if (hit != null) return hit;
+  var out = null;
+  for (var i = 0; i < I18N_PATTERNS.length; i++) {
+    if (I18N_PATTERNS[i][0].test(k)) {
+      out = k.replace(I18N_PATTERNS[i][0], I18N_PATTERNS[i][1]);
+      for (var r = 0; r < I18N_RULES.length; r++) out = out.replace(I18N_RULES[r][0], I18N_RULES[r][1]);
+      break;
+    }
+  }
+  if (out == null) {
+    /* Built from parts: each part between " · ", " — " and ": " on its own. */
+    var parts = k.split(/( · | — |: )/);
+    for (var j = 0; j < parts.length; j += 2) parts[j] = i18nSeg(parts[j]);
+    out = parts.join("");
+  }
+  if (out === k) return null;
+  /* Arabic punctuation, once the words are Arabic. */
+  if (/[\u0600-\u06FF]/.test(out)) out = out.replace(/\?(?=\s|$)/g, "؟").replace(/, /g, "، ");
+  return out;
+}
+/* For text the app builds and uses away from the screen (a share, a
+   dialog, a notification): the text in the chosen language. */
+function L(s){
+  if (LANG !== "ar" || s == null) return s;
+  var t = trText(s);
+  if (t == null) return s;
+  return (/^\s/.test(s) ? " " : "") + t + (/\s$/.test(s) ? " " : "");
+}
+/* Only a whole known sentence - for a text that may be someone's own
+   words, which must never be changed piece by piece. */
+function LX(s){
+  if (LANG !== "ar" || s == null) return s;
+  var h = AR[trNorm(s)];
+  return h != null ? h : s;
+}
+function trLines(s){
+  return String(s).split("\n").map(function(line){ return /[A-Za-z]/.test(line) ? L(line) : line; }).join("\n");
+}
+
+function i18nText(n){
+  if (n.__tr === n.data || !/[A-Za-z]/.test(n.data)) return;   /* times, numbers: nothing to do */
+  var p = n.parentNode;
+  if (!p || I18N_SKIP[p.nodeName] || (p.closest && p.closest('[translate="no"]'))) return;
+  var t = trText(n.data);
+  if (t == null) return;
+  var v = (/^\s/.test(n.data) ? " " : "") + t + (/\s$/.test(n.data) ? " " : "");
+  n.__tr = v;
+  n.data = v;
+}
+function i18nAttrs(el){
+  for (var i = 0; i < I18N_ATTRS.length; i++) {
+    var a = I18N_ATTRS[i], v = el.getAttribute(a);
+    if (!v || v === el["__tr_" + a]) continue;
+    var t = trText(v);
+    if (t != null) { el["__tr_" + a] = t; el.setAttribute(a, t); }
+  }
+}
+function i18nWalk(root){
+  if (root.nodeType === 3) { i18nText(root); return; }
+  if (root.nodeType !== 1 || I18N_SKIP[root.nodeName]) return;
+  if (root.closest && root.closest('[translate="no"]')) return;
+  i18nAttrs(root);
+  var w = document.createTreeWalker(root, 5 /* elements and text */, {
+    acceptNode: function(n){
+      if (n.nodeType === 1 && (I18N_SKIP[n.nodeName] || n.getAttribute("translate") === "no")) {
+        if (n.nodeName === "TEXTAREA") i18nAttrs(n);
+        return 2;
+      }
+      return 1;
+    }
+  });
+  var n, texts = [];
+  while ((n = w.nextNode())) { if (n.nodeType === 3) texts.push(n); else i18nAttrs(n); }
+  for (var i = 0; i < texts.length; i++) i18nText(texts[i]);
+}
+function i18nStart(){
+  if (LANG !== "ar") return;
+  var root = document.documentElement;
+  root.lang = "ar"; root.dir = "rtl";
+  document.title = L(document.title);
+  i18nWalk(document.body);
+  new MutationObserver(function(list){
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      if (m.type === "characterData") i18nText(m.target);
+      else if (m.type === "attributes") {
+        if (!(m.target.closest && m.target.closest('[translate="no"]'))) i18nAttrs(m.target);
+      } else for (var j = 0; j < m.addedNodes.length; j++) i18nWalk(m.addedNodes[j]);
+    }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true,
+                              attributes: true, attributeFilter: I18N_ATTRS });
+  /* The browser's own boxes (Are you sure?) too. */
+  var c = window.confirm, a = window.alert, p = window.prompt;
+  window.confirm = function(m){ return c.call(window, trLines(m)); };
+  window.alert = function(m){ return a.call(window, trLines(m)); };
+  window.prompt = function(m, d){ return p.call(window, trLines(m), d); };
+}
+function isRtl(){ return LANG === "ar"; }
+
+/* Choosing a language: kept, and the app opens again in it. Not in the
+   middle of a call - reopening would end it. */
+function setLang(v){
+  v = v === "ar" ? "ar" : "en";
+  if (v === LANG) return;
+  if ((typeof call !== "undefined" && call) || (typeof group !== "undefined" && group && group.state === "live")) {
+    toast(L("Change the language after the call"));
+    return;
+  }
+  try { localStorage.setItem("fmn-lang", v); } catch (e) {}
+  if (state) { state.lang = v; try { save(); } catch (e) {} }
+  try { swPost({ t: "lang", v: v }); } catch (e) {}
+  setTimeout(function(){ location.reload(); }, 150);
+}
+i18nStart();
+
 
 /* ==================================================================== *
  * Family Notifier — buzz, and real voice calls, over the internet.
@@ -1439,16 +2641,16 @@
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.8.2";
+var APP_VERSION = "1.9.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Fixes: iPhone photos no longer sent sideways, faster photo downloads, more reliable large uploads";
+var WHATS_NEW   = "Arabic language (Settings → Language), and no notification sounds while you use the app";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-20h";
+var VERSION  = "2026-10-20i";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -1531,6 +2733,7 @@ function snapshot(){
            server: state.server || null, token: state.token || null,
            fs: state.fs || null,
            tone: state.tone || "classic", snd: state.snd || null, blocked: state.blocked || [],
+           lang: state.lang || null,
            pending: state.pending || [], presOff: !!state.presOff, tzOff: !!state.tzOff,
            missedIds: state.missedIds || [], grpSeen: state.grpSeen || {},
            admin: state.admin || null, admins: state.admins || [],
@@ -1698,8 +2901,18 @@ function restoreFromIdb(){
     if (!state) {
       state = saved; save(); paintMain();
       if (state.me) openStreams();
+      langFromState(state);
     }
   });
+}
+function langFromState(s){
+  try {
+    if (!s || !s.lang || s.lang === LANG || localStorage.getItem("fmn-lang")) return;
+    if (sessionStorage.getItem("fmn-lang-once")) return;
+    sessionStorage.setItem("fmn-lang-once", "1");
+    localStorage.setItem("fmn-lang", s.lang);
+    location.reload();
+  } catch (e) {}
 }
 
 /* A revision that is also a clock reading. Two phones editing
@@ -5351,7 +6564,7 @@ function needTapForSound(){
     var el = $("remoteAudio");
     var p = el && el.play();
     if (p && p.then) p.then(function(){
-      if (call && $("callNote").textContent === "Tap anywhere to hear them")
+      if (call && $("callNote").textContent === L("Tap anywhere to hear them"))
         $("callNote").textContent = "";
     }).catch(function(){});
     document.removeEventListener("click", go, true);
@@ -5457,7 +6670,7 @@ var TONES = {
     steps: [ { f:[440,480], d:2, r:0 } ] }
 };
 var TONE_ORDER = ["classic","digital","chime","urgent","soft","knock","retro","rise"];
-var NOTE_ORDER = ["n_ding","n_pop","n_chord","n_bubble","n_tick","none"];
+var NOTE_ORDER = ["n_ding","n_pop","n_chord","n_bubble","n_tick"];
 
 function toneName(){
   return (state && state.tone && TONE_ORDER.indexOf(state.tone) !== -1) ? state.tone : "classic";
@@ -5475,7 +6688,9 @@ function toneName(){
  * settings on this phone (so they survive closing the app and
  * restarting the phone), and handed to the notification helper, which
  * follows them while the app is closed. */
-var SND_DEF = { rv: 1, rvib: true, nt: "n_ding", nv: 0.7, nvib: true, nopen: true };
+/* nfg: a sound for messages while the app is open - off: you are looking
+   at the app, you see it on screen. */
+var SND_DEF = { rv: 1, rvib: true, nt: "n_ding", nv: 0.7, nvib: true, nopen: true, nfg: false };
 function sndPrefs(){
   var s = (state && state.snd) || {}, o = {};
   Object.keys(SND_DEF).forEach(function(k){ o[k] = typeof s[k] === typeof SND_DEF[k] ? s[k] : SND_DEF[k]; });
@@ -5494,10 +6709,9 @@ function sndSet(k, v){
 /* The notification helper (sw.js) follows these while the app is closed:
    no sound at all when the notification sound is None, and each kind of
    vibration only if it is on. */
-function sndToHelper(){
-  var p = sndPrefs();
-  swPost({ t: "sound", p: { note: p.nt !== "none", nvib: p.nvib, rvib: p.rvib } });
-}
+/* The notification helper needs only the language: sounds and vibration
+   with the app closed are the phone's own (see sw.js). */
+function sndToHelper(){ swPost({ t: "lang", v: LANG }); }
 /* A volume, as a step the sound files are made at: 10 steps is plenty
    to hear, and keeps a handful of files instead of one per slider pixel. */
 function volStep(v){ return Math.max(1, Math.min(10, Math.round(v * 10))) / 10; }
@@ -5652,6 +6866,23 @@ function toneWavUrl(key, vol){
 }
 
 var ringEl = null, ringPrimed = false, ringLoud = false;
+/* A twentieth of a second of silence. A phone only lets a page play a
+   sound by itself after that same player has played once on a tap - so
+   each player is started on the first tap with this, never with the
+   ringtone. Starting it with the ringtone (muted) could still be heard
+   on some iPhones: a burst of ringing the moment the app was touched. */
+var silentUrl = null;
+function silence(){
+  if (silentUrl) return silentUrl;
+  var n = 1103, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), o = 0;
+  function s(t){ for (var j = 0; j < t.length; j++) v.setUint8(o++, t.charCodeAt(j)); }
+  function u32(x){ v.setUint32(o, x, true); o += 4; }
+  function u16(x){ v.setUint16(o, x, true); o += 2; }
+  s("RIFF"); u32(36 + n * 2); s("WAVE"); s("fmt "); u32(16); u16(1); u16(1);
+  u32(22050); u32(44100); u16(2); u16(16); s("data"); u32(n * 2);
+  silentUrl = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  return silentUrl;
+}
 function ringElement(){
   if (!ringEl) {
     ringEl = new Audio();
@@ -5678,7 +6909,7 @@ function primeRinger(){
   primeNote();
   if (ringPrimed || ringLoud) return;
   var el = ringElement();
-  try { ringSrc(el, toneName(), sndPrefs().rv); } catch (e) { return; }
+  try { el.src = silence(); } catch (e) { return; }
   el.muted = true;
   var p;
   try { p = el.play(); } catch (e) { el.muted = false; return; }
@@ -5746,7 +6977,7 @@ function ringBlocked(opts){
     document.removeEventListener("pointerdown", retry, true);
     document.removeEventListener("touchend", retry, true);
     if (loop) clearInterval(loop);
-    if (ringHintFor && ringHintFor.textContent === hint) ringHintFor.textContent = "";
+    if (ringHintFor && ringHintFor.textContent === L(hint)) ringHintFor.textContent = "";
     var still = opts.group ? (group && group.state === "incoming")
                            : (call && call.state === "incoming");
     if (still && toneStop) setTimeout(function(){
@@ -5946,13 +7177,13 @@ function systemNotify(title, body, tag){
        are not allowed. */
     if (tag && "serviceWorker" in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.getRegistration().then(function(reg){
-        if (reg) reg.showNotification(title, { body: body, tag: tag, renotify: true,
+        if (reg) reg.showNotification(L(title), { body: L(body), tag: tag, renotify: true,
           requireInteraction: true, data: { url: location.href, kind: "call", tag: tag } });
       }).catch(function(){});
       return true;
     }
-    var n = new Notification(title, {
-      body: body,
+    var n = new Notification(L(title), {
+      body: L(body),
       tag: "notifyer-call",       /* replaces itself, never stacks */
       renotify: true,
       requireInteraction: true    /* stays until it is dealt with */
@@ -5996,11 +7227,9 @@ function noteElement(){
   return noteEl;
 }
 function primeNote(){
-  if (notePrimed) return;
-  var p = sndPrefs();
-  if (p.nt === "none") return;
+  if (notePrimed || !sndPrefs().nfg) return;
   var el = noteElement();
-  try { el.src = toneWavUrl(p.nt, p.nv); } catch (e) { return; }
+  try { el.src = silence(); } catch (e) { return; }
   el.muted = true;
   var q; try { q = el.play(); } catch (e) { el.muted = false; return; }
   Promise.resolve(q).then(function(){ el.pause(); el.muted = false; notePrimed = true; },
@@ -6009,10 +7238,12 @@ function primeNote(){
 function notifySound(kind, opts){
   opts = opts || {};
   if (document.hidden) return;                   /* the phone's notification sounds */
+  var p = sndPrefs();
+  /* The app is open and in use: what arrives shows on screen, silently -
+     unless "a sound while the app is open" was chosen. */
+  if (!p.nfg) return;
   if (Date.now() - noteAt < 700) return;          /* a burst sounds once */
   noteAt = Date.now();
-  var p = sndPrefs();
-  if (opts.inChat && !p.nopen) return;
   if (call || group || ringLoud) return;          /* never over a call */
   try { if (navigator.vibrate && p.nvib && !opts.inChat) navigator.vibrate([100, 70, 100]); } catch (e) {}
   if (p.nt === "none") return;
@@ -6050,7 +7281,7 @@ function showBuzz(from, what){
   $("ringKind").textContent = rest || "is buzzing you";
   $("ringAvatar").textContent = initials(name);
   paintWho($("ring"), m && m.colour);
-  $("ringWhat").textContent = what || "wants your attention";
+  $("ringWhat").textContent = LX(what || "wants your attention");
   $("ring").classList.add("on");
   /* The notification sound - never the ringtone: a buzz is not a call. */
   notifySound("buzz");
@@ -6223,8 +7454,10 @@ function lastWith(name){
   /* The latest message, as a messaging app's list shows it. */
   var r = list[0];
   if (msg && (!r || msg.at >= r.at)) {
-    return { text: (unread > 1 ? unread + " new · " : "") + (msg.d === "out" ? "You: " : "") +
-                   msgText(msg).replace(/\s+/g, " ") + " · " + ago(msg.at),
+    var words = msg.t ? msgText(msg).replace(/\s+/g, " ") : L(msgText(msg));
+    return { text: (unread > 1 ? unread + " new · " : "") + (msg.d === "out" ? "You: " : "") + words + " · " + ago(msg.at),
+             pre: (unread > 1 ? unread + " new · " : "") + (msg.d === "out" ? "You: " : ""),
+             words: words, post: " · " + ago(msg.at),
              missed: false, unread: unread > 0, count: unread, msgOnly: unread > 0 };
   }
   return { text: (r.k === "call" ? callLabel(r) : buzzLabel(r)) + " · " + ago(r.at),
@@ -6566,10 +7799,12 @@ function paintCardNotes(){
     if (!sub) return;
     var last = lastWith(card.getAttribute("data-who"));
     sub.className = "sub" + (last && last.missed ? " missed" : last && last.unread ? " unread" : "");
-    sub.textContent = last ? last.text : "Tap to chat, call or buzz";
+    sub.setAttribute("translate", "no");
+    sub.textContent = last ? (last.words != null ? L(last.pre || "") + last.words + L(last.post || "") : L(last.text))
+                           : L("Tap to chat, call or buzz");
     var bid = card.getAttribute("data-id");
     card.classList.toggle("blocked", !!(bid && isBlocked(bid)));
-    if (bid && isBlocked(bid)) { sub.className = "sub"; sub.textContent = "Blocked"; }
+    if (bid && isBlocked(bid)) { sub.className = "sub"; sub.textContent = L("Blocked"); }
     var dot = card.querySelector(".dot"), bd = dot && dot.querySelector(".badge");
     if (bd) bd.remove();
     if (dot && last && last.count) {
@@ -7264,7 +8499,8 @@ function chatBanner(pid, text){
   av.style.background = m ? m.colour : "#5B8DEF"; av.textContent = initials(m ? m.name : "?");
   var tx = document.createElement("span"); tx.className = "btx";
   var nm = document.createElement("b"); nm.textContent = nameOf(pid);
-  var bd = document.createElement("span"); bd.textContent = text;
+  var bd = document.createElement("span"); bd.textContent = LX(text);
+  bd.setAttribute("translate", "no");
   tx.appendChild(nm); tx.appendChild(bd);
   b.appendChild(av); b.appendChild(tx);
   b.onclick = function(){ b.classList.remove("on"); openChat(pid); };
@@ -7476,12 +8712,14 @@ function chatBubble(pid, m){
     q.setAttribute("aria-label", "Reply to " + who + ": " + (m.re.t || "a message") + ". Show it");
     q.style.setProperty("--q", quoteColour(m.re.f));
     var qb = document.createElement("b"); qb.textContent = who;
-    var qs = document.createElement("span"); qs.textContent = m.re.t || "Message";
+    var qs = document.createElement("span"); qs.textContent = LX(m.re.t || "Message");
+    qs.setAttribute("translate", "no");
     q.appendChild(qb); q.appendChild(qs);
     d.appendChild(q);
   }
   if (m.a) d.appendChild(chatMediaEl(m));
   var t = document.createElement("span"); t.className = "bt"; t.textContent = m.t;
+  t.setAttribute("translate", "no");
   var meta = document.createElement("span"); meta.className = "bm";
   var tm = document.createElement("span"); tm.textContent = timeOf(m.at);
   meta.appendChild(tm);
@@ -7540,8 +8778,8 @@ function chatQuick(){
   if (q.childNodes.length) return;
   QUICK.forEach(function(text){
     var b = document.createElement("button");
-    b.className = "chip2"; b.textContent = text;
-    b.onclick = function(){ if (chatOpenId) chatSend(chatOpenId, text); };
+    b.className = "chip2"; b.textContent = L(text);
+    b.onclick = function(){ if (chatOpenId) chatSend(chatOpenId, L(text)); };
     q.appendChild(b);
   });
 }
@@ -7604,7 +8842,7 @@ function chatReplyPaint(){
   if (show) {
     var re = chatReply.re;
     $("chatReplyWho").textContent = re.f === state.me ? "You" : nameOf(re.f);
-    $("chatReplyText").textContent = re.t || "Message";
+    $("chatReplyText").textContent = LX(re.t || "Message");
     bar.style.setProperty("--q", quoteColour(re.f));
   }
   bar.hidden = !show;
@@ -7729,7 +8967,7 @@ function chatMsgMenu(el, opts){
     items.push({ label: "Send again", icon: ICO_RETRY, run: function(){ chatRetryOne(pid, cid); } });
   el.classList.add("sel");
   cmenuOpen(el.getBoundingClientRect(), items, {
-    right: m.d === "out", x: opts.x, y: opts.y, focus: opts.focus,
+    right: (m.d === "out") !== isRtl(), x: opts.x, y: opts.y, focus: opts.focus,
     onClose: function(){ el.classList.remove("sel"); }
   });
 }
@@ -7814,7 +9052,7 @@ function chatClear(pid){
       blocked ? { label: "Unblock " + nameOf(pid), icon: ICO_BLOCK, run: function(){ blockSet(pid, false); } }
               : { label: "Block " + nameOf(pid), icon: ICO_BLOCK, danger: true, run: function(){ blockAsk(pid); } },
       { label: "Clear chat", icon: ICO_CLEAR, danger: true, run: function(){ chatClearAsk(pid); } }
-    ], { right: true, anchor: more, focus: e.detail === 0 });
+    ], { right: !isRtl(), anchor: more, focus: e.detail === 0 });
   };
 
   /* ---- Gestures on the messages, handled once for the whole list. ----
@@ -7825,7 +9063,7 @@ function chatClear(pid){
   function buzzLite(){ try { if (navigator.vibrate) navigator.vibrate(8); } catch (e) {} }
   function place(x){
     if (g !== x) return;
-    x.el.style.transform = x.dx ? "translateX(" + x.dx.toFixed(1) + "px)" : "";
+    x.el.style.transform = x.dx ? "translateX(" + (x.dx * (isRtl() ? -1 : 1)).toFixed(1) + "px)" : "";
     x.el.style.setProperty("--sw", Math.min(1, x.dx / SWIPE).toFixed(3));
   }
   function end(fire){
@@ -7860,17 +9098,18 @@ function chatClear(pid){
   body.addEventListener("pointermove", function(e){
     var x = g;
     if (!x || e.pointerId !== x.id || x.menu) return;
-    var dx = e.clientX - x.x0, dy = e.clientY - x.y0;
+    var way = isRtl() ? -1 : 1;
+    var dx = (e.clientX - x.x0) * way, dy = e.clientY - x.y0;
     if (!x.sw) {
       if (Math.abs(dy) > 10 || dx < -10) { end(false); return; }   /* scrolling - not ours */
       if (Math.abs(dx) > 8) clearTimeout(x.lp);
       if (dx > 14 && dx > Math.abs(dy) * 1.6) {
-        x.sw = true; x.x0 += 14;
+        x.sw = true; x.x0 += 14 * way;
         x.el.classList.add("swiping");
         cmenuClose();
       } else return;
     }
-    var d = Math.max(0, e.clientX - x.x0);
+    var d = Math.max(0, (e.clientX - x.x0) * way);
     if (d > SWIPE) d = SWIPE + (d - SWIPE) * 0.3;               /* a little resistance */
     d = Math.min(d, SWIPE + 26);
     var was = x.dx >= SWIPE;
@@ -8537,7 +9776,8 @@ function chatMediaEl(m){
     box.className = "mfile";
     var ic = document.createElement("span"); ic.className = "fic"; ic.textContent = fileExt(a.n);
     var tx = document.createElement("span"); tx.className = "ftx";
-    var nm = document.createElement("b"); nm.textContent = a.n || "File";
+    var nm = document.createElement("b"); nm.textContent = a.n || L("File");
+    nm.setAttribute("translate", "no");
     var sm = document.createElement("small"); sm.className = "fsm";
     tx.appendChild(nm); tx.appendChild(sm);
     box.appendChild(ic); box.appendChild(tx);
@@ -8771,7 +10011,8 @@ function attOpen(pid, files, asFiles){
       t.appendChild(im); photos++;
     } else {
       var ic = document.createElement("span"); ic.className = "fic"; ic.textContent = fileExt(it.file.name);
-      var nm = document.createElement("span"); nm.className = "anm"; nm.textContent = it.file.name || "File";
+      var nm = document.createElement("span"); nm.className = "anm"; nm.textContent = it.file.name || L("File");
+      nm.setAttribute("translate", "no");
       t.appendChild(ic); t.appendChild(nm);
     }
     var sz = document.createElement("span"); sz.className = "asz";
@@ -8821,7 +10062,7 @@ function attMenu(btn, focus){
   }
   if (fsCaps.loc) items.push({ label: "Location", icon: ICO_PIN, run: function(){ locAsk(pid); } });
   if (!items.length) { toast("The family server needs updating before photos, files and locations can be sent"); return; }
-  cmenuOpen(btn.getBoundingClientRect(), items, { anchor: btn, focus: focus });
+  cmenuOpen(btn.getBoundingClientRect(), items, { anchor: btn, focus: focus, right: isRtl() });
 }
 function attInput(id){
   var i = $(id);
@@ -8878,7 +10119,7 @@ function mediaNavValue(){
   var p = mediaPrefs();
   var ph = p.pw && p.pm ? "always" : p.pw ? "on Wi-Fi" : p.pm ? "on mobile data" : "when tapped";
   var fi = p.fw && p.fm ? "always" : p.fw ? "on Wi-Fi" : p.fm ? "on mobile data" : "when tapped";
-  return "Photos download " + ph + ", files " + fi;
+  return "Photos: " + ph + " · Files: " + fi;
 }
 (function(){
   [["mapw", "pw"], ["mapm", "pm"], ["mafw", "fw"], ["mafm", "fm"]].forEach(function(x){
@@ -9136,7 +10377,7 @@ function paintStorage(fresh){
     bar.className = "stbar" + (pct >= 90 ? " high" : pct >= 70 ? " mid" : "");
     $("stFill").style.width = Math.max(pct, used ? 1 : 0).toFixed(1) + "%";
     var cap = $("stCap");
-    if (r.total && r.total < free) { cap.style.display = "block"; cap.style.left = (r.total / free * 100).toFixed(1) + "%"; }
+    if (r.total && r.total < free) { cap.style.display = "block"; cap.style[isRtl() ? "right" : "left"] = (r.total / free * 100).toFixed(1) + "%"; }
     else cap.style.display = "none";
     bar.setAttribute("aria-label", "Storage used: " + fmtDec(used) + " of " + fmtDec(free));
     $("stTotal").textContent = fmtDec(used) + " of " + fmtDec(free) + " free allowance used (" +
@@ -9169,6 +10410,25 @@ function paintStorage(fresh){
   var b = $("stRefresh");
   if (b) b.onclick = function(){ paintStorage(true); };
 })();
+
+/* The Language page: English or Arabic, each written in itself. */
+var ICO_LANG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5Z"/></svg>';
+function paintLang(){
+  var box = $("langList");
+  if (!box) return;
+  box.innerHTML = "";
+  [["en", "English"], ["ar", "العربية"]].forEach(function(o){
+    var b = document.createElement("button");
+    b.className = "toneopt" + (o[0] === LANG ? " sel" : "");
+    b.setAttribute("aria-pressed", o[0] === LANG ? "true" : "false");
+    b.setAttribute("translate", "no");
+    b.setAttribute("lang", o[0]);
+    b.innerHTML = '<span class="tp" aria-hidden="true">' + ICO_LANG + "</span><span></span>";
+    b.lastChild.textContent = o[1];
+    b.onclick = function(){ setLang(o[0]); };
+    box.appendChild(b);
+  });
+}
 
 /* ------------------------------------------------------------ sheets */
 
@@ -9207,8 +10467,8 @@ function openMsgSheet(){
   var list = $("msgList"); list.innerHTML = "";
   QUICK.forEach(function(q){
     var b = document.createElement("button");
-    b.className = "msgopt"; b.textContent = q;
-    b.onclick = function(){ closeSheet("msgSheet"); buzz(pendingId, q); };
+    b.className = "msgopt"; b.textContent = L(q);
+    b.onclick = function(){ closeSheet("msgSheet"); buzz(pendingId, L(q)); };
     list.appendChild(b);
   });
   $("customMsg").value = "";
@@ -9273,7 +10533,7 @@ var PAGE_TITLES = { home: "Settings", setup: "Set up your family", profile: "You
   family: "Family", invite: "Invite someone", calls: "Calls on this phone",
   ringtone: "Sounds", status: "Your status", admin: "Family admin",
   usage: "Usage and call quality", connection: "Connection and relay", media: "Chats and media",
-  blocked: "Blocked people" };
+  blocked: "Blocked people", language: "Language · اللغة" };
 function setPage(name){
   setPageNow = name;
   Array.prototype.forEach.call(document.querySelectorAll("#setupSheet [data-pages]"), function(el){
@@ -9299,6 +10559,7 @@ function setPage(name){
   }
   if (name === "media") { try { paintMediaSettings(); } catch (e) {} }
   if (name === "blocked") { try { paintBlocked(); } catch (e) {} }
+  if (name === "language") { try { paintLang(); } catch (e) {} }
   if (name === "usage") {
     try { paintStorage(false); } catch (e) {}
     /* Both parts drawn fresh: a phone's report may have arrived since. */
@@ -9349,8 +10610,9 @@ function paintSetNav(){
       : fsPushState === "blocked" ? "Blocked — tap to fix" : "Off — tap to turn on",
       { icon: ICON.phone, warn: !callsOk });
   var sp = sndPrefs();
+  row("language", "Language · اللغة", LANG === "ar" ? "العربية" : "English", { icon: ICO_LANG });
   row("ringtone", "Sounds", "Calls: " + (TONES[toneName()] || TONES.classic).name + " · Messages: " +
-      (sp.nt === "none" ? "Silent" : TONES[sp.nt].name), { icon: ICON.bell });
+      (sp.nfg ? TONES[sp.nt].name : "Silent while open"), { icon: ICON.bell });
   row("media", "Chats and media", mediaNavValue(), { icon: ICO_PHOTO });
   var nb = (state.blocked || []).filter(function(id){ return memberById(id); }).length;
   row("blocked", "Blocked people", nb ? nb + (nb > 1 ? " people" : " person") : "Nobody", { icon: ICO_BLOCK });
@@ -10126,7 +11388,7 @@ function sendLink(m){
   shareInvite(m, url);
 }
 function shareInvite(m, url){
-  var data = { title: "Family Notifier", text: inviteText(m), url: url };
+  var data = { title: "Family Notifier", text: L(inviteText(m)), url: url };
   /* The system share window where there is one. Some computers - many
      company-managed Windows ones - block it, and Chrome reports that
      as "cancelled", instantly. A cancel that fast is not a person
@@ -10161,7 +11423,7 @@ function showSendBox(m, url){
   var p = document.createElement("p");
   p.className = "sub"; p.style.margin = "0 0 12px";
   p.textContent = "It signs them in as " + m.name + ", so send it only to them.";
-  var text = inviteText(m) + " " + url;
+  var text = L(inviteText(m)) + " " + url;
   function close(){ if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
   function btn(label, cls, fn){
     var b = document.createElement("button");
@@ -10248,39 +11510,72 @@ function paintTones(){
     el.innerHTML = "";
     order.forEach(function(key){
       var b = document.createElement("button");
-      b.className = "toneopt" + (key === current ? " sel" : "") + (key === "none" ? " none" : "");
+      b.className = "toneopt" + (key === current ? " sel" : "");
       b.setAttribute("aria-pressed", key === current ? "true" : "false");
-      b.innerHTML = '<span class="tp" aria-hidden="true">' + (key === "none" ? "" : ICON.bell) + "</span><span></span>";
-      b.lastChild.textContent = key === "none" ? "Silent" : TONES[key].name;
+      b.innerHTML = '<span class="tp" aria-hidden="true">' + ICON.bell + "</span><span></span>";
+      b.lastChild.textContent = TONES[key].name;
       b.onclick = function(){ pick(key); };
       el.appendChild(b);
     });
   }
   grid(box, TONE_ORDER, toneName(), function(key){
-    if (!state) { toast("Save your family first"); return; }
+    if (!state) { toast(L("Save your family first")); return; }
     state.tone = key; save();
     paintTones();
     previewTone(key);
   });
   grid($("noteList"), NOTE_ORDER, p.nt, function(key){
     sndSet("nt", key);
-    notePrimed = false;
     paintTones();
     stopTone();
-    if (key !== "none") playNote(key, sndPrefs().nv);
+    playNote(key, sndPrefs().nv);
   });
   $("ringVol").value = Math.round(p.rv * 10);
   $("noteVol").value = Math.round(p.nv * 10);
   $("ringVib").checked = p.rvib;
-  $("noteVib").checked = p.nvib;
-  $("noteOpen").checked = p.nopen;
-  $("noteVol").disabled = p.nt === "none";
-  $("sndClosedNote").textContent = (isIOS()
-      ? "The iPhone plays its own notification sound for the app — it doesn't let web apps use their own sounds there. "
-      : "Your phone plays its own notification sound for the app — phones don't let web apps use their own sounds there. ") +
-    "A call keeps alerting every few seconds, with a long vibration, until you answer or it ends; " +
-    "everything else alerts once" + (isIOS() ? "" : ", with a short vibration") + "." +
-    (p.nt === "none" ? " With Silent chosen, those notifications arrive without sound." : "");
+  $("noteFg").checked = p.nfg;
+  $("noteFgOpts").style.display = p.nfg ? "" : "none";
+  /* An iPhone has no vibration a web app can use. */
+  $("ringVibRow").style.display = navigator.vibrate ? "" : "none";
+  var steps, note;
+  if (isIOS()) {
+    note = "Your iPhone alerts with its standard notification sound — web apps can't choose their own sound there. " +
+           "A call keeps alerting every few seconds until you answer or it ends; everything else alerts once.";
+    steps = ["Open the iPhone's Settings app", "Tap Notifications, then Family Notifier",
+             "Turn Sounds on or off, and choose how alerts appear"];
+  } else if (isAndroid()) {
+    note = "Android uses the sound and vibration set for this app in your phone's settings — every app's " +
+           "notifications work this way, and a web app can't override it. A call keeps alerting every few " +
+           "seconds until you answer or it ends; everything else alerts once.";
+    steps = ["Tap Show a test notification below", "When it appears, press and hold it, then tap the ⚙ settings icon",
+             "Choose the sound and vibration you want for Family Notifier"];
+  } else {
+    note = "Your computer shows the notification with its own sound. A call keeps alerting every few seconds " +
+           "until you answer or it ends; everything else alerts once.";
+    steps = [];
+  }
+  $("sndClosedNote").textContent = note;
+  var ol = $("sndSteps");
+  ol.innerHTML = "";
+  steps.forEach(function(t){ var li = document.createElement("li"); li.textContent = t; ol.appendChild(li); });
+  ol.style.display = steps.length ? "" : "none";
+}
+/* A notification made here on the phone, the way a message arrives -
+   so you can see and hear it, and on Android press and hold it to reach
+   the phone's settings for the app. */
+function sndTestNote(){
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    toast(L("Turn on call notifications first")); return;
+  }
+  var body = L("This is how messages and other notifications look and sound.");
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistration().then(function(reg){
+      if (reg) reg.showNotification("Family Notifier", { body: body, tag: "fmn-test", renotify: true,
+                                                         data: { url: location.href, kind: "test" } });
+      else new Notification("Family Notifier", { body: body });
+    }).catch(function(){});
+  } else { try { new Notification("Family Notifier", { body: body }); } catch (e) {} }
+  toast(L("Sent — it should appear in a moment"));
 }
 (function(){
   function vol(id, key, isRing){
@@ -10290,18 +11585,25 @@ function paintTones(){
       var v = Math.max(1, Math.min(10, Number(el.value) || 7)) / 10;
       sndSet(key, v);
       if (isRing) previewTone(toneName());
-      else { var p = sndPrefs(); if (p.nt !== "none") playNote(p.nt, v); }
+      else playNote(sndPrefs().nt, v);
     };
   }
   vol("ringVol", "rv", true);
   vol("noteVol", "nv", false);
-  [["ringVib", "rvib"], ["noteVib", "nvib"], ["noteOpen", "nopen"]].forEach(function(x){
-    var el = $(x[0]);
-    if (el) el.onchange = function(){
-      sndSet(x[1], el.checked);
-      if (el.checked && x[0] !== "noteOpen") { try { navigator.vibrate && navigator.vibrate(x[0] === "ringVib" ? [400, 200, 400] : [100, 70, 100]); } catch (e) {} }
-    };
-  });
+  var rv = $("ringVib");
+  if (rv) rv.onchange = function(){
+    sndSet("rvib", rv.checked);
+    if (rv.checked) { try { navigator.vibrate && navigator.vibrate([400, 200, 400]); } catch (e) {} }
+  };
+  var fg = $("noteFg");
+  if (fg) fg.onchange = function(){
+    sndSet("nfg", fg.checked);
+    notePrimed = false;
+    paintTones();
+    if (fg.checked) playNote(sndPrefs().nt, sndPrefs().nv);
+  };
+  var t = $("sndTest");
+  if (t) t.onclick = sndTestNote;
 })();
 
 /* Whether this phone can ring with the page closed. Said in Settings,
@@ -13580,6 +14882,10 @@ if (location.protocol === "file:") $("filewarn").style.display = "block";
 
 loadLedgers();
 state = load();
+/* Arabic chosen, but this browser's quick storage was cleared (iPhones
+   do that): the family settings still remember it - opened again in it,
+   once. */
+langFromState(state);
 /* Bark has been taken out. Anything it left in storage goes with it. */
 if (state) {
   var hadBark = ("barkWant" in state) || ("barkSentAt" in state);
@@ -13605,18 +14911,11 @@ if (state) {
 (function(){
   var el = $("silentHow");
   if (!el) return;
-  el.innerHTML = isIOS()
-    ? "With the app open, a call rings out loud even on silent. With it closed, an iPhone " +
-      "doesn't let any web app ring through silent - but it can <b>vibrate</b> for every ring: " +
-      "Settings → Sounds &amp; Haptics → Haptics → <b>Always Play</b>. If you use a Focus " +
-      "(Sleep, Work), allow Family Notifier's notifications in it."
+  el.textContent = L(isIOS()
+    ? "With the app open, a call rings out loud even on silent. With it closed, an iPhone doesn't let any web app ring through silent — but it can vibrate for every ring: Settings → Sounds & Haptics → Haptics → Always Play. If you use a Focus (Sleep, Work), allow Family Notifier's notifications in it."
     : isAndroid()
-    ? "With the app open, a call rings out loud. With it closed, a call is your browser's " +
-      "notification: in vibrate mode every ring vibrates in a long pattern (a message vibrates " +
-      "once, a buzz twice). To let calls through Do Not Disturb: long-press a call notification → " +
-      "<b>Settings</b> → this site → turn on <b>Override Do Not Disturb</b> (and make sure it is set to alert)."
-    : "Calls ring out loud while the app is open. On a computer, check that notifications for " +
-      "this site are allowed and not muted by Focus / Do Not Disturb.";
+    ? "With the app open, a call rings out loud. With it closed, calls and messages use the sound and vibration set for this app in your phone's settings. To let calls through Do Not Disturb: press and hold a call notification → Settings → turn on Override Do Not Disturb."
+    : "Calls ring out loud while the app is open. On a computer, check that notifications for this site are allowed and not muted by Focus / Do Not Disturb.");
 })();
 
 readIntent();
