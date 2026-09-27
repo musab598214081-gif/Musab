@@ -2798,16 +2798,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.10.0";
+var APP_VERSION = "1.10.1";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Voice messages, camera sharing in calls on phones, and a faster start";
+var WHATS_NEW   = "Calls: sound now plays on every phone, and relays are ready before the call starts";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-27a";
+var VERSION  = "2026-10-27b";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3416,6 +3416,24 @@ function fsFrame(f){
        this server). A server that says anything about media at all also
        takes locations. */
     fsCaps = { sfu: !!f.sfu, turn: !!f.turn, media: f.media || null, loc: "media" in f };
+    /* The server says whether it can hand out relay details. That answer
+       used to be kept but never read: a phone that had once been told
+       "no relay keys" ignored the server's relay for six hours even after
+       the keys were added, and relay details were only ever fetched at
+       the moment a call started - with a four-second cap, after which
+       the call went ahead on the direct route alone. Now a stale "off"
+       note is dropped the moment the server says it has a relay, and the
+       details are fetched (and kept fresh) while the app is idle, so the
+       very first call across a country or a mobile network already has
+       every route it needs. */
+    try {
+      var autoLink = autoRelayLink();
+      if (fsCaps.turn && autoLink && relayCache[autoLink] && relayCache[autoLink].off) {
+        delete relayCache[autoLink];
+        try { localStorage.setItem("fmn-relays", JSON.stringify(relayCache)); } catch (e) {}
+      }
+      if (fsCaps.turn || relayLinks().length) ensureRelay().catch(function(){});
+    } catch (e) {}
   } else if (f.k === "guest") {
     takeGuest(f);
   } else if (f.k === "joinreq") {
@@ -3974,6 +3992,9 @@ function fetchRelay(link){
     var servers = list.filter(function(x){ return x && x.urls; }).map(function(x){
       /* Port 53 is blocked by browsers and only ever times out. */
       var urls = [].concat(x.urls).filter(function(u){ return !/:53(\?|$)/.test(u); });
+      /* Whatever the provider lists, the relay is also offered over TCP
+         and TLS on 443 - the ports that pass where all else is blocked. */
+      if (x.username) urls = withWebPorts(urls);
       var copy = { urls: urls };
       if (x.username) copy.username = x.username;
       if (x.credential) copy.credential = x.credential;
@@ -3999,29 +4020,43 @@ function ensureRelay(){
     if (e && e.off && Date.now() - e.at < 6 * 3600000) return Promise.resolve(false);
     return fetchRelay(link);
   });
-  /* Never hold a call up for more than four seconds over it: a cached
-     copy or the direct route is better than a wait. */
-  var cap = new Promise(function(res){ setTimeout(function(){ res(false); }, 4000); });
+  /* Never hold a call up for long over it: a cached copy (even a stale
+     one, good for 20 hours) or the direct route is better than a wait.
+     With nothing cached at all the wait is longer - the details are
+     normally fetched at start-up, so this only happens on a phone's
+     first call, and a call that starts without any relay is exactly the
+     call that fails between countries. */
+  var anyCached = links.some(function(l){ return cachedServers(l).length > 0; });
+  var cap = new Promise(function(res){ setTimeout(function(){ res(false); }, anyCached ? 4000 : 8000); });
   return Promise.race([Promise.all(jobs).then(function(r){
     return r.some(Boolean);
   }), cap]);
 }
 
+/* Many office, school, hotel and mobile networks - and whole countries
+   that filter voice calls - block everything except ordinary web
+   traffic: TLS on port 443, sometimes plain TCP on 80/443. The same
+   relay reached that way gets through, so every relay is offered over
+   TCP and TLS on 443 as well as whatever it was given as. Unused routes
+   cost nothing; the browser tries them all at once and the call takes
+   the first that works. */
+function withWebPorts(urls){
+  var out = [].concat(urls).slice();
+  out.forEach(function(url){
+    if (!/^turns?:/i.test(url)) return;
+    var host = url.replace(/^turns?:/i, "").replace(/\?.*$/, "").replace(/:\d+$/, "");
+    ["turn:" + host + ":443?transport=tcp",
+     "turns:" + host + ":443?transport=tcp"].forEach(function(u){
+      if (out.indexOf(u) === -1) out.push(u);
+    });
+  });
+  return out;
+}
+
 function fixedRelayServer(){
   var url = state && state.turn && tidyTurn(state.turn.url);
   if (!url) return null;
-  /* Many office, school and hotel networks block everything except
-     ordinary web traffic on port 443. The same relay reached over
-     TCP and TLS on 443 gets through those, so it is offered that way
-     as well - unused routes cost nothing. */
-  var host = url.replace(/^turns?:/i, "").replace(/\?.*$/, "")
-                .replace(/:\d+$/, "");
-  var urls = [url];
-  ["turn:" + host + ":443?transport=tcp",
-   "turns:" + host + ":443?transport=tcp"].forEach(function(u){
-    if (urls.indexOf(u) === -1) urls.push(u);
-  });
-  return { urls: urls, username: state.turn.user || "",
+  return { urls: withWebPorts([url]), username: state.turn.user || "",
            credential: state.turn.pass || "" };
 }
 
@@ -4813,7 +4848,18 @@ function outRoute(el, loud){
     /* Phone mode. On a laptop there is no ear to protect: normal volume. */
     if (!isPhone()) { outChainOff(el); el.volume = 1; return outInfo.how = ""; }
     if (volumeWorks) { outChainOff(el); el.volume = OUT_EAR; return outInfo.how = "quieter"; }
-    if (outChainOn(el, OUT_EAR)) return outInfo.how = "quieter";
+    /* A phone whose browser ignores the element's volume (every iPhone)
+       used to be sent through the page's audio engine here - the call's
+       <audio> element MUTED, and the voice re-played through a
+       MediaStreamAudioSourceNode -> gain -> compressor chain. That is the
+       default state of every call on such a phone, and it is fragile: a
+       remote WebRTC track fed into the audio engine is silent on some
+       WebKit builds, and whenever the engine is not really running the
+       muted element is the only thing left - so the call showed
+       "Connected", the timer ran, packets arrived, and nothing was heard.
+       The plain element is the one path every browser gets right, so
+       Phone mode now uses it at normal volume. The engine is only used
+       for the Speaker boost, which the person chooses and can undo. */
     outChainOff(el); el.volume = 1;
     return outInfo.how = "";
   });
@@ -6715,6 +6761,31 @@ function noSound(){
     sendSig(call.peer, { t:"relay", call: call.id, from: state.me })
       .catch(function(){});
     goRelay(true);
+    return;
+  }
+  /* No relay on hand right now - the details were never fetched, or the
+     phone still carries an old "server has no relay keys" note. It used
+     to stop here with a message; now it asks for the relay and, if one
+     is there, moves the call onto it without hanging up. */
+  if (!call.forcedRelay && !call.relayFetching && relayLinks().length) {
+    call.relayFetching = true;
+    var id = call.id;
+    try {
+      var a = autoRelayLink();
+      if (a && relayCache[a] && relayCache[a].off) delete relayCache[a];
+    } catch (e) {}
+    $("callNote").textContent = "No sound is getting through — looking for a relay";
+    ensureRelay().then(function(){
+      if (!call || call.id !== id) return;
+      call.relayFetching = false;
+      if (hasRelay() && !call.forcedRelay && call.state === "connected") {
+        sendSig(call.peer, { t:"relay", call: call.id, from: state.me }).catch(function(){});
+        goRelay(true);
+      } else if (!hasRelay()) {
+        $("callNote").textContent = "No sound is getting through — this network blocks direct calls. " +
+                                    "Add a relay in Settings.";
+      }
+    }).catch(function(){ if (call && call.id === id) call.relayFetching = false; });
     return;
   }
   $("callNote").textContent = call.forcedRelay
@@ -15108,6 +15179,15 @@ function checkAlone(){
  * and voice level - only it shares the one connection ("virtual"). */
 var fsCaps = {};
 function groupMax(){ return fsCaps.sfu ? 20 : 8; }
+/* Relay details are refreshed in the background while the app is open
+   (ensureRelay only fetches when its copy is over an hour old), so a
+   call never has to wait on them or start without them. */
+setInterval(function(){
+  try {
+    if (!state || !state.me || document.hidden) return;
+    if (fsCaps.turn || relayLinks().length) ensureRelay().catch(function(){});
+  } catch (e) {}
+}, 50 * 60 * 1000);
 
 function sfuOn(g){ return !!(g && g.room && g.room.mode === "sfu"); }
 
