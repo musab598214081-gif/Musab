@@ -654,6 +654,13 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   .cwho b{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cwho small{font-size:12px;color:var(--mist);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cwho small.on{color:var(--go)} .cwho small.away{color:var(--amber)}
+  /* Status and their local time: side by side when they fit, and the
+     time on a line of its own when they don't, so neither is cut off. */
+  .cwho small.split{display:flex;flex-wrap:wrap;line-height:1.35}
+  .cwho small.split > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-width:0}
+  .cwho small.split > .lt{white-space:normal;overflow:visible}
+  .cwho small .lt{color:var(--mist)} .cwho small .lt.night{color:#B9C4FF}
+  .cwho small.wrapped .sep{display:none} .cwho small.wrapped .lt{flex-basis:100%}
   .cbody{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:10px 12px 12px;-webkit-overflow-scrolling:touch;
     overscroll-behavior:contain;display:flex;flex-direction:column;gap:4px}
   .cbody > *{max-width:640px;width:100%;margin-left:auto;margin-right:auto}
@@ -2798,16 +2805,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.10.1";
+var APP_VERSION = "1.10.2";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Calls: sound now plays on every phone, and relays are ready before the call starts";
+var WHATS_NEW   = "Calls carry on with the screen locked, and the app reconnects faster when you come back";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-27b";
+var VERSION  = "2026-10-27d";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -5216,6 +5223,7 @@ function micStream(){
      device, and a speakerphone call without echo cancellation is the
      "I can hear myself" call. A browser that refuses the constraints
      gets the plain request instead of no call. */
+  audioSession("play-and-record");   /* see keepAwake */
   var media = navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true,
              autoGainControl: true, channelCount: 1 },
@@ -6814,6 +6822,12 @@ function goRelay(ours){
    mid-conversation can suspend the page and the audio with it. */
 var wakeLock = null;
 function keepAwake(){
+  /* On an iPhone the call's sound is what keeps the app alive with the
+     screen locked or another app in front: told it is a call
+     ("play-and-record"), the phone keeps the microphone and the speaker
+     going in the background, as it does for a phone call. Without it
+     the app is put to sleep within seconds and the call goes quiet. */
+  audioSession("play-and-record");
   try {
     if (!navigator.wakeLock || wakeLock) return;
     navigator.wakeLock.request("screen").then(function(lock){
@@ -6825,12 +6839,20 @@ function keepAwake(){
 function releaseAwake(){
   try { if (wakeLock) wakeLock.release(); } catch (e) {}
   wakeLock = null;
+  audioSession("auto");
 }
 document.addEventListener("visibilitychange", function(){
   if (document.hidden || !call) return;
   /* The browser drops the lock whenever the page is hidden; take it
      back, and make sure sound is still playing after being away. */
-  if (call.state === "connected") keepAwake();
+  if (call.state === "connected") {
+    keepAwake();
+    /* The path between the phones may have died while this one slept,
+       without the browser announcing it. Look now, not at the next
+       check, and find a new path if it has. */
+    if (!isUp() && !call.recovering) beginRecovery(0);
+    else if (call.recovering) checkSoon();
+  }
   var el = $("remoteAudio");
   if (el && el.srcObject && el.paused) {
     var p = el.play(); if (p && p.catch) p.catch(function(){ needTapForSound(); });
@@ -8874,9 +8896,32 @@ function chatPaintSub(){
   var st = presenceOf(chatOpenId), tt = theirTime(chatOpenId);
   var sub = $("chatSub");
   if (isBlocked(chatOpenId)) { sub.textContent = "Blocked"; sub.className = ""; return; }
-  sub.textContent = st.text + (tt ? " · " + (tt.night ? "\u263E " : "") + tt.short : "");
-  sub.className = st.k;
+  if (!tt) { sub.textContent = st.text; sub.className = st.k; return; }
+  /* Two pieces, so a narrow phone can put their time under the status
+     instead of cutting it off. The separator goes when they wrap. */
+  sub.textContent = "";
+  var a = document.createElement("span"), sep = document.createElement("span"),
+      b = document.createElement("span");
+  a.textContent = st.text;
+  sep.className = "sep"; sep.textContent = "\u00A0·\u00A0";
+  b.className = "lt" + (tt.night ? " night" : "");
+  b.textContent = (tt.night ? "\u263E " : "") + tt.short;
+  sub.appendChild(a); sub.appendChild(sep); sub.appendChild(b);
+  sub.className = st.k + " split";
+  chatSubWrap();
+  /* Again once the screen is up and the words are in their language. */
+  requestAnimationFrame(chatSubWrap);
 }
+/* Whether their time went down to a second line - checked after layout,
+   and again whenever the screen changes width. */
+function chatSubWrap(){
+  var sub = $("chatSub");
+  if (!sub || !sub.classList.contains("split")) return;
+  sub.classList.remove("wrapped");
+  var a = sub.firstChild, b = sub.lastChild;
+  if (a && b && b.offsetTop > a.offsetTop + 2) sub.classList.add("wrapped");
+}
+window.addEventListener("resize", function(){ if (chatOpenId) chatSubWrap(); });
 
 function chatItems(pid){
   var m = memberById(pid), items = [];
@@ -15900,9 +15945,15 @@ document.addEventListener("visibilitychange", function(){
   /* After more than a few seconds asleep a phone has usually cut the
      connection without saying so, so reopen; after a glance away, just
      catch up on anything missed. */
-  if (hiddenAt && Date.now() - hiddenAt > 30000) { fsRetry = 1000; openStreams(); }
-  else { reviveStreams(); if (hiddenAt && Date.now() - hiddenAt > 5000) fsProbe(5000); }
+  /* An iPhone cuts the connection within seconds of the screen locking,
+     so after 10 seconds away it is reopened at once rather than probed
+     and waited for. */
+  if (hiddenAt && Date.now() - hiddenAt > 10000) { fsRetry = 1000; openStreams(); }
+  else { reviveStreams(); if (hiddenAt && Date.now() - hiddenAt > 3000) fsProbe(3000); }
 });
+/* Android and desktop browsers may freeze a background page and thaw it
+   later without it ever being hidden: the same catch-up on thawing. */
+document.addEventListener("resume", function(){ if (state && state.me) reviveStreams(); });
 
 window.addEventListener("online", function(){
   fsRetry = 1000;
