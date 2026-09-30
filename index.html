@@ -2808,13 +2808,13 @@ i18nStart();
 var APP_VERSION = "1.10.2";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Calls carry on with the screen locked, and the app reconnects faster when you come back";
+var WHATS_NEW   = "Reconnects the instant the screen comes on, and notifications no longer go missing in the moment after it locks";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-27d";
+var VERSION  = "2026-10-28";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3297,7 +3297,7 @@ function fsSetSince(t){
 var lastPongAt = 0;
 function fsProbe(ms){
   var ws = fsWs;
-  if (!ws || !fsOpen) { if (useFS() && !fsTimer) { fsRetry = 1000; fsConnect(); } return; }
+  if (!ws || !fsOpen) { if (useFS() && !fsTimer && !fsConnecting()) { fsRetry = 1000; fsConnect(); } return; }
   var sentAt = Date.now();
   try { ws.send("ping"); } catch (e) {}
   setTimeout(function(){
@@ -3306,15 +3306,68 @@ function fsProbe(ms){
 }
 function fsClose(){
   if (fsTimer) { clearTimeout(fsTimer); fsTimer = null; }
-  if (fsPingTimer) { clearInterval(fsPingTimer); fsPingTimer = null; }
-  var ws = fsWs; fsWs = null; fsOpen = false;
+  if (fsPingTimer) { clearTimeout(fsPingTimer); fsPingTimer = null; }
+  var ws = fsWs; fsWs = null; fsOpen = false; fsConnectAt = 0;
   if (ws) { try { ws.close(); } catch (e) {} }
 }
+/* Retries slow down while they keep failing, but never to more than 10
+   seconds with the app on screen - half a minute between tries was
+   fine for a phone in a pocket and far too long for somebody watching
+   "Not connected". */
 function fsSchedule(){
   if (fsTimer || !useFS()) return;
-  var d = fsRetry + Math.random() * 500;
-  fsRetry = Math.min(fsRetry * 2, 30000);
+  var cap = document.hidden ? 30000 : 10000;
+  var d = Math.min(fsRetry, cap) + Math.random() * 500;
+  fsRetry = Math.min(fsRetry * 2, cap);
   fsTimer = setTimeout(function(){ fsTimer = null; fsConnect(); }, d);
+}
+/* A connection still being opened, started within the last few seconds.
+   Several things ask for a fresh connection at the same moment when the
+   phone wakes (the screen, a notification, the network) - each used to
+   throw away the handshake the last one had just started. */
+var fsConnectAt = 0;
+function fsConnecting(){
+  return !!(fsWs && fsWs.readyState === 0 && fsConnectAt && Date.now() - fsConnectAt < 6000);
+}
+/* The ping: every 20 seconds normally, every 8 during a call - a call's
+   reconnect messages travel over this connection, and a phone in a
+   call with its screen locked keeps running (see keepAwake) but sees
+   nothing else that would show the connection has died. The answer is
+   expected within half the gap. */
+function fsPingEvery(){ return (typeof call !== "undefined" && call) || (typeof group !== "undefined" && group) ? 8000 : 20000; }
+function fsPingLoop(ws){
+  if (fsPingTimer) clearTimeout(fsPingTimer);
+  var every = fsPingEvery();
+  fsPingTimer = setTimeout(function(){
+    fsPingTimer = null;
+    if (ws !== fsWs) return;
+    fsProbe(Math.max(3000, every / 2));
+    fsPingLoop(ws);
+  }, every);
+}
+/* Everything that means "the phone is back" comes through here: the
+   screen coming on, a notification arriving, the network returning, a
+   thawed page. `gone` is how long the app was out of sight; `force`
+   reopens regardless. An iPhone cuts a background page's connection
+   within seconds of the screen locking, and afterwards the connection
+   still LOOKS open - so after a couple of seconds away it is reopened
+   without asking, and after a mere glance it is only probed. */
+function fsWake(gone, force){
+  if (!useFS()) return;
+  var quick = isIOS() ? 2000 : 10000;
+  /* In a call the page kept running with the screen off (see keepAwake),
+     pinging every few seconds: a connection heard from moments ago is
+     fine, and dropping it mid-call would only lose the call's messages. */
+  var inCall = !!((typeof call !== "undefined" && call) || (typeof group !== "undefined" && group));
+  if (!force && inCall && fsOpen && fsWs && fsWs.readyState === 1 && Date.now() - lastBeatAt < 15000) {
+    fsProbe(2500); return;
+  }
+  if (force || !fsWs || fsWs.readyState > 1 || (gone && gone > quick) || Date.now() - lastBeatAt > 75000) {
+    if (fsConnecting()) return;              /* one already on its way */
+    fsRetry = 1000; fsConnect(); return;
+  }
+  if (fsConnecting()) return;
+  fsProbe(gone && gone > 1000 ? 2500 : 4000);
 }
 function fsConnect(){
   if (!useFS()) return;
@@ -3324,10 +3377,15 @@ function fsConnect(){
           + "&since=" + fsSince() + "&sec=" + encodeURIComponent(mySec());
   var ws;
   try { ws = new WebSocket(url); } catch (e) { fsSchedule(); return; }
-  fsWs = ws;
+  fsWs = ws; fsConnectAt = Date.now();
+  /* A handshake that never finishes (a network that swallows it) is
+     given up on, so the retries carry on instead of waiting for ever. */
+  setTimeout(function(){
+    if (ws === fsWs && ws.readyState === 0) { fsClose(); fsSchedule(); }
+  }, 12000);
   ws.onopen = function(){
     if (ws !== fsWs) return;
-    fsOpen = true; fsRetry = 1000; beat(); paintStatus(true);
+    fsOpen = true; fsRetry = 1000; fsConnectAt = 0; beat(); paintStatus(true);
     fsPres = document.hidden ? "away" : "on";
     fsSendPres();
     fsSendSub();
@@ -3338,7 +3396,7 @@ function fsConnect(){
        connection that died without saying so - the phone changed network,
        a mobile operator dropped it - used to go unnoticed for up to 75
        seconds, and any call placed in that time never arrived. */
-    fsPingTimer = setInterval(function(){ fsProbe(10000); }, 20000);
+    fsPingLoop(ws);
     chatRetry();
   };
   ws.onmessage = function(ev){
@@ -3350,8 +3408,8 @@ function fsConnect(){
   };
   ws.onclose = function(){
     if (ws !== fsWs) return;
-    fsWs = null; fsOpen = false;
-    if (fsPingTimer) { clearInterval(fsPingTimer); fsPingTimer = null; }
+    fsWs = null; fsOpen = false; fsConnectAt = 0;
+    if (fsPingTimer) { clearTimeout(fsPingTimer); fsPingTimer = null; }
     paintStatus(false);
     for (var q in fsReqs) { fsReqs[q]({ ok: false, status: 0 }); }
     fsReqs = {};
@@ -3507,9 +3565,22 @@ function fsRequest(frame, timeout, keepalive, viaHttp){
     .catch(function(){ return { ok: false, status: 0 }; });
 }
 function fsSendPres(){
-  if (!fsOpen || !fsWs) return;
   var s = (state && state.presOff) ? "off" : fsPres;
-  try { fsWs.send(JSON.stringify({ k: "pres", s: s, tz: (state && state.tzOff) ? "" : myTz() })); } catch (e) {}
+  var frame = { k: "pres", s: s, tz: (state && state.tzOff) ? "" : myTz() };
+  if (fsOpen && fsWs) { try { fsWs.send(JSON.stringify(frame)); } catch (e) {} }
+  /* Leaving the screen: said over plain HTTP as well (a request the
+     phone finishes even as the page freezes). An iPhone stops the page
+     within seconds of the screen locking, and what was written to the
+     connection in that moment did not always get out - the server then
+     kept the phone as "on screen" for another 45 seconds, and a message
+     sent in that window raised no notification. */
+  if (fsPres !== "on" && useFS()) {
+    try {
+      var body = { k: "pres", s: s, me: state.me, sec: mySec() };
+      fetch(fsBase() + "/send", { method: "POST", headers: { "Content-Type": "application/json" },
+                                 body: JSON.stringify(body), keepalive: true }).catch(function(){});
+    } catch (e) {}
+  }
 }
 
 /* ---- notifications on this device (Web Push through sw.js) ---- */
@@ -3638,8 +3709,8 @@ if ("serviceWorker" in navigator) {
        Its connection may have died quietly while it slept - reconnect
        now, so the call behind the notification arrives at once. */
     if (d.t === "push") {
-      if (!fsOpen || Date.now() - lastBeatAt > 20000) { fsRetry = 1000; fsConnect(); }
-      else { try { fsWs.send("ping"); } catch (x) {} }
+      fsWake(hiddenAt && document.hidden ? Date.now() - hiddenAt : 0,
+             !fsOpen || Date.now() - lastBeatAt > 20000);
       return;
     }
     if (d.t !== "open" || !d.url) return;
@@ -6828,6 +6899,9 @@ function keepAwake(){
      going in the background, as it does for a phone call. Without it
      the app is put to sleep within seconds and the call goes quiet. */
   audioSession("play-and-record");
+  /* The family server's connection is checked more often for the length
+     of the call (see fsPingEvery). */
+  try { if (fsOpen && fsWs) fsPingLoop(fsWs); } catch (e) {}
   try {
     if (!navigator.wakeLock || wakeLock) return;
     navigator.wakeLock.request("screen").then(function(lock){
@@ -15933,35 +16007,45 @@ setTimeout(function(){
    the page comes back to the front, and when the network returns. */
 function reviveStreams(){
   if (!state || !state.me) return;
-  if (!fsWs || fsWs.readyState > 1 || Date.now() - lastBeatAt > 75000) {
-    fsRetry = 1000; fsConnect();
-  }
+  if (!fsWs || fsWs.readyState > 1 || Date.now() - lastBeatAt > 75000) fsWake(0, true);
 }
 
-setInterval(reviveStreams, 45000);
+/* A timer that notices it overslept. A page that was frozen (screen
+   locked, app in the background) has its timers held; when they run
+   again the gap between two ticks tells how long it was out, even where
+   the browser never says "hidden" or "resumed". After a long gap the
+   connection is treated as dead. */
+var lastTickAt = Date.now();
+setInterval(function(){
+  var now = Date.now(), gap = now - lastTickAt; lastTickAt = now;
+  if (!state || !state.me) return;
+  /* Only a page ON SCREEN with a long gap was frozen. A hidden page on
+     Android or a desktop is merely slowed (timers once a minute), and
+     its connection is usually fine - the ping and pong say so. */
+  if (gap > 30000 && !document.hidden) { fsWake(gap, true); return; }
+  reviveStreams();
+}, 15000);
 
 document.addEventListener("visibilitychange", function(){
   if (document.hidden) { hiddenAt = Date.now(); return; }
-  /* After more than a few seconds asleep a phone has usually cut the
-     connection without saying so, so reopen; after a glance away, just
-     catch up on anything missed. */
-  /* An iPhone cuts the connection within seconds of the screen locking,
-     so after 10 seconds away it is reopened at once rather than probed
-     and waited for. */
-  if (hiddenAt && Date.now() - hiddenAt > 10000) { fsRetry = 1000; openStreams(); }
-  else { reviveStreams(); if (hiddenAt && Date.now() - hiddenAt > 3000) fsProbe(3000); }
+  /* Back on screen: reopen after any real time away (an iPhone cuts a
+     background page's connection within seconds of the screen locking,
+     and it still looks open afterwards); after a glance away, only
+     probe, and catch up on anything missed. See fsWake. */
+  fsWake(hiddenAt ? Date.now() - hiddenAt : 0, false);
 });
 /* Android and desktop browsers may freeze a background page and thaw it
    later without it ever being hidden: the same catch-up on thawing. */
-document.addEventListener("resume", function(){ if (state && state.me) reviveStreams(); });
+document.addEventListener("resume", function(){ if (state && state.me) fsWake(0, true); });
+document.addEventListener("freeze", function(){ hiddenAt = hiddenAt || Date.now(); });
 
 window.addEventListener("online", function(){
-  fsRetry = 1000;
-  if (state && state.me) openStreams();
+  if (state && state.me) fsWake(0, true);
 });
 window.addEventListener("pageshow", function(ev){
-  if (ev && ev.persisted) reviveStreams();
+  if (ev && ev.persisted) fsWake(0, true);
 });
+window.addEventListener("pagehide", function(){ hiddenAt = Date.now(); });
 
 window.addEventListener("beforeunload", function(){
   if (!call) return;
