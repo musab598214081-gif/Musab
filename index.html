@@ -2445,6 +2445,11 @@ Object.assign(AR, {
 " new": " جديدة",
 "Phone — quieter, hold it to your ear": "الهاتف — صوت أخف، قرّبه من أذنك",
 "Playing in your headphones": "يعمل عبر سماعاتك",
+"Phone — earpiece": "الهاتف — سماعة الأذن",
+"Speaker on": "مكبر الصوت يعمل",
+"Calls now start in Phone mode, with Speaker only when you tap it": "تبدأ المكالمات الآن على وضع الهاتف، ومكبر الصوت فقط عند الضغط عليه",
+"Speaker on — louder": "مكبر الصوت يعمل — صوت أعلى",
+"This browser plays calls out loud — use headphones for a private call": "هذا المتصفح يشغّل المكالمات بصوت عالٍ — استخدم السماعات لمكالمة خاصة",
 "voice call · ": "مكالمة صوتية · ",
 " poor of ": " ضعيفة من ",
 "no loss": "بلا فقد",
@@ -2805,16 +2810,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.10.2";
+var APP_VERSION = "1.10.3";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Reconnects the instant the screen comes on, and notifications no longer go missing in the moment after it locks";
+var WHATS_NEW   = "Calls now start in Phone mode, with Speaker only when you tap it";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-28";
+var VERSION  = "2026-10-28b";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -4783,12 +4788,10 @@ function paintCallButtons(incoming){
     $("callNote").textContent = off ? "Your microphone is off" : "";
   };
 
-  var spk = add("spk", ICON.spk, "Speaker", null);
-  spk.button.onclick = function(){
-    setSpeaker(!speakerOn);
-    spk.button.classList.toggle("on", speakerOn);
-  };
-  spk.button.classList.toggle("on", speakerOn);
+  /* Off at the start of every call - the earpiece, like a phone. On
+     only while the person wants it. */
+  add("spk", ICON.spk, "Speaker", function(){ setSpeaker(!speakerOn); });
+  paintSpeaker();
 
   add("add", ICON.addp, "Add", function(){
     if (!call || call.state !== "connected") { toast("Add people once the call has connected"); return; }
@@ -4808,39 +4811,77 @@ function paintCallButtons(incoming){
   box.classList.toggle("tight", box.children.length >= 5);
 }
 
-/* Phone and Speaker.
+/* Phone (earpiece) and Speaker - like a normal phone call.
  *
- * What a web page can and cannot do here. A browser on an iPhone or an
- * Android phone decides by itself where a call's sound comes out - with
- * the microphone open, both play it from the loudspeaker, and neither
- * lets a page move it to the earpiece. That is why the old Speaker
- * button seemed to do nothing: it could only nudge the volume up a
- * little, from a speaker that was already on.
+ * Every call starts in Phone mode: the sound is meant for the earpiece,
+ * for one person's ear. Speaker is only ever on because the person
+ * tapped it, and it goes back off at the end of every call.
  *
- * So the two modes are now made clearly different in the one way a page
- * can control - loudness - and routed for real wherever the browser does
- * offer a choice (laptops, some Android phones, which list "earpiece" and
- * "speaker" as outputs):
+ * Where the sound actually comes out depends on what this device lets a
+ * page decide, so the best of these is used, in this order:
  *
- *   Phone    quiet enough to hold to your ear, like a handset
- *   Speaker  much louder, through a limiter so it does not distort
+ *   1. The app shell. Opened inside the family's Android or iPhone app
+ *      (a native wrapper around this page), the app itself switches the
+ *      phone between earpiece and loudspeaker - exactly like the phone's
+ *      own dialler. See nativeAudio() for what the shell provides.
+ *   2. A named output. Some browsers list "earpiece" and "speaker" as
+ *      separate outputs; the call's sound is sent to the right one.
+ *   3. Headphones or a Bluetooth headset. The sound is in your ears
+ *      either way, so both modes simply play there.
+ *   4. None of those. Safari on iPhone and Chrome on Android give a web
+ *      page no way to reach the earpiece: with the microphone open they
+ *      play a call through the loudspeaker, and turning the volume down
+ *      only makes the loudspeaker quieter. Rather than pretend, Phone
+ *      mode then says so and suggests headphones for a private call.
+ *      (On Android, where it works, it is also played quieter.)
  *
- * With headphones or a Bluetooth headset connected both play normally:
- * the sound is in your ears either way.
- *
- * Safety first: the loudness is set in the page's audio engine, and a
- * phone can pause that engine (a notification sound, the screen
- * locking). Whenever it is not running, the call's own <audio> element
- * plays instead - so changing the volume can never become silence. */
+ * Safety first: Speaker's extra loudness is made in the page's audio
+ * engine, and a phone can pause that engine (a notification sound, the
+ * screen locking). Whenever it is not running, the call's own <audio>
+ * element plays instead - so changing mode can never become silence. */
 var speakerOn = false;
 var OUT_EAR = 0.55, OUT_LOUD = 2.6;
 var outChains = [];            /* { el, stream, src, gain, comp } */
 var outInfo = { headset: false, how: "" };
+var outWarned = false;         /* the "no earpiece here" note, once per call */
 var volumeWorks = (function(){
   try { var a = document.createElement("audio"); a.volume = 0.5; return Math.abs(a.volume - 0.5) < 0.02; }
   catch (e) { return false; }
 })();
 function isPhone(){ return isIOS() || isAndroid(); }
+
+/* The app shell, when this page runs inside one.
+ *
+ *   Android (WebView): window.FamilyAudio.setRoute(route) -> String
+ *     route: "earpiece" | "speaker" | "off" (call over, back to normal)
+ *     returns where the sound now goes: "earpiece", "speaker",
+ *     "headset" or "bluetooth" ("" if it could not tell).
+ *   iPhone (WKWebView): window.webkit.messageHandlers.familyAudio
+ *     .postMessage({ route: route }) - no answer comes back at once.
+ *
+ * Either shell calls window.familyAudioRoute(where) whenever the route
+ * changes by itself (headphones plugged in or out, Bluetooth connecting),
+ * with the same words as above. */
+function nativeAudio(){
+  try {
+    var A = window.FamilyAudio;
+    if (A && typeof A.setRoute === "function")
+      return { set: function(r){ return String(A.setRoute(r) || ""); } };
+    var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.familyAudio;
+    if (h && typeof h.postMessage === "function")
+      return { set: function(r){ h.postMessage({ route: r }); return ""; } };
+  } catch (e) {}
+  return null;
+}
+/* The shell reporting a route change it made, or the person made. */
+window.familyAudioRoute = function(where){
+  where = String(where || "");
+  if (where === "headset" || where === "bluetooth") outInfo.how = "headset";
+  else if (where === "earpiece" || where === "speaker") outInfo.how = where;
+  else return;
+  outInfo.headset = outInfo.how === "headset";
+  outSay();
+};
 
 /* What this device offers: a named earpiece or loudspeaker output, and
    whether a headset is plugged in. Labels only exist once the
@@ -4902,65 +4943,115 @@ function outGuard(){
     if (!running) { try { audioCtx.resume(); } catch (e) {} }
   });
 }
+function outPlain(el, vol){ outChainOff(el); el.volume = vol == null ? 1 : vol; }
 
-/* Puts one element's sound where the mode says. */
+/* Puts one element's sound where the mode says, and answers with what
+   really happened:
+     "earpiece"  in the earpiece, private      "speaker"  loudspeaker
+     "headset"   headphones / Bluetooth        "louder"   loudspeaker, boosted
+     "open"      a phone that will not use its earpiece for a web page
+     ""          a computer: its normal output */
 function outRoute(el, loud){
   if (!el) return Promise.resolve("");
+  var nat = nativeAudio();
+  if (nat) {
+    outPlain(el, 1);
+    var got = "";
+    try { got = nat.set(loud ? "speaker" : "earpiece"); } catch (e) {}
+    outInfo.headset = got === "headset" || got === "bluetooth";
+    return Promise.resolve(outInfo.how = outInfo.headset ? "headset" : loud ? "speaker" : "earpiece");
+  }
   return outDevices().then(function(d){
     outInfo.headset = d.headset;
-    var target = loud ? d.loud : d.ear;
     if (d.headset) {
-      outChainOff(el); el.volume = 1;
+      outPlain(el, 1);
+      if (el.setSinkId && el.sinkId) el.setSinkId("").catch(function(){});
       return outInfo.how = "headset";
     }
+    var target = loud ? d.loud : d.ear;
+    var fallback = function(){
+      /* Back to the browser's own choice before anything else. */
+      if (el.setSinkId && el.sinkId) el.setSinkId("").catch(function(){});
+      if (loud) {
+        if (outChainOn(el, OUT_LOUD)) return outInfo.how = "louder";
+        outPlain(el, 1);
+        return outInfo.how = isPhone() ? "speaker" : "";
+      }
+      if (!isPhone()) { outPlain(el, 1); return outInfo.how = ""; }
+      /* A phone that keeps the call on its loudspeaker. Quieter where the
+         browser lets a page set the volume (Android), which at least keeps
+         Phone and Speaker apart - but it is still the loudspeaker, so the
+         note says so. iPhone ignores the volume, and the audio engine is
+         not used here: a remote call track fed into it is silent on some
+         WebKit builds, which once left calls "Connected" with no sound. */
+      outPlain(el, volumeWorks ? OUT_EAR : 1);
+      return outInfo.how = "open";
+    };
     if (el.setSinkId && target) {
-      el.setSinkId(target.deviceId).catch(function(){});
-      outChainOff(el); el.volume = 1;
-      return outInfo.how = "device";
+      /* Only claimed once the browser has actually switched. */
+      return el.setSinkId(target.deviceId).then(function(){
+        outPlain(el, 1);
+        return outInfo.how = loud ? "speaker" : "earpiece";
+      }, fallback);
     }
-    if (loud) {
-      if (outChainOn(el, OUT_LOUD)) return outInfo.how = "louder";
-      outChainOff(el); el.volume = 1;
-      return outInfo.how = "";
-    }
-    /* Phone mode. On a laptop there is no ear to protect: normal volume. */
-    if (!isPhone()) { outChainOff(el); el.volume = 1; return outInfo.how = ""; }
-    if (volumeWorks) { outChainOff(el); el.volume = OUT_EAR; return outInfo.how = "quieter"; }
-    /* A phone whose browser ignores the element's volume (every iPhone)
-       used to be sent through the page's audio engine here - the call's
-       <audio> element MUTED, and the voice re-played through a
-       MediaStreamAudioSourceNode -> gain -> compressor chain. That is the
-       default state of every call on such a phone, and it is fragile: a
-       remote WebRTC track fed into the audio engine is silent on some
-       WebKit builds, and whenever the engine is not really running the
-       muted element is the only thing left - so the call showed
-       "Connected", the timer ran, packets arrived, and nothing was heard.
-       The plain element is the one path every browser gets right, so
-       Phone mode now uses it at normal volume. The engine is only used
-       for the Speaker boost, which the person chooses and can undo. */
-    outChainOff(el); el.volume = 1;
-    return outInfo.how = "";
+    return fallback();
   });
+}
+
+/* The words for where the sound is. */
+function outText(how){
+  return how === "headset"  ? "Playing in your headphones" :
+         how === "earpiece" ? "Phone — earpiece" :
+         how === "speaker"  ? "Speaker on" :
+         how === "louder"   ? "Speaker on — louder" :
+         how === "open"     ? "This browser plays calls out loud — use headphones for a private call" : "";
+}
+/* Shows it under the call (or the group call). Quiet about the ordinary
+   case - a private earpiece needs no comment - unless it was asked for. */
+function outSay(asked){
+  var how = outInfo.how, t = outText(how);
+  if (!asked && how === "earpiece") t = "";
+  if (!asked && how === "open") { if (outWarned) return; outWarned = true; }
+  if (group && group.state === "live") { if (t || asked) gNote(t); return; }
+  if (!call || call.muted) return;
+  if (call.state !== "connected" && !asked) { if (how === "open") outWarned = false; return; }
+  if (t || asked) $("callNote").textContent = t;
 }
 
 function setSpeaker(on){
   speakerOn = !!on;
-  var el = $("remoteAudio");
-  outRoute(el, speakerOn).then(function(how){
-    if (!call) return;
-    var note = $("callNote");
-    if (how === "headset") note.textContent = "Playing in your headphones";
-    else if (speakerOn) note.textContent = "Speaker — louder";
-    else note.textContent = how === "quieter" ? "Phone — quieter, hold it to your ear" :
-                            how === "device" ? "Phone — earpiece" : "";
-  });
+  paintSpeaker();
+  return outRoute($("remoteAudio"), speakerOn).then(function(){ if (call) outSay(true); });
+}
+function paintSpeaker(){
+  var b = document.querySelector("#callBtns .spk");
+  if (b) { b.classList.toggle("on", speakerOn); b.setAttribute("aria-pressed", speakerOn ? "true" : "false"); }
 }
 /* Kept under its old name for the places that still call it. */
-function setBoost(on){ if (!on) { outChainOff($("remoteAudio")); speakerOn = false; } else setSpeaker(true); }
+function setBoost(on){ if (!on) { outChainOff($("remoteAudio")); speakerOn = false; paintSpeaker(); } else setSpeaker(true); }
+/* Every call ends back in Phone mode, so the next one starts private. */
 function outReset(){
   speakerOn = false;
+  outWarned = false;
   outChains.slice().forEach(function(c){ outChainOff(c.el); });
   try { $("remoteAudio").volume = 1; } catch (e) {}
+  if (!group || group.state !== "live") {
+    var nat = nativeAudio();
+    if (nat) { try { nat.set("off"); } catch (e) {} }
+  }
+}
+/* Headphones in or out mid-call: everything re-routed for the mode
+   already chosen, and the note brought up to date. */
+function outRefresh(){
+  var jobs = [];
+  if (call && call.state === "connected") jobs.push(outRoute($("remoteAudio"), speakerOn));
+  if (group && group.state === "live") Object.keys(group.links).forEach(function(id){
+    var a = group.links[id].audio;
+    if (a) jobs.push(outRoute(a, !!group.speaker));
+  });
+  if (!jobs.length) return;
+  var before = outInfo.how;
+  Promise.all(jobs).then(function(){ if (outInfo.how !== before) outSay(true); });
 }
 
 /* ------------------------------------------------ the voice itself
@@ -5100,7 +5191,7 @@ function newPeer(peerId){
     var p = el.play();
     if (p && p.catch) p.catch(function(){ needTapForSound(); });
     /* Phone or Speaker, whichever is chosen, for this sound too. */
-    outRoute(el, speakerOn);
+    outRoute(el, speakerOn).then(function(){ outSay(); });
   };
 
   /* Listened for on BOTH events, on purpose.
@@ -5159,7 +5250,8 @@ function showRoute(){
     var a = cands[p.localCandidateId], b = cands[p.remoteCandidateId];
     var route = routeOf(stats);
     var note = $("callNote");
-    if (note && call && call.state === "connected" && !speakerOn && !call.muted)
+    if (note && call && call.state === "connected" && !speakerOn && !call.muted &&
+        outInfo.how !== "open" && outInfo.how !== "headset")
       note.textContent =
         route === "Cloudflare" ? "Connected through Cloudflare" :
         route === "Main relay" ? "Connected through the relay" :
@@ -5182,6 +5274,8 @@ function markConnected(){
   watchAudio();
   $("call").classList.remove("incoming");
   $("callNote").textContent = "";
+  /* Where the sound is going, if it is not the private earpiece. */
+  outSay();
   startTimer();
   setTimeout(showRoute, 600);
   scrHello();
@@ -6433,6 +6527,9 @@ try {
          asking again for the default microphone gives. */
       if (call && call.pc && call.state === "connected")
         setTimeout(swapMic, 600);
+      /* ...and the sound should follow it in (or back out to the
+         earpiece when it is unplugged), keeping Phone or Speaker. */
+      setTimeout(outRefresh, 700);
     });
 } catch (e) {}
 
@@ -15711,7 +15808,7 @@ function groupEnd(why, quiet){
     logCall(null, e.dir, st, e);
     if (why === "missed") toast("Missed group call from " + gName(g.room, g.by));
   } else save();
-  if (!call) releaseAwake();
+  if (!call) { releaseAwake(); outReset(); }
   hideGroupScreen();
 }
 
@@ -15894,10 +15991,7 @@ function paintGroupButtons(incoming){
     Object.keys(group.links).forEach(function(id){
       if (group.links[id].audio) jobs.push(sinkTo(group.links[id].audio, group.speaker));
     });
-    Promise.all(jobs).then(function(){
-      gNote(outInfo.how === "headset" ? "Playing in your headphones"
-          : group.speaker ? "Speaker — louder" : (isPhone() ? "Phone — quieter, hold it to your ear" : ""));
-    });
+    Promise.all(jobs).then(function(){ outSay(true); });
     paintGroup();
   });
   add("add", ICON.addp, "Add", function(){
@@ -15908,7 +16002,9 @@ function paintGroupButtons(incoming){
 }
 
 /* The same Phone / Speaker as a one-to-one call (see outRoute). */
-function sinkTo(el, loud){ return outRoute(el, !!loud); }
+function sinkTo(el, loud){
+  return outRoute(el, !!loud).then(function(how){ outSay(); return how; });
+}
 
 function gTapForSound(){
   gNote("Tap anywhere to hear everyone");
