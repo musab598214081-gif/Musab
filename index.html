@@ -5073,7 +5073,12 @@ function outRoute(el, loud){
       outPlain(el, volumeWorks ? OUT_EAR : 1);
       return outInfo.how = "open";
     };
-    if (el.setSinkId && target) {
+    /* Not on iPhone: from iOS 26 Safari lists outputs and accepts
+       setSinkId, but reportedly ignores it for a call's sound - the
+       promise resolves while the sound stays where it was, and this would
+       then say "earpiece" over a loudspeaker. Until that is proven on a
+       real iPhone, an iPhone gets the honest note instead (fallback). */
+    if (el.setSinkId && target && !isIOS()) {
       /* Only claimed once the browser has actually switched. */
       return el.setSinkId(target.deviceId).then(function(){
         outPlain(el, 1);
