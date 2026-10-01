@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Family Notifier — Privacy policy</title>
+<meta name="theme-color" content="#0F1B2A">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #0F1B2A;
+    --seam: #26394E;
+    --paper: #F3F6F9;
+    --ink: #1C2A39;
+    --quiet: #55687C;
+    --brass: #E8B04B;
+    --line: #D9E1E9;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Roboto, Tahoma, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+  }
+  a { color: inherit; text-decoration-color: var(--brass); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  a:focus-visible { outline: 3px solid var(--brass); outline-offset: 2px; border-radius: 3px; }
+
+  header {
+    background: var(--night);
+    color: var(--paper);
+    padding: calc(28px + env(safe-area-inset-top, 0px)) 20px 30px;
+  }
+  .wrap { max-width: 44rem; margin: 0 auto; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand svg { width: 52px; height: 52px; flex: none; }
+  .brand p { margin: 0; font-weight: 600; font-size: 18px; }
+  .brand p span { display: block; font-weight: 400; font-size: 14px; color: #9CB0C4; }
+  header h1 { font-size: 34px; line-height: 1.2; margin: 26px 0 6px; font-weight: 600; }
+  .updated { margin: 0; color: #9CB0C4; font-size: 15px; }
+  .langs { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .langs a {
+    color: var(--paper); text-decoration: none; font-size: 15px;
+    border: 1px solid var(--seam); border-radius: 999px; padding: 4px 14px;
+  }
+  .langs a:hover { border-color: var(--brass); }
+
+  main { padding: 8px 20px calc(48px + env(safe-area-inset-bottom, 0px)); }
+  section.lang { padding-top: 28px; }
+  section.lang + section.lang { border-top: 6px solid var(--night); margin-top: 48px; }
+  h2 { font-size: 22px; line-height: 1.3; margin: 40px 0 10px; font-weight: 600; }
+  h2::after { content: ""; display: block; width: 36px; height: 3px; background: var(--brass); margin-top: 8px; border-radius: 2px; }
+  p { margin: 0 0 14px; }
+  .lead { font-size: 19px; }
+
+  dl { margin: 0; }
+  dt { font-weight: 600; margin-top: 16px; }
+  dd { margin: 2px 0 0; color: var(--ink); }
+
+  /* What's kept, and for how long - the heart of the page. */
+  .keep { width: 100%; border-collapse: collapse; margin: 6px 0 8px; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .keep caption { text-align: start; color: var(--quiet); font-size: 15px; padding: 0 0 8px; }
+  .keep th, .keep td { padding: 12px 14px; text-align: start; vertical-align: top; border-bottom: 1px solid var(--line); }
+  .keep tr:last-child td { border-bottom: 0; }
+  .keep thead th { background: var(--night); color: var(--paper); font-weight: 600; font-size: 15px; }
+  .keep td.how { width: 40%; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .keep td.how.never { color: #1E7A4C; }
+  .scroll { overflow-x: auto; }
+
+  .note { color: var(--quiet); font-size: 15px; }
+  .fill { background: #FFF1D2; border-bottom: 2px solid var(--brass); padding: 0 4px; border-radius: 3px; }
+
+  [dir="rtl"] { font-size: 18px; line-height: 1.8; }
+  [dir="rtl"] .keep td.how { direction: rtl; }
+
+  @media (max-width: 520px) {
+    header h1 { font-size: 28px; }
+    .keep th, .keep td { padding: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <rect width="100" height="100" rx="23" fill="#E8B04B"/>
+        <path d="M50 15.5 84 43.5a3.2 3.2 0 0 1-2 5.7h-3.6V80a5 5 0 0 1-5 5H26.6a5 5 0 0 1-5-5V49.2H18a3.2 3.2 0 0 1-2-5.7Z" fill="#0F1B2A"/>
+        <path d="M38.6 71.5h22.8c-2.3-2.5-3.5-5.9-3.5-10v-3.3a7.9 7.9 0 0 0-15.8 0v3.3c0 4.1-1.2 7.5-3.5 10Z" fill="#E8B04B"/>
+        <circle cx="50" cy="76" r="3" fill="#E8B04B"/>
+        <circle cx="50" cy="47.6" r="2.1" fill="#E8B04B"/>
+        <path d="M33.5 52.5a14 14 0 0 0-2.4 12M66.5 52.5a14 14 0 0 1 2.4 12" fill="none" stroke="#E8B04B" stroke-width="3.2" stroke-linecap="round"/>
+      </svg>
+      <p>Family Notifier <span>Calls and messages within your family</span></p>
+    </div>
+    <h1>Privacy policy</h1>
+    <p class="updated">Last updated 1 October 2026</p>
+    <p class="updated" lang="ar" dir="rtl" style="text-align:left">آخر تحديث ١ أكتوبر ٢٠٢٦</p>
+    <nav class="langs" aria-label="Language">
+      <a href="#en" hreflang="en">English</a>
+      <a href="#ar" hreflang="ar" lang="ar">العربية</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+<!-- ================================================================ English -->
+<section class="lang" id="en" lang="en">
+
+  <p class="lead">Family Notifier lets the members of one family call and message each other. It is a private app: you can only use it if someone in your family invites you. This page explains what it stores, why, for how long, and who else is involved.</p>
+  <p>Family Notifier is developed and run by Musab B. If you have a question about your data, write to <span class="fill">[your email address]</span>.</p>
+
+  <h2>What the app uses</h2>
+  <dl>
+    <dt>Your name and colour in the family</dt>
+    <dd>Chosen when you join, so the others know who is calling. Your family's admin can see and change the family list.</dd>
+    <dt>Messages, photos, files, voice messages and locations you send</dt>
+    <dd>Passed through the family server to the person you sent them to. A location is only ever sent when you choose to share it in a chat; the app never tracks where you are.</dd>
+    <dt>Calls</dt>
+    <dd>Your voice (and your camera, only if you choose to share it) goes to the person you are calling while the call lasts. Calls are never recorded.</dd>
+    <dt>Your status and local time</dt>
+    <dd>Whether you are online, and your time zone, shown to the people you are in touch with. You can hide either one in Settings.</dd>
+    <dt>A notification address for your phone</dt>
+    <dd>So calls and messages reach you when the app is closed. It identifies the app on your phone, not you.</dd>
+    <dt>Usage totals for the family admin</dt>
+    <dd>For each phone: the app version, whether notifications are on, and monthly totals of calls, call minutes and data used. It never includes who you called or what anyone said.</dd>
+  </dl>
+
+  <h2>Phone permissions</h2>
+  <p>The Android app asks for the <strong>microphone</strong> for calls and voice messages, <strong>notifications</strong> so calls can ring, <strong>full-screen notifications</strong> so an incoming call can fill the screen, and the <strong>camera</strong> and <strong>location</strong> only when you use those features. While a call is in progress, it keeps running in the background so the call continues when you switch apps.</p>
+
+  <h2>What's kept, and for how long</h2>
+  <div class="scroll">
+  <table class="keep">
+    <caption>Everything below is deleted automatically after the time shown.</caption>
+    <thead><tr><th scope="col">What</th><th scope="col">Kept for</th></tr></thead>
+    <tbody>
+      <tr><td>Call audio and video</td><td class="how never">Never stored</td></tr>
+      <tr><td>Call set-up messages</td><td class="how">12 hours</td></tr>
+      <tr><td>Group call details</td><td class="how">6 hours at most</td></tr>
+      <tr><td>Chat messages and shared locations</td><td class="how">7 days</td></tr>
+      <tr><td>Photos, files and voice messages</td><td class="how">30 days</td></tr>
+      <tr><td>Requests to join a family</td><td class="how">14 days</td></tr>
+      <tr><td>Invite links</td><td class="how">30 days</td></tr>
+      <tr><td>Your phone's notification address</td><td class="how">Until you remove the phone or uninstall</td></tr>
+      <tr><td>Your name and family membership</td><td class="how">Until you leave the family</td></tr>
+      <tr><td>Usage totals</td><td class="how">On the admin's phone, until the admin clears them</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Messages you have received also stay on your own phone until you delete them or remove the app.</p>
+
+  <h2>What the app does not do</h2>
+  <p>There are no ads and no tracking or analytics. Nothing is sold or shared for marketing. Your contacts, photos and files are never read unless you choose to send one.</p>
+
+  <h2>Who else is involved</h2>
+  <dl>
+    <dt>Cloudflare</dt>
+    <dd>Runs the family server that passes messages and calls between phones, stores photos and files for the time above, and relays calls when two phones can't connect directly.</dd>
+    <dt>Google (Firebase Cloud Messaging and Google Play)</dt>
+    <dd>Delivers notifications to the Android app, and distributes the app. A notification carries the sender's name and a short preview of the message, which passes through Google's service on its way to your phone.</dd>
+    <dt>Your browser's notification service</dt>
+    <dd>If you use the web version, notifications go through your browser maker's service (Google, Apple or Mozilla), encrypted so it cannot read them.</dd>
+  </dl>
+
+  <h2>How your data is protected</h2>
+  <p>Everything travels over encrypted connections. One-to-one calls are encrypted between the two phones, including when a relay passes them on. Large group calls go through Cloudflare's call service, which handles the audio in order to pass it on but does not record it. Photos, files and voice messages are encrypted on your phone before they are uploaded.</p>
+  <p>To be clear about the limits: chat messages are stored on the family server in readable form until they are deleted after 7 days, and the key to each photo or file travels inside its chat message. So the app is not end-to-end encrypted, and the person who runs the family server could technically read them. They don't, and nothing is kept longer than the table above says.</p>
+
+  <h2>Your choices</h2>
+  <p>You can hide your status and your local time in Settings. To stop using the app on a phone and erase its notification address, open Settings and choose <strong>Remove this phone from the family</strong>. To leave the family completely, ask your family's admin to remove you; your name is then removed from the family, and everything else expires on the schedule above. You can also write to the address at the top of this page to have your data deleted.</p>
+
+  <h2>Children</h2>
+  <p>Family Notifier is set up by an adult in each family, who decides who joins. Children use it only as part of their family and with their parents' agreement.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new date.</p>
+</section>
+
+<!-- ================================================================ Arabic -->
+<section class="lang" id="ar" lang="ar" dir="rtl">
+
+  <p class="lead">يتيح Family Notifier لأفراد العائلة الواحدة الاتصال ببعضهم ومراسلة بعضهم. وهو تطبيق خاص: لا يمكنك استخدامه إلا إذا دعاك أحد أفراد عائلتك. توضح هذه الصفحة ما يحفظه التطبيق، ولماذا، ولأي مدة، ومن هي الجهات الأخرى المعنية.</p>
+  <p>يطوّر Family Notifier ويديره مصعب ب. إذا كان لديك سؤال عن بياناتك، فراسلنا على <span class="fill">[عنوان بريدك الإلكتروني]</span>.</p>
+
+  <h2>ما يستخدمه التطبيق</h2>
+  <dl>
+    <dt>اسمك ولونك في العائلة</dt>
+    <dd>تختارهما عند الانضمام، ليعرف الآخرون من المتصل. يستطيع مشرف عائلتك رؤية قائمة العائلة وتعديلها.</dd>
+    <dt>الرسائل والصور والملفات والرسائل الصوتية والمواقع التي ترسلها</dt>
+    <dd>تمر عبر خادم العائلة إلى الشخص الذي أرسلتها إليه. لا يُرسل الموقع إلا عندما تختار مشاركته في محادثة، ولا يتتبع التطبيق مكانك أبدًا.</dd>
+    <dt>المكالمات</dt>
+    <dd>يصل صوتك (وصورة الكاميرا فقط إن اخترت مشاركتها) إلى الشخص الذي تتصل به طوال مدة المكالمة. لا تُسجَّل المكالمات أبدًا.</dd>
+    <dt>حالتك وتوقيتك المحلي</dt>
+    <dd>هل أنت متصل، ومنطقتك الزمنية، تظهران للأشخاص الذين تتواصل معهم. يمكنك إخفاء أي منهما من الإعدادات.</dd>
+    <dt>عنوان إشعارات لهاتفك</dt>
+    <dd>لتصلك المكالمات والرسائل والتطبيق مغلق. وهو يعرّف التطبيق على هاتفك، لا يعرّفك أنت.</dd>
+    <dt>إجماليات الاستخدام لمشرف العائلة</dt>
+    <dd>لكل هاتف: إصدار التطبيق، وهل الإشعارات مفعّلة، وإجماليات شهرية لعدد المكالمات ودقائقها والبيانات المستخدمة. ولا تتضمن أبدًا بمن اتصلت أو ما قاله أحد.</dd>
+  </dl>
+
+  <h2>أذونات الهاتف</h2>
+  <p>يطلب تطبيق Android إذن <strong>الميكروفون</strong> للمكالمات والرسائل الصوتية، و<strong>الإشعارات</strong> ليرنّ عند الاتصال، و<strong>الإشعارات بملء الشاشة</strong> لتملأ المكالمة الواردة الشاشة، و<strong>الكاميرا</strong> و<strong>الموقع</strong> فقط عند استخدامك لهاتين الميزتين. وأثناء المكالمة يستمر في العمل في الخلفية لتستمر المكالمة عند تنقلك بين التطبيقات.</p>
+
+  <h2>ما يُحفظ، ولأي مدة</h2>
+  <div class="scroll">
+  <table class="keep">
+    <caption>كل ما يلي يُحذف تلقائيًا بعد المدة المذكورة.</caption>
+    <thead><tr><th scope="col">البيان</th><th scope="col">مدة الحفظ</th></tr></thead>
+    <tbody>
+      <tr><td>صوت المكالمات وصورتها</td><td class="how never">لا يُحفظ أبدًا</td></tr>
+      <tr><td>رسائل إعداد المكالمات</td><td class="how">١٢ ساعة</td></tr>
+      <tr><td>تفاصيل المكالمات الجماعية</td><td class="how">٦ ساعات كحد أقصى</td></tr>
+      <tr><td>رسائل المحادثة والمواقع المشتركة</td><td class="how">٧ أيام</td></tr>
+      <tr><td>الصور والملفات والرسائل الصوتية</td><td class="how">٣٠ يومًا</td></tr>
+      <tr><td>طلبات الانضمام إلى العائلة</td><td class="how">١٤ يومًا</td></tr>
+      <tr><td>روابط الدعوة</td><td class="how">٣٠ يومًا</td></tr>
+      <tr><td>عنوان الإشعارات لهاتفك</td><td class="how">حتى تزيل الهاتف أو تحذف التطبيق</td></tr>
+      <tr><td>اسمك وعضويتك في العائلة</td><td class="how">حتى تغادر العائلة</td></tr>
+      <tr><td>إجماليات الاستخدام</td><td class="how">على هاتف المشرف، حتى يمسحها</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">تبقى الرسائل التي استلمتها أيضًا على هاتفك حتى تحذفها أو تحذف التطبيق.</p>
+
+  <h2>ما لا يفعله التطبيق</h2>
+  <p>لا إعلانات، ولا تتبع أو تحليلات. لا يُباع شيء ولا يُشارك لأغراض تسويقية. ولا تُقرأ جهات اتصالك أو صورك أو ملفاتك إلا ما تختار إرساله.</p>
+
+  <h2>الجهات الأخرى المعنية</h2>
+  <dl>
+    <dt>Cloudflare</dt>
+    <dd>تشغّل خادم العائلة الذي ينقل الرسائل والمكالمات بين الهواتف، وتحفظ الصور والملفات للمدة المذكورة أعلاه، وتمرّر المكالمات عندما يتعذر اتصال الهاتفين مباشرة.</dd>
+    <dt>Google (خدمة Firebase Cloud Messaging ومتجر Google Play)</dt>
+    <dd>توصل الإشعارات إلى تطبيق Android، وتوزّع التطبيق. يحمل الإشعار اسم المرسل ومعاينة قصيرة للرسالة، وتمر عبر خدمة Google في طريقها إلى هاتفك.</dd>
+    <dt>خدمة الإشعارات في متصفحك</dt>
+    <dd>إذا استخدمت نسخة الويب، فتمر الإشعارات عبر خدمة الشركة المصنّعة لمتصفحك (Google أو Apple أو Mozilla)، مشفّرة بحيث لا تستطيع قراءتها.</dd>
+  </dl>
+
+  <h2>كيف تُحمى بياناتك</h2>
+  <p>ينتقل كل شيء عبر اتصالات مشفّرة. والمكالمات الفردية مشفّرة بين الهاتفين، حتى عندما يمرّرها خادم وسيط. أما المكالمات الجماعية الكبيرة فتمر عبر خدمة المكالمات لدى Cloudflare، التي تتعامل مع الصوت لتمريره لكنها لا تسجّله. وتُشفَّر الصور والملفات والرسائل الصوتية على هاتفك قبل رفعها.</p>
+  <p>وللوضوح بشأن الحدود: تُحفظ رسائل المحادثة على خادم العائلة بصيغة مقروءة إلى أن تُحذف بعد ٧ أيام، ومفتاح كل صورة أو ملف ينتقل داخل رسالة المحادثة الخاصة به. لذا فالتطبيق ليس مشفّرًا بين الطرفين، ويستطيع من يدير خادم العائلة قراءتها من الناحية التقنية. لكنه لا يفعل، ولا يُحفظ شيء أطول مما يذكره الجدول أعلاه.</p>
+
+  <h2>خياراتك</h2>
+  <p>يمكنك إخفاء حالتك وتوقيتك المحلي من الإعدادات. ولإيقاف استخدام التطبيق على هاتف ما ومحو عنوان إشعاراته، افتح الإعدادات واختر <strong>إزالة هذا الهاتف من العائلة</strong>. ولمغادرة العائلة نهائيًا، اطلب من مشرف عائلتك إزالتك؛ فيُزال اسمك من العائلة، وتنتهي صلاحية كل ما عدا ذلك حسب الجدول أعلاه. ويمكنك أيضًا مراسلة العنوان المذكور أعلى هذه الصفحة لحذف بياناتك.</p>
+
+  <h2>الأطفال</h2>
+  <p>يُعدّ Family Notifier شخصٌ بالغ في كل عائلة، وهو من يقرر من ينضم. ولا يستخدمه الأطفال إلا ضمن عائلتهم وبموافقة والديهم.</p>
+
+  <h2>التغييرات</h2>
+  <p>إذا تغيّرت هذه السياسة، فستُنشر النسخة الجديدة في هذه الصفحة بتاريخ جديد.</p>
+</section>
+
+</div>
+</main>
+</body>
+</html>
