@@ -2447,6 +2447,9 @@ Object.assign(AR, {
 "Playing in your headphones": "يعمل عبر سماعاتك",
 "Phone — earpiece": "الهاتف — سماعة الأذن",
 "Speaker on": "مكبر الصوت يعمل",
+"Notifications are off for this app — turn them on in the phone's settings": "الإشعارات متوقفة لهذا التطبيق — شغّلها من إعدادات الهاتف",
+"Couldn't save the file": "تعذّر حفظ الملف",
+"Blocked. Notifications are off for this app. Tap the button to open its settings, turn notifications on, and come back.": "محظورة. الإشعارات متوقفة لهذا التطبيق. اضغط الزر لفتح إعداداته، وشغّل الإشعارات، ثم عد.",
 "Calls now start in Phone mode, with Speaker only when you tap it": "تبدأ المكالمات الآن على وضع الهاتف، ومكبر الصوت فقط عند الضغط عليه",
 "Speaker on — louder": "مكبر الصوت يعمل — صوت أعلى",
 "This browser plays calls out loud — use headphones for a private call": "هذا المتصفح يشغّل المكالمات بصوت عالٍ — استخدم السماعات لمكالمة خاصة",
@@ -2810,7 +2813,7 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.10.3";
+var APP_VERSION = "1.11.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
 var WHATS_NEW   = "Calls now start in Phone mode, with Speaker only when you tap it";
@@ -2819,7 +2822,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-10-28b";
+var VERSION  = "2026-10-28c";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3591,6 +3594,7 @@ function fsSendPres(){
 /* ---- notifications on this device (Web Push through sw.js) ---- */
 var fsPushState = "unknown";     /* on | off | blocked | nosw | unsupported | needhome */
 function isStandalone(){
+  if (APP) return true;                 /* the family's Android app */
   return !!(window.navigator.standalone ||
             (window.matchMedia && matchMedia("(display-mode: standalone)").matches));
 }
@@ -3602,6 +3606,7 @@ function fsSwReg(){
 }
 function fsCheckPush(){
   if (!useFS()) return Promise.resolve();
+  if (APP) return appCheckPush();
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     fsPushState = (isIOS() && !isStandalone()) ? "needhome" : "unsupported";
     paintFsPush(); return Promise.resolve();
@@ -3627,6 +3632,7 @@ function fsCheckPush(){
   }).catch(function(){ fsPushState = "nosw"; paintFsPush(); });
 }
 function fsSendSub(){
+  if (APP) { if (useFS()) appSendSub(true); return; }
   if (!useFS() || !("serviceWorker" in navigator)) return;
   navigator.serviceWorker.getRegistration().then(function(reg){
     return reg ? reg.pushManager.getSubscription() : null;
@@ -3636,6 +3642,9 @@ function fsSendSub(){
 }
 function fsEnablePush(){
   if (!useFS()) return;
+  /* In the app: the phone's own question, then the app's push address
+     (see familyNotifyResult). */
+  if (APP) { try { APP.askNotify(); } catch (e) {} return; }
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     fsPushState = (isIOS() && !isStandalone()) ? "needhome" : "unsupported";
     paintFsPush();
@@ -3701,6 +3710,8 @@ function paintFsPush(){
               "open the app from there, and tap the button.",
     unknown: "Checking…"
   };
+  if (APP) t.blocked = "Blocked. Notifications are off for this app. Tap the button to open its settings, " +
+                       "turn notifications on, and come back.";
   el.textContent = t[fsPushState] || t.unknown;
   if (btn) btn.style.display = (fsPushState === "on" || fsPushState === "nosw" ||
                                 fsPushState === "unsupported") ? "none" : "block";
@@ -3724,6 +3735,78 @@ if ("serviceWorker" in navigator) {
     history.replaceState(null, "", location.pathname);
     location.hash = String(d.url).slice(i);
   });
+}
+
+/* ---- inside the family's Android app ----
+ *
+ * The app (android/ in the app's repository) shows this same page in a
+ * WebView and adds what a browser cannot: the earpiece (see
+ * nativeAudio), a ringing full-screen call while the phone is locked,
+ * and its own notifications. A WebView has no Web Push, so the app
+ * registers a Firebase push address with the family server instead -
+ * the server sends both kinds - and everything this page used to tell
+ * sw.js (who it is, the language, "this call was answered here") is
+ * told to the app as well, through appPost. */
+var APP = (function(){
+  try { return (window.FamilyApp && typeof window.FamilyApp.helper === "function") ? window.FamilyApp : null; }
+  catch (e) { return null; }
+})();
+function appPost(msg){ if (APP) { try { APP.helper(JSON.stringify(msg)); } catch (e) {} } }
+function appToken(){ try { return APP ? String(APP.pushToken() || "") : ""; } catch (e) { return ""; } }
+function appNotif(){ try { return APP ? String(APP.notifState() || "default") : "default"; } catch (e) { return "default"; } }
+var appSubSent = "";
+function appSendSub(force){
+  var t = appToken();
+  if (!t || !useFS()) return Promise.resolve(false);
+  if (t === appSubSent && !force) return Promise.resolve(true);
+  return fsRequest({ k: "sub", sub: { fcm: t } }, 8000).then(function(r){
+    if (r && r.ok) { appSubSent = t; return true; }
+    return false;
+  }).catch(function(){ return false; });
+}
+function appCheckPush(){
+  var perm = appNotif();
+  if (perm === "denied") { fsPushState = "blocked"; paintFsPush(); return Promise.resolve(); }
+  return appSendSub(true).then(function(ok){
+    fsPushState = (ok && perm === "granted") ? "on" : "off";
+    paintFsPush();
+    try { paintPushWarn(); } catch (e) {}
+  });
+}
+/* Called by the app: its push address is ready, or has changed. */
+window.familyPushToken = function(){ if (useFS()) appCheckPush(); };
+/* Called by the app when the person has answered the notifications question. */
+window.familyNotifyResult = function(granted){
+  if (!useFS()) return;
+  appCheckPush().then(function(){
+    if (fsPushState === "on") toast("Call notifications are on for this device");
+    else if (!granted) toast("Notifications are off for this app — turn them on in the phone's settings");
+    else toast("The family server didn't accept it — check the connection and try again");
+  });
+};
+/* Called by the app when a push arrives while it is open - as sw.js does. */
+window.familyPush = function(){
+  try { fsWake(hiddenAt && document.hidden ? Date.now() - hiddenAt : 0,
+               !fsOpen || Date.now() - lastBeatAt > 20000); } catch (e) {}
+};
+/* Called by the app when one of its notifications is tapped. */
+window.familyOpen = function(url){
+  var i = String(url || "").indexOf("#");
+  if (i === -1) return;
+  history.replaceState(null, "", location.pathname);
+  location.hash = String(url).slice(i);
+};
+/* A file saved from the app: the WebView cannot download a blob: link,
+   so the bytes are handed to the app, which puts them in Downloads. */
+function appSave(blob, name){
+  var r = new FileReader();
+  r.onload = function(){
+    var s = String(r.result || ""), b64 = s.slice(s.indexOf(",") + 1), ok = false;
+    try { ok = APP.saveFile(name, blob.type || "application/octet-stream", b64) === "ok"; } catch (e) {}
+    toast(ok ? "Saved to Downloads" : "Couldn't save the file");
+  };
+  r.onerror = function(){ toast("Couldn't save the file"); };
+  r.readAsDataURL(blob);
 }
 
 function ringPush(memberId, title, message, answerable, kind, opt){
@@ -3770,6 +3853,8 @@ function ringPush(memberId, title, message, answerable, kind, opt){
    so a phone whose browser replaced it keeps ringing by itself. */
 var fsSkew = 0;
 function swConfig(){
+  if (useFS()) appPost({ t: "cfg", send: fsBase() + "/send", me: state.me, sec: mySec(), skew: fsSkew,
+                         url: location.origin + location.pathname });
   if (!useFS() || !("serviceWorker" in navigator)) return;
   fsVapidKey().then(function(key){
     return navigator.serviceWorker.getRegistration().then(function(reg){
@@ -3785,6 +3870,7 @@ function swConfig(){
 /* Takes this call's notification off this device - it was answered,
    declined or has ended, and "is calling you" should not stay up. */
 function clearCallNote(tag){
+  if (tag) appPost({ t: "silence", tag: tag });
   if (!tag || !("serviceWorker" in navigator)) return;
   navigator.serviceWorker.getRegistration().then(function(reg){
     if (!reg) return;
@@ -7419,6 +7505,7 @@ function primeRinger(){
    when it really is. */
 function reportAudible(tag, on){
   if (!tag) return;
+  appPost({ t: "audible", tag: tag, on: !!on });
   try {
     if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistration().then(function(reg){
       var w = reg && reg.active; if (w) w.postMessage({ t: "audible", tag: tag, on: !!on });
@@ -8959,6 +9046,7 @@ function chatChanged(pid, toBottom){
 /* ------------------------------------------------------ the icon badge */
 var badgeLast = -1;
 function swPost(msg){
+  appPost(msg);
   try {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.getRegistration().then(function(reg){
@@ -10497,6 +10585,7 @@ function mediaSave(m, share){
   });
 }
 function mediaDownload(b, name){
+  if (APP && APP.saveFile) { appSave(b, name); return; }
   var safe = MEDIA_SAFE_TYPE.test(b.type || "");
   var u = URL.createObjectURL(safe ? b : new Blob([b], { type: "application/octet-stream" }));
   var x = document.createElement("a");
@@ -12713,6 +12802,13 @@ function paintTones(){
    so you can see and hear it, and on Android press and hold it to reach
    the phone's settings for the app. */
 function sndTestNote(){
+  if (APP) {
+    if (appNotif() !== "granted") { toast(L("Turn on call notifications first")); return; }
+    appPost({ t: "test", title: "Family Notifier",
+              body: L("This is how messages and other notifications look and sound.") });
+    toast(L("Sent — it should appear in a moment"));
+    return;
+  }
   if (!("Notification" in window) || Notification.permission !== "granted") {
     toast(L("Turn on call notifications first")); return;
   }
@@ -14207,6 +14303,12 @@ $("resetGo").onclick = function(){
    quietly register the phone again when the browser renews it). */
 function pushOff(){
   var jobs = [];
+  if (APP) {
+    appPost({ t: "forget" });
+    var tk = appToken();
+    if (tk) jobs.push(fsRequest({ k: "unsub", endpoint: "fcm:" + tk }, 4000, false, true).catch(function(){}));
+    appSubSent = "";
+  }
   try {
     if ("serviceWorker" in navigator) jobs.push(navigator.serviceWorker.getRegistration().then(function(reg){
       if (!reg) return;
@@ -14408,8 +14510,8 @@ function reportUsage(force){
    about what anyone said or who they called. */
 function deviceInfo(){
   var perm = null;
-  try { perm = ("Notification" in window) ? Notification.permission : null; } catch (e) {}
-  return { v: VERSION, av: APP_VERSION, notif: perm,
+  try { perm = APP ? appNotif() : ("Notification" in window) ? Notification.permission : null; } catch (e) {}
+  return { v: VERSION, av: APP_VERSION, notif: perm, app: APP ? 1 : 0,
            push: fsPushState === "on",
            ios: isIOS(), home: !!(window.navigator.standalone ||
              (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) };
@@ -14632,6 +14734,7 @@ $("famUsageCsv").onclick = function(){
     });
   });
   var blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  if (APP && APP.saveFile) { appSave(blob, "family-usage.csv"); return; }
   var a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "family-usage.csv";
