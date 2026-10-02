@@ -2495,6 +2495,7 @@ Object.assign(AR, {
 "Invitations last 30 days. Tap below and the family admin is notified to send you a new link — it arrives the same way this one did.": "تدوم الدعوات 30 يومًا. اضغط بالأسفل ليصل إشعار إلى مسؤول العائلة لإرسال رابط جديد إليك — يصلك بالطريقة نفسها التي وصلك بها هذا.",
 "Invitations last 30 days. Ask whoever invited you to send it again.": "تدوم الدعوات 30 يومًا. اطلب ممن دعاك إرسالها مرة أخرى.",
 "Ask for a new link": "طلب رابط جديد",
+"A newer link was sent to you after this one — look for it in your messages first. If you can't find it, tap below and the family admin is notified to send you another.": "أُرسل إليك رابط أحدث بعد هذا — ابحث عنه في رسائلك أولًا. إن لم تجده، اضغط بالأسفل ليصل إشعار إلى مسؤول العائلة لإرسال رابط آخر.",
 "The family server hasn't been updated to take renewal requests yet.": "لم يتم تحديث خادم العائلة بعد لاستقبال طلبات التجديد.",
 "Asking…": "جارٍ الطلب…",
 "The family admin has been notified. They'll get a notification and can send you a new link with one tap. When it arrives, open it on this phone.": "تم إشعار مسؤول العائلة. سيصله إشعار ويمكنه إرسال رابط جديد إليك بضغطة واحدة. عندما يصلك، افتحه على هذا الهاتف.",
@@ -2861,7 +2862,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-02d";
+var VERSION  = "2026-11-02e";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -8783,6 +8784,8 @@ function redeemInvite(){
        knows whose it was, and can ask for a new one on your behalf. */
     var canAsk = expired && !!info.renew;
     t.textContent = !expired ? "Check the internet connection and try again."
+      : canAsk && info.newer ? "A newer link was sent to you after this one — look for it in your messages first. " +
+                 "If you can't find it, tap below and the family admin is notified to send you another."
       : canAsk ? "Invitations last 30 days. Tap below and the family admin is notified to send you a new link " +
                  "— it arrives the same way this one did."
       : "Invitations last 30 days. Ask whoever invited you to send it again.";
