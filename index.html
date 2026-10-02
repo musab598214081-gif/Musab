@@ -2614,6 +2614,9 @@ Object.assign(AR, {
 "Forget this link": "نسيان هذا الرابط",
 "This phone is offline. The invitation opens by itself as soon as it's back online.": "هذا الهاتف غير متصل. ستُفتح الدعوة تلقائيًا فور عودة الاتصال.",
 "The family server couldn't be reached. It's tried again by itself every little while — or tap below.": "تعذر الوصول إلى خادم العائلة. تُعاد المحاولة تلقائيًا بين حين وآخر — أو اضغط أدناه.",
+"Have the Family Notifier app?": "هل لديك تطبيق Family Notifier؟",
+"Open this invitation in the app instead — calls ring there even with the app closed.": "افتح هذه الدعوة في التطبيق بدلًا من ذلك — تَرِنّ المكالمات فيه حتى والتطبيق مغلق.",
+"Open in the app": "فتح في التطبيق",
 "Creation code": "رمز الإنشاء",
 "Let someone start their own family": "السماح لشخص بإنشاء عائلته الخاصة",
 "This family server only accepts new families from people who were given a code. Make one here and send it to the person; it works for one family and lasts 14 days. They type it on the app's first screen, under Create a new family.": "لا يقبل خادم العائلة هذا عائلات جديدة إلا ممن أُعطي رمزًا. أنشئ رمزًا هنا وأرسله للشخص؛ يعمل لعائلة واحدة ويدوم 14 يومًا. يكتبه في الشاشة الأولى للتطبيق تحت «إنشاء عائلة جديدة».",
@@ -2905,7 +2908,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-03c";
+var VERSION  = "2026-11-03d";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3907,11 +3910,26 @@ window.familyPush = function(){
 };
 /* Called by the app when one of its notifications is tapped. */
 window.familyOpen = function(url){
-  var i = String(url || "").indexOf("#");
-  if (i === -1) return;
+  var frag = fragOfUrl(url);
+  if (!frag) return;
   history.replaceState(null, "", location.pathname);
-  location.hash = String(url).slice(i);
+  location.hash = frag;
 };
+/* The part of an address that matters to this page. Normally after #;
+   an invitation may also come as ?i=CODE or ?j=… (that is how the
+   Android app's "open in the app" link carries it, since an intent
+   address cannot hold a #) or with the # written as %23. */
+function fragOfUrl(url){
+  var u = String(url || "");
+  var i = u.indexOf("#");
+  if (i !== -1) return u.slice(i);
+  try { var d = decodeURIComponent(u); i = d.indexOf("#"); if (i !== -1) return d.slice(i); } catch (e) {}
+  var q = u.indexOf("?");
+  if (q === -1) return "";
+  var qs = u.slice(q + 1).replace(/#.*$/, "");
+  if (/(^|&)(i|j|m|s|p|by|f|ak)=/.test(qs)) return "#" + qs;
+  return "";
+}
 /* A file saved from the app: the WebView cannot download a blob: link,
    so the bytes are handed to the app, which puts them in Downloads. */
 function appSave(blob, name){
@@ -8794,6 +8812,7 @@ function recentRow(r, withDate, run){
  * pendingLink: the part after # of a link that could not be opened yet
  * (no connection), kept so it is tried again by itself. */
 var PENDING_KEY = "fmn-pending-link", INVITED_KEY = "fmn-invited";
+var lastInviteFrag = "";
 var inviteSeen = /[#&](i|j)=/.test(location.hash || "");
 /* Remembered on the phone: once any invitation has been opened here,
    this browser is an invited one, however that first visit ended. */
@@ -9007,6 +9026,7 @@ function redeemInvite(){
   var code = m[1].toUpperCase();
   markInvited();
   var thisFrag = location.hash;
+  lastInviteFrag = thisFrag;
   var f = location.hash.match(/[#&]f=([A-Za-z0-9_-]+)/);
   var base = DEFAULT_FS;
   if (f) { try { base = unb64u(f[1]); } catch (e) {} }
@@ -9016,6 +9036,7 @@ function redeemInvite(){
   var hello = document.createElement("p"); hello.className = "greet"; hello.textContent = "One moment…";
   var p = document.createElement("p"); p.className = "hint"; p.textContent = "Opening your invitation.";
   main.appendChild(hello); main.appendChild(p);
+  paintOpenInApp(main, thisFrag);
   function failed(expired, info){
     info = info || {};
     main.innerHTML = "";
@@ -14196,6 +14217,8 @@ function tryJoin(){
   var newcomer = /[#&]p=1(&|$)/.test(location.hash);
   var keyIn = location.hash.match(/[#&]s=([A-Za-z0-9_-]{16,80})(&|$)/);
   var byM   = location.hash.match(/[#&]by=([A-Za-z0-9]{3,16})(&|$)/);
+  /* The short code this came from (if any), for "Open in the app". */
+  var joinFrom = lastInviteFrag || location.hash;
   history.replaceState(null, "", location.pathname);
   if (!cfg) { toast("That invite link looks damaged"); return false; }
 
@@ -14281,7 +14304,7 @@ function tryJoin(){
      their name (already filled in) and the admin is asked. Opening the
      same link again later, once they are in, goes straight in. */
   if (mine && newcomer && state.admin && !(same && prev.inFam)) {
-    joinForm = { id: mine, name: nameOf(mine), by: byM ? byM[1] : null };
+    joinForm = { id: mine, name: nameOf(mine), by: byM ? byM[1] : null, from: joinFrom };
     state.me = null;
     paintMain();
     return true;
@@ -14302,6 +14325,12 @@ function tryJoin(){
        screen reads like something went wrong. */
     if (!openedFromNote) toast((same && prev.me === mine ? "Welcome back, " : "Welcome, ") +
                                nameOf(mine));
+    if (joinFrom && isAndroid() && !APP && !isStandalone() && !(same && prev.me === mine)) {
+      var mainEl = $("main"); if (mainEl && mainEl.firstChild) {
+        var hold = document.createElement("div"); paintOpenInApp(hold, joinFrom);
+        if (hold.firstChild) mainEl.insertBefore(hold.firstChild, mainEl.firstChild.nextSibling);
+      }
+    }
     return true;
   }
 
@@ -14309,7 +14338,7 @@ function tryJoin(){
      shows nobody's name - a stranger holding it learns nothing - and
      simply asks who you are. */
   if (state.admin) {
-    joinForm = { id: null, name: "", by: byM ? byM[1] : null };
+    joinForm = { id: null, name: "", by: byM ? byM[1] : null, from: joinFrom };
     paintMain();
     return true;
   }
@@ -14351,6 +14380,36 @@ function tryJoin(){
  * the relay and every other setting came inside the link. */
 var joinForm = null;
 
+/* ------------------------------------------- open in the Android app
+ *
+ * An invitation opened in an Android browser, on a phone that has the
+ * family's app: one tap moves it into the app, which rings properly
+ * while closed. The link below asks Android to open the app with the
+ * invitation; a phone without the app simply stays here. (Once the app
+ * is built with verified links, Android opens it by itself and this
+ * card is never needed.) */
+var ANDROID_PKG = "com.musab.familynotifier";
+function appIntentUrl(frag){
+  frag = String(frag || "").replace(/^#/, "");
+  var fallback = location.origin + location.pathname + "?" + frag + "&noapp=1";
+  return "intent://" + location.host + location.pathname + "?" + frag +
+         "#Intent;scheme=https;package=" + ANDROID_PKG +
+         ";S.browser_fallback_url=" + encodeURIComponent(fallback) + ";end";
+}
+function paintOpenInApp(main, frag){
+  if (!isAndroid() || APP || isStandalone() || !frag) return;
+  if (/(^|&)noapp=1/.test(location.search || "")) return;
+  var card = document.createElement("div"); card.className = "onb";
+  var h = document.createElement("h3"); h.textContent = "Have the Family Notifier app?";
+  var p = document.createElement("p");
+  p.textContent = "Open this invitation in the app instead — calls ring there even with the app closed.";
+  var b = document.createElement("a"); b.className = "btn"; b.style.display = "block"; b.style.textAlign = "center";
+  b.style.textDecoration = "none"; b.style.boxSizing = "border-box";
+  b.textContent = "Open in the app"; b.href = appIntentUrl(frag);
+  card.appendChild(h); card.appendChild(p); card.appendChild(b);
+  main.appendChild(card);
+}
+
 function paintJoinForm(main){
   var f = joinForm;
   var inviter = f.by && memberById(f.by) ? nameOf(f.by)
@@ -14358,6 +14417,7 @@ function paintJoinForm(main){
   var hello = document.createElement("p");
   hello.className = "greet"; hello.textContent = "You're invited";
   main.appendChild(hello);
+  paintOpenInApp(main, f.from);
   var card = document.createElement("div"); card.className = "onb joinform";
   var p = document.createElement("p");
   p.textContent = (inviter ? inviter + " invited you to their family on Family Notifier. "
@@ -16807,6 +16867,11 @@ if (state) {
     : "Calls ring out loud while the app is open. On a computer, check that notifications for this site are allowed and not muted by Focus / Do Not Disturb.");
 })();
 
+/* ?i=CODE in the address (the fallback of an "open in the app" link,
+   or a messenger that dropped the #): the same as #i=CODE. */
+if (!location.hash && /(^\?|&)(i|j)=/.test(location.search || "")) {
+  history.replaceState(null, "", location.pathname + "#" + location.search.slice(1));
+}
 readIntent();
 /* An invitation that waited for a connection last time: tried first. */
 if (!state && !location.hash && pendingLink()) history.replaceState(null, "", location.pathname + pendingLink());
