@@ -90,6 +90,11 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   .invrow .dot{width:36px;height:36px;border-radius:50%;flex:0 0 auto;display:flex;
     align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0F1B2A}
   .invrow .nm{flex:1;min-width:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .invrow{flex-wrap:wrap}
+  /* The person's code on a line of its own, never cut off; a tap copies it. */
+  .invcode{flex:0 0 100%;display:flex;align-items:center;gap:8px;margin:2px 0 0 44px;font-size:13px;color:var(--mist)}
+  .invcode b{font-weight:600;letter-spacing:.08em;color:var(--paper);font-variant-numeric:tabular-nums;cursor:pointer}
+  .invcode .st{margin-left:auto;font-size:12px}
   .mini{display:flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--seam);
     color:var(--paper);border-radius:12px;padding:9px 12px;font-size:14px;cursor:pointer;flex:0 0 auto}
   .mini svg{width:17px;height:17px}
@@ -2619,6 +2624,10 @@ Object.assign(AR, {
 "Open in the app": "فتح في التطبيق",
 "Or open the app and type the code ": "أو افتح التطبيق واكتب الرمز ",
 "Code ": "الرمز ",
+"Code": "الرمز",
+"Tap to copy": "اضغط للنسخ",
+"Code for ": "رمز ",
+" copied": " تم نسخه",
 "App version ": "إصدار التطبيق ",
 " is ready": " جاهز",
 "Downloading the update…": "جارٍ تنزيل التحديث…",
@@ -2925,7 +2934,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-04d";
+var VERSION  = "2026-11-04e";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -13302,17 +13311,7 @@ function paintInvites(){
     /* How long their link has left - so it can be sent again before it
        runs out, rather than after they have found it dead. */
     var st = linkStatus(m.id);
-    /* Their code, to read out over the phone - the person types it on
-       the app's first screen. Together with how long the link has left. */
     var c = cachedInvite(m.id);
-    var codeTxt = c && c.code ? L("Code ") + prettyCode(c.code) : "";
-    if (st || codeTxt) {
-      var sm = document.createElement("span");
-      sm.setAttribute("translate", "no");
-      sm.style.cssText = "display:block;font-size:12px;color:" + (st && st.warn ? "var(--brass)" : "var(--mist)");
-      sm.textContent = [codeTxt, st ? st.text : ""].filter(Boolean).join(" · ");
-      nm.appendChild(sm);
-    }
     var send = document.createElement("button");
     send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
     send.setAttribute("aria-label", "Send " + m.name + " their link");
@@ -13333,6 +13332,27 @@ function paintInvites(){
       rs.setAttribute("aria-label", "Reset " + m.name + "'s sign-in");
       rs.onclick = function(){ resetSignIn(m); };
       row.appendChild(rs);
+    }
+    /* Their code, in full, on its own line: to read out over the phone
+       (the person types it on the app's first screen). A tap copies it.
+       How long the link has left sits at the end of the line. */
+    if ((c && c.code) || st) {
+      var line = document.createElement("div"); line.className = "invcode";
+      line.setAttribute("translate", "no");
+      if (c && c.code) {
+        var lab = document.createElement("span"); lab.textContent = L("Code");
+        var cd = document.createElement("b"); cd.textContent = prettyCode(c.code);
+        cd.title = L("Tap to copy"); cd.setAttribute("role", "button");
+        cd.onclick = function(){ copy(c.code, L("Code for ") + m.name + L(" copied")); };
+        line.appendChild(lab); line.appendChild(cd);
+      }
+      if (st) {
+        var stx = document.createElement("span"); stx.className = "st";
+        if (st.warn) stx.style.color = "var(--brass)";
+        stx.textContent = st.text;
+        line.appendChild(stx);
+      }
+      row.appendChild(line);
     }
     box.appendChild(row);
   });
