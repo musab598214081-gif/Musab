@@ -2617,6 +2617,8 @@ Object.assign(AR, {
 "Have the Family Notifier app?": "هل لديك تطبيق Family Notifier؟",
 "Open this invitation in the app instead — calls ring there even with the app closed.": "افتح هذه الدعوة في التطبيق بدلًا من ذلك — تَرِنّ المكالمات فيه حتى والتطبيق مغلق.",
 "Open in the app": "فتح في التطبيق",
+"Or open the app and type the code ": "أو افتح التطبيق واكتب الرمز ",
+"Code ": "الرمز ",
 "Creation code": "رمز الإنشاء",
 "Let someone start their own family": "السماح لشخص بإنشاء عائلته الخاصة",
 "This family server only accepts new families from people who were given a code. Make one here and send it to the person; it works for one family and lasts 14 days. They type it on the app's first screen, under Create a new family.": "لا يقبل خادم العائلة هذا عائلات جديدة إلا ممن أُعطي رمزًا. أنشئ رمزًا هنا وأرسله للشخص؛ يعمل لعائلة واحدة ويدوم 14 يومًا. يكتبه في الشاشة الأولى للتطبيق تحت «إنشاء عائلة جديدة».",
@@ -2908,7 +2910,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-03d";
+var VERSION  = "2026-11-03e";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -13054,6 +13056,13 @@ function ensureInvite(id, force){
   return inviteBusy[busyKey];
 }
 /* What goes with the link: who it's from and what it is, in words. */
+/* The 10-letter code inside a short link, shown as K7P2-QX9M-4T. */
+function codeOfUrl(url){
+  var m = String(url || "").match(/[#&?]i=([2-9A-Za-z]{10})(&|$)/);
+  return m ? m[1].toUpperCase() : "";
+}
+function prettyCode(c){ return String(c || "").replace(/^(.{4})(.{4})(.{2})$/, "$1-$2-$3"); }
+
 function inviteText(m){
   var from = state && state.me ? String(nameOf(state.me)).split(/\s+/)[0] : "";
   return (from ? from + " invited you" : "You're invited") +
@@ -13083,8 +13092,12 @@ function sendLink(m){
   catch (e) { toast("Couldn't make " + m.name + "'s link: " + e.message); return; }
   shareInvite(m, url);
 }
+function inviteMsg(m, url){
+  var c = codeOfUrl(url);
+  return L(inviteText(m)) + (c ? " " + L("Or open the app and type the code ") + prettyCode(c) : "");
+}
 function shareInvite(m, url){
-  var data = { title: "Family Notifier", text: L(inviteText(m)), url: url };
+  var data = { title: "Family Notifier", text: inviteMsg(m, url), url: url };
   /* The system share window where there is one. Some computers - many
      company-managed Windows ones - block it, and Chrome reports that
      as "cancelled", instantly. A cancel that fast is not a person
@@ -13119,7 +13132,7 @@ function showSendBox(m, url){
   var p = document.createElement("p");
   p.className = "sub"; p.style.margin = "0 0 12px";
   p.textContent = "It signs them in as " + m.name + ", so send it only to them.";
-  var text = L(inviteText(m)) + " " + url;
+  var text = inviteMsg(m, url) + " " + url;
   function close(){ if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
   function btn(label, cls, fn){
     var b = document.createElement("button");
@@ -13175,10 +13188,15 @@ function paintInvites(){
     /* How long their link has left - so it can be sent again before it
        runs out, rather than after they have found it dead. */
     var st = linkStatus(m.id);
-    if (st) {
+    /* Their code, to read out over the phone - the person types it on
+       the app's first screen. Together with how long the link has left. */
+    var c = cachedInvite(m.id);
+    var codeTxt = c && c.code ? L("Code ") + prettyCode(c.code) : "";
+    if (st || codeTxt) {
       var sm = document.createElement("span");
-      sm.style.cssText = "display:block;font-size:12px;color:" + (st.warn ? "var(--brass)" : "var(--mist)");
-      sm.textContent = st.text;
+      sm.setAttribute("translate", "no");
+      sm.style.cssText = "display:block;font-size:12px;color:" + (st && st.warn ? "var(--brass)" : "var(--mist)");
+      sm.textContent = [codeTxt, st ? st.text : ""].filter(Boolean).join(" · ");
       nm.appendChild(sm);
     }
     var send = document.createElement("button");
