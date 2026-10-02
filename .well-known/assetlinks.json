@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.musab.familynotifier",
+    "sha256_cert_fingerprints": [
+      "BD:5E:D5:66:E0:0D:5A:4E:20:8D:0C:42:4F:0C:C8:70:61:15:B3:F9:D3:48:54:94:A2:97:16:9C:64:50:3B:AC"
+    ]
+  }
+}]
