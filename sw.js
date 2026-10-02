@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-10-28c";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-11-02a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var FONTS = "fmn-fonts-v1";   /* the app's font, kept here between launches */
