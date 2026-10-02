@@ -2619,6 +2619,16 @@ Object.assign(AR, {
 "Open in the app": "فتح في التطبيق",
 "Or open the app and type the code ": "أو افتح التطبيق واكتب الرمز ",
 "Code ": "الرمز ",
+"App version ": "إصدار التطبيق ",
+" is ready": " جاهز",
+"Downloading the update…": "جارٍ تنزيل التحديث…",
+"Opening the installer…": "جارٍ فتح المثبّت…",
+"Updating…": "جارٍ التحديث…",
+"Allow Family Notifier to install updates, then tap Update again": "اسمح لـ Family Notifier بتثبيت التحديثات، ثم اضغط «تحديث» مجددًا",
+"The downloaded update didn't check out — try again later": "التحديث الذي تم تنزيله لم يجتز التحقق — حاول لاحقًا",
+"Couldn't open the installer": "تعذر فتح المثبّت",
+"Couldn't download the update — check the connection": "تعذر تنزيل التحديث — تحقق من الاتصال",
+"Create a new family…": "إنشاء عائلة جديدة…",
 "Creation code": "رمز الإنشاء",
 "Let someone start their own family": "السماح لشخص بإنشاء عائلته الخاصة",
 "This family server only accepts new families from people who were given a code. Make one here and send it to the person; it works for one family and lasts 14 days. They type it on the app's first screen, under Create a new family.": "لا يقبل خادم العائلة هذا عائلات جديدة إلا ممن أُعطي رمزًا. أنشئ رمزًا هنا وأرسله للشخص؛ يعمل لعائلة واحدة ويدوم 14 يومًا. يكتبه في الشاشة الأولى للتطبيق تحت «إنشاء عائلة جديدة».",
@@ -2910,7 +2920,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-03e";
+var VERSION  = "2026-11-03g";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -8945,8 +8955,11 @@ function paintWelcome(main){
   welcomeClipWatch(true);
 
   /* Creating a family: for the one person doing it, deliberately. Not
-     while an invitation is in play on this phone. */
-  if (!inviteSeen && !pend) {
+     while an invitation is in play on this phone - unless asked for
+     outright, from the gear (a device that was invited once but now
+     starts a family; the server still wants its creation code). */
+  var wanted = forceCreate; forceCreate = false;
+  if ((!inviteSeen && !pend) || wanted) {
     var make = document.createElement("button");
     make.className = "more"; make.textContent = "Setting up a family for the first time?";
     make.onclick = function(){
@@ -8984,9 +8997,11 @@ function paintWelcome(main){
       make.parentNode.insertBefore(cc, make.nextSibling);
     };
     main.appendChild(make);
+    if (wanted) setTimeout(function(){ make.onclick(); try { make.scrollIntoView({ block: "nearest" }); } catch (e) {} }, 0);
   }
   main.appendChild(creditLine());
 }
+var forceCreate = false;
 
 /* While the first screen is up: when the person comes back to the app
    (from copying the link in their messages, say) and the browser has
@@ -12153,6 +12168,16 @@ function openSetup(create){
     $("setBack").style.visibility = "hidden";
     setPageNow = "language";
     try { paintLang(); } catch (e) {}
+    /* For the one person starting a family on a device that has seen an
+       invitation (so the first screen keeps that card out of the way). */
+    var oldMk = $("liteCreate"); if (oldMk) oldMk.parentNode.removeChild(oldMk);
+    if (!state) {
+      var mk = document.createElement("button"); mk.id = "liteCreate"; mk.className = "more";
+      mk.setAttribute("data-pages", "language");
+      mk.textContent = "Create a new family…";
+      mk.onclick = function(){ closeSheet("setupSheet"); forceCreate = true; paintMain(); };
+      $("langBlock").parentNode.insertBefore(mk, $("langBlock").nextSibling);
+    }
     openSheet("setupSheet");
     return;
   }
@@ -12655,8 +12680,38 @@ function contactsPanel(m, withContacts){
 var updInfo = null, updCheckedAt = 0, syncing = false;
 var SHELL_CACHE = "fmn-shell-v1";            /* sw.js keeps the app under this name */
 
+/* ------------------------------------------- updating the Android app
+ *
+ * Inside the family's app, an update to the APP itself is offered on the
+ * same bar as an update to this page. The app (Updater.kt) checks for a
+ * newer build when asked, downloads it inside the app, and hands it to
+ * Android's installer, which replaces the app in place: the family, chats,
+ * settings and permissions all stay. Its progress comes back through
+ * familyUpdate. */
+var appUpd = null, appUpdState = "", appUpdPct = -1;
+function appUpdater(){
+  try { return (APP && window.FamilyUpdate && typeof window.FamilyUpdate.check === "function") ? window.FamilyUpdate : null; }
+  catch (e) { return null; }
+}
+window.familyUpdate = function(json){
+  var d = {}; try { d = JSON.parse(json); } catch (e) { return; }
+  appUpdState = d.state || "";
+  if (d.state === "available") appUpd = { code: d.code, name: d.name, notes: d.notes || "" };
+  else if (d.state === "downloading" && typeof d.pct === "number" && d.pct >= 0) appUpdPct = d.pct;
+  else if (d.state === "none") appUpd = null;
+  else if (d.state === "failed") {
+    toast(d.why === "permission" ? "Allow Family Notifier to install updates, then tap Update again"
+        : d.why === "hash" ? "The downloaded update didn't check out — try again later"
+        : d.why === "installer" ? "Couldn't open the installer"
+        : "Couldn't download the update — check the connection");
+  }
+  paintUpdateBar();
+};
+
 function checkUpdate(){
   updCheckedAt = Date.now();
+  var u = appUpdater();
+  if (u) { try { u.check(); } catch (e) {} }
   /* The address with a changing ending, so neither this phone's cache nor
      the web host's hands back an old copy. */
   return fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" })
@@ -12676,14 +12731,35 @@ function checkUpdate(){
 
 function paintUpdateBar(){
   var bar = $("updBar"); if (!bar) return;
+  var go = $("updGo");
+  /* The app's own update comes first: it brings the newest page with it. */
+  if (appUpd) {
+    bar.style.display = "";
+    var t = "App version " + appUpd.name + " is ready" + (appUpd.notes ? " — " + appUpd.notes : "");
+    if (appUpdState === "downloading") t = L("Downloading the update…") + (appUpdPct >= 0 ? " " + appUpdPct + "%" : "");
+    else if (appUpdState === "installing") t = "Opening the installer…";
+    $("updText").textContent = t;
+    go.disabled = appUpdState === "downloading" || appUpdState === "installing";
+    go.textContent = L(appUpdState === "downloading" || appUpdState === "installing" ? "Updating…" : "Update");
+    return;
+  }
+  go.disabled = false; go.textContent = L("Update");
   bar.style.display = updInfo ? "" : "none";
   if (updInfo) $("updText").textContent = (updInfo.av && updInfo.av !== APP_VERSION
       ? "Version " + updInfo.av + " is ready" : "An update is ready") + (updInfo.wn ? " — " + updInfo.wn : "");
 }
 
 function applyUpdate(){
-  if (!updInfo) return;
   if (call || group) { toast("Finish the call first — then Update"); return; }
+  if (appUpd) {
+    var u = appUpdater();
+    if (!u) return;
+    saveFlush(); try { chatFlush(); } catch (e) {}
+    appUpdState = "downloading"; paintUpdateBar();
+    try { u.install(); } catch (e) { appUpdState = ""; paintUpdateBar(); }
+    return;
+  }
+  if (!updInfo) return;
   var html = updInfo.html;
   $("updGo").disabled = true; $("updGo").textContent = "Updating…";
   var jobs = [];
