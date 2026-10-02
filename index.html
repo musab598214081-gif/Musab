@@ -2492,6 +2492,18 @@ Object.assign(AR, {
 "Show a test notification": "عرض إشعار تجريبي",
 "Silent while open": "صامت أثناء الاستخدام",
 "Your phone's sounds": "أصوات هاتفك",
+"Invitations last 30 days. Tap below and whoever invited you is asked to send a new one — it arrives the same way this one did.": "تدوم الدعوات 30 يومًا. اضغط بالأسفل ليُطلب ممن دعاك إرسال دعوة جديدة — تصلك بالطريقة نفسها التي وصلتك بها هذه.",
+"Invitations last 30 days. Ask whoever invited you to send it again.": "تدوم الدعوات 30 يومًا. اطلب ممن دعاك إرسالها مرة أخرى.",
+"Ask for a new link": "طلب رابط جديد",
+"Asking…": "جارٍ الطلب…",
+"Whoever invited you has been told. They'll get a notification and can send you a new link with one tap. When it arrives, open it on this phone.": "تم إبلاغ من دعاك. سيصله إشعار ويمكنه إرسال رابط جديد إليك بضغطة واحدة. عندما يصلك، افتحه على هذا الهاتف.",
+"Couldn't reach the family server — try again in a moment": "تعذر الوصول إلى خادم العائلة — حاول مرة أخرى بعد قليل",
+"Send a new link": "إرسال رابط جديد",
+"Dismiss": "تجاهل",
+"Someone you invited": "شخص دعوته",
+"Their invitation expired. Send a new one and they're in.": "انتهت صلاحية دعوته. أرسل دعوة جديدة وسينضم.",
+"Link expired — Send makes a new one": "انتهت صلاحية الرابط — «إرسال» ينشئ رابطًا جديدًا",
+"Asked for a new link": "طلب رابطًا جديدًا",
 "Your phone's ringtone and notification sound": "نغمة رنين هاتفك وصوت إشعاراته",
 "Calls ring with your phone's own ringtone, at its ring volume, and vibrate the way your phone does. Messages, photos, missed calls and buzzes use your phone's notification sound and volume. Silent mode and Do Not Disturb are respected, just like the phone's own calls.": "ترن المكالمات بنغمة رنين هاتفك نفسها، وبمستوى صوت الرنين فيه، وتهتز كما يهتز هاتفك. وتستخدم الرسائل والصور والمكالمات الفائتة والنداءات صوت إشعارات هاتفك ومستواه. ويُحترم الوضع الصامت وعدم الإزعاج، تمامًا كمكالمات الهاتف نفسه.",
 "To change the ringtone or the volumes, use your phone's Sound & vibration settings. To change this app's notification sound, open its notification settings.": "لتغيير نغمة الرنين أو مستويات الصوت، استخدم إعدادات الصوت والاهتزاز في هاتفك. ولتغيير صوت إشعارات هذا التطبيق، افتح إعدادات إشعاراته.",
@@ -3543,6 +3555,10 @@ function fsFrame(f){
     takeJoinOk(f);
   } else if (f.k === "joinno") {
     takeJoinNo(f);
+  } else if (f.k === "renew") {
+    takeRenew(f.req);
+  } else if (f.k === "renewdone") {
+    if (renewReqs[f.m]) { delete renewReqs[f.m]; paintMain(); }
   }
 }
 function fsTakePres(p){
@@ -8143,6 +8159,7 @@ function paintMain(){
     main.appendChild(hello);
   }
   paintJoinReqs(main);
+  paintRenewReqs(main);
   paintSetupCard(main);
   paintInstallCard(main);
   if (big) {
@@ -8754,30 +8771,56 @@ function redeemInvite(){
   var hello = document.createElement("p"); hello.className = "greet"; hello.textContent = "One moment…";
   var p = document.createElement("p"); p.className = "hint"; p.textContent = "Opening your invitation.";
   main.appendChild(hello); main.appendChild(p);
-  function failed(expired){
+  function failed(expired, info){
+    info = info || {};
     main.innerHTML = "";
     var h = document.createElement("p"); h.className = "greet";
     h.textContent = expired ? "This invitation has expired" : "Couldn't open the invitation";
     var card = document.createElement("div"); card.className = "onb";
     var t = document.createElement("p");
-    t.textContent = expired
-      ? "Invitations last 30 days, and stop working when a new one is made. Ask whoever invited you to send it again."
-      : "Check the internet connection and try again.";
+    /* An expired link need not be a dead end: the family server still
+       knows whose it was, and can ask for a new one on your behalf. */
+    var canAsk = expired && !!info.renew;
+    t.textContent = !expired ? "Check the internet connection and try again."
+      : canAsk ? "Invitations last 30 days. Tap below and whoever invited you is asked to send a new one — " +
+                 "it arrives the same way this one did."
+      : "Invitations last 30 days. Ask whoever invited you to send it again.";
     card.appendChild(t);
     if (!expired) {
       var again = document.createElement("button"); again.className = "btn"; again.textContent = "Try again";
       again.onclick = function(){ redeemInvite(); };
       card.appendChild(again);
     }
+    if (canAsk) {
+      var ask = document.createElement("button"); ask.className = "btn";
+      ask.textContent = "Ask for a new link";
+      ask.onclick = function(){
+        ask.disabled = true; ask.textContent = L("Asking…");
+        netFetch(base + "/i/" + code + "/renew", { method: "POST" }, 1).then(function(r){
+          return r.json().catch(function(){ return null; });
+        }).then(function(r){
+          if (!r || !r.ok) throw new Error("no");
+          var who = r.to ? String(r.to) : "";
+          t.textContent = (who ? who + " has been told" : "Whoever invited you has been told") +
+            (r.again ? " already" : "") + ". They'll get a notification and can send you a new link " +
+            "with one tap. When it arrives, open it on this phone.";
+          ask.style.display = "none";
+        }).catch(function(){
+          ask.disabled = false; ask.textContent = L("Ask for a new link");
+          toast("Couldn't reach the family server — try again in a moment");
+        });
+      };
+      card.appendChild(ask);
+    }
     main.appendChild(h); main.appendChild(card); main.appendChild(creditLine());
-    if (expired) history.replaceState(null, "", location.pathname);
+    if (expired && !canAsk) history.replaceState(null, "", location.pathname);
   }
   netFetch(base + "/i/" + code, {}, 2).then(function(r){
     return r.json().then(function(d){ return { st: r.status, d: d }; });
   }).then(function(x){
     var d = x.d;
     if (!d || !d.ok || !/^[A-Za-z0-9_-]+$/.test(String(d.j || "")) || !/^[A-Za-z0-9]{3,16}$/.test(String(d.m || ""))) {
-      failed(x.st === 404); return;
+      failed(x.st === 404, d || {}); return;
     }
     var h = "#j=" + d.j + "&m=" + d.m +
             (d.s && /^[A-Za-z0-9_-]{16,80}$/.test(d.s) ? "&s=" + d.s : "") +
@@ -12648,6 +12691,20 @@ function cachedInvite(id){
   if (!c || c.exp - Date.now() < 86400000 || c.fs !== fsUrl() || c.kt !== keyTag(id)) return null;
   return c;
 }
+/* The state of somebody's short link, in words, for the invite list.
+   null when there is nothing to say (no family server, or no link made
+   yet - one is made the moment the list is shown). */
+function linkStatus(id){
+  if (!useFS() || !state || !state.invites || !state.invites[id]) return null;
+  var c = state.invites[id];
+  if (c.fs !== fsUrl() || c.kt !== keyTag(id)) return null;
+  var left = c.exp - Date.now();
+  if (left <= 0) return { text: "Link expired — Send makes a new one", warn: true };
+  var days = Math.ceil(left / 86400000);
+  if (days <= 5) return { text: "Link expires in " + (days === 1 ? "1 day" : days + " days") + " — send it again to renew", warn: true };
+  if (renewReqs[id]) return { text: "Asked for a new link", warn: true };
+  return { text: "Link good for " + days + " days", warn: false };
+}
 function shortLink(code){
   var u = location.origin + location.pathname + "#i=" + code;
   if (fsUrl() !== DEFAULT_FS) u += "&f=" + b64u(fsUrl());
@@ -12694,8 +12751,12 @@ function inviteText(m){
 function sendLink(m){
   /* Not ready yet (a person just added): made now, then the send box -
      the share window would refuse, the tap is no longer fresh. */
-  if (!cachedInvite(m.id) && useFS()) {
-    ensureInvite(m.id).then(function(u){
+  /* In its last week the link is renewed as it is sent: a fresh 30 days
+     rather than one that dies on them in a few. */
+  var cur = cachedInvite(m.id);
+  var stale = !!(cur && cur.exp - Date.now() < 7 * 86400000);
+  if ((!cur || stale) && useFS()) {
+    ensureInvite(m.id, stale).then(function(u){
       var url;
       try { url = u || linkFor(m.id, false, true); } catch (e) { toast("Couldn't make " + m.name + "'s link"); return; }
       shareInvite(m, url);
@@ -12796,6 +12857,15 @@ function paintInvites(){
     dot.textContent = initials(m.name);
     var nm = document.createElement("span");
     nm.className = "nm"; nm.textContent = m.name;
+    /* How long their link has left - so it can be sent again before it
+       runs out, rather than after they have found it dead. */
+    var st = linkStatus(m.id);
+    if (st) {
+      var sm = document.createElement("span");
+      sm.style.cssText = "display:block;font-size:12px;color:" + (st.warn ? "var(--brass)" : "var(--mist)");
+      sm.textContent = st.text;
+      nm.appendChild(sm);
+    }
     var send = document.createElement("button");
     send.className = "mini"; send.innerHTML = ICON.share + "<span>Send</span>";
     send.setAttribute("aria-label", "Send " + m.name + " their link");
@@ -13376,6 +13446,86 @@ function paintJoinReqs(main){
     yes.onclick = function(){ approveJoin(id); };
     var no = document.createElement("button"); no.className = "btn ghost"; no.textContent = "Reject";
     no.onclick = function(){ rejectJoin(id); };
+    row.appendChild(yes); row.appendChild(no);
+    box.appendChild(top); box.appendChild(row);
+    main.appendChild(box);
+  });
+}
+
+/* ------------------------------------------- "I need a new link"
+ *
+ * Somebody opened their invite link after it expired and tapped Ask.
+ * The server tells whoever can make their link - the admins for a
+ * member, the person who invited them for a newcomer - and it shows
+ * here as a card, until a new link is made or it is dismissed. */
+var renewReqs = {};          /* member id -> { m, by, name, at, n } */
+
+function takeRenew(req){
+  if (!req || !/^[A-Za-z0-9]{3,16}$/.test(String(req.m || ""))) return;
+  var isNew = !renewReqs[req.m];
+  renewReqs[req.m] = { m: req.m, by: req.by || null, name: req.name || null,
+                       at: req.at || Date.now(), n: req.n || 1 };
+  paintMain();
+  if (isNew) { toast(renewWho(renewReqs[req.m]) + " needs a new link — see the top of the screen"); notifySound("info"); }
+}
+/* Who it is, in words: a member by name; a newcomer by whoever we
+   remember inviting them as, else by who invited them. */
+function renewWho(r){
+  var m = memberById(r.m) || pendingMember(r.m);
+  if (m && m.name) return m.name;
+  if (r.name) return r.name;
+  var by = r.by ? memberById(r.by) : null;
+  return by ? "Someone " + by.name + " invited" : "Someone you invited";
+}
+function renewSend(r){
+  var m = memberById(r.m) || pendingMember(r.m);
+  if (!m) {
+    toast("This phone doesn't have " + renewWho(r) + "'s details — add them to the family again, then send the link");
+    return;
+  }
+  /* A fresh code, whatever this phone had cached, then the share sheet
+     (the tap is spent by then, so the app's own send box opens on a
+     computer - see shareInvite). */
+  ensureInvite(m.id, true).then(function(u){
+    var url;
+    try { url = u || linkFor(m.id, false, true); }
+    catch (e) { toast("Couldn't make " + m.name + "'s link"); return; }
+    delete renewReqs[r.m]; paintMain();
+    shareInvite(m, url);
+  });
+}
+function renewDismiss(r){
+  delete renewReqs[r.m]; paintMain();
+  fsRequest({ k: "renewdrop", m: r.m }, 8000).catch(function(){});
+}
+function paintRenewReqs(main){
+  var ids = Object.keys(renewReqs);
+  if (!ids.length || !state || !state.me) return;
+  ids.sort(function(a, b){ return renewReqs[a].at - renewReqs[b].at; });
+  ids.forEach(function(id){
+    var r = renewReqs[id];
+    var m = memberById(r.m) || pendingMember(r.m);
+    var who = renewWho(r);
+    var box = document.createElement("div"); box.className = "req";
+    box.setAttribute("role", "group");
+    box.setAttribute("aria-label", who + " needs a new link");
+    var top = document.createElement("div"); top.className = "top";
+    var dot = document.createElement("span"); dot.className = "dot";
+    dot.style.background = m && COLOURS.indexOf(m.colour) !== -1 ? m.colour : "#9CB0C4";
+    dot.textContent = m ? initials(m.name) : "?";
+    var tx = document.createElement("div"); tx.className = "tx";
+    var b = document.createElement("b"); b.textContent = who + " needs a new link";
+    var sm = document.createElement("small");
+    sm.textContent = "Their invitation expired" + (r.n > 1 ? " — they've asked " + r.n + " times" : "") +
+      ". Send a new one and they're in.";
+    tx.appendChild(b); tx.appendChild(sm);
+    top.appendChild(dot); top.appendChild(tx);
+    var row = document.createElement("div"); row.className = "row";
+    var yes = document.createElement("button"); yes.className = "btn green";
+    yes.textContent = "Send a new link";
+    yes.onclick = function(){ renewSend(r); };
+    var no = document.createElement("button"); no.className = "btn ghost"; no.textContent = "Dismiss";
+    no.onclick = function(){ renewDismiss(r); };
     row.appendChild(yes); row.appendChild(no);
     box.appendChild(top); box.appendChild(row);
     main.appendChild(box);
