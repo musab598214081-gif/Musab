@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-11-03g";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-11-04b";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var FONTS = "fmn-fonts-v1";   /* the app's font, kept here between launches */
@@ -151,9 +151,26 @@ self.addEventListener("fetch", function (e) {
     }).catch(function () { return fetch(req); }));
     return;
   }
-  if (req.method !== "GET" || req.mode !== "navigate") return;
+  if (req.method !== "GET") return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  /* The app's own scripts (lang-ar.js and any others the page names,
+     each with its version in the address): kept with the page, so a
+     launch from a notification, or with no connection, has them at
+     once. A new version has a new address, so nothing stale is served. */
+  if (req.mode !== "navigate" && /\.js(\?|$)/.test(url.pathname + url.search)) {
+    e.respondWith(caches.open(SHELL).then(function (c) {
+      return c.match(req.url).then(function (hit) {
+        if (hit) return hit;
+        return fetch(req).then(function (res) {
+          if (res && res.ok && res.type === "basic") c.put(req.url, res.clone()).catch(function () {});
+          return res;
+        });
+      });
+    }).catch(function () { return fetch(req); }));
+    return;
+  }
+  if (req.mode !== "navigate") return;
   if (url.searchParams.has("nocache")) return;
   var key = url.origin + url.pathname;
   e.respondWith(caches.open(SHELL).then(function (c) {
