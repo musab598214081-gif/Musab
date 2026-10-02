@@ -2614,6 +2614,15 @@ Object.assign(AR, {
 "Forget this link": "نسيان هذا الرابط",
 "This phone is offline. The invitation opens by itself as soon as it's back online.": "هذا الهاتف غير متصل. ستُفتح الدعوة تلقائيًا فور عودة الاتصال.",
 "The family server couldn't be reached. It's tried again by itself every little while — or tap below.": "تعذر الوصول إلى خادم العائلة. تُعاد المحاولة تلقائيًا بين حين وآخر — أو اضغط أدناه.",
+"Creation code": "رمز الإنشاء",
+"This server's creation code (from its owner)": "رمز إنشاء هذا الخادم (من مالكه)",
+"Type the creation code first — the server's owner has it": "اكتب رمز الإنشاء أولًا — مالك الخادم لديه",
+"Checking…": "جارٍ التحقق…",
+"That code isn't right": "هذا الرمز غير صحيح",
+"Too many tries — wait ten minutes": "محاولات كثيرة — انتظر عشر دقائق",
+"Couldn't reach the family server — check the connection": "تعذر الوصول إلى خادم العائلة — تحقق من الاتصال",
+"This family server takes new families only with its creation code. Ask the server's owner for it, then type it here:": "يقبل خادم العائلة هذا عائلات جديدة فقط برمز الإنشاء. اطلبه من مالك الخادم ثم اكتبه هنا:",
+"The family isn't registered on the server yet — Settings → Family admin to try again": "لم تُسجَّل العائلة على الخادم بعد — الإعدادات ← مشرف العائلة للمحاولة مجددًا",
 "Nobody manages this family yet. Whoever set it up can make their phone its admin from Settings.": "لا أحد يدير هذه العائلة بعد. يمكن لمن أنشأها جعل هاتفه مشرفًا لها من الإعدادات.",
 "Record a voice message": "تسجيل رسالة صوتية",
 "Delete voice message": "حذف الرسالة الصوتية",
@@ -2886,7 +2895,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-03a";
+var VERSION  = "2026-11-03b";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -8878,11 +8887,31 @@ function paintWelcome(main){
       var cp = document.createElement("p");
       cp.textContent = "Only one person does this — the one who then invites everyone else and " +
         "manages the family. If somebody sent you a link, don't create a family: open their link above.";
+      var ki = document.createElement("input"); ki.type = "password"; ki.id = "createKey";
+      ki.placeholder = "Creation code"; ki.autocomplete = "off"; ki.style.display = "none";
+      var kl = document.createElement("label"); kl.htmlFor = "createKey"; kl.style.display = "none";
+      kl.textContent = "This server's creation code (from its owner)";
       var cb = document.createElement("button"); cb.className = "btn"; cb.textContent = "I'm the one setting it up";
-      cb.onclick = function(){ openSetup(true); };
+      var locked = null;
+      serverLocked().then(function(l){
+        locked = l;
+        if (l) { kl.style.display = ""; ki.style.display = ""; }
+      });
+      cb.onclick = function(){
+        if (!locked) { openSetup(true); return; }
+        var ck = ki.value.trim();
+        if (!ck) { toast("Type the creation code first — the server's owner has it"); try { ki.focus(); } catch (e) {} return; }
+        cb.disabled = true; cb.textContent = L("Checking…");
+        checkCreateKey(null, ck).then(function(r){
+          cb.disabled = false; cb.textContent = L("I'm the one setting it up");
+          if (r.ok) { createKeyGiven = ck; openSetup(true); return; }
+          toast(r.st === 429 ? "Too many tries — wait ten minutes" : r.st ? "That code isn't right" : "Couldn't reach the family server — check the connection");
+        });
+      };
+      ki.onkeydown = function(e){ if (e.key === "Enter") cb.onclick(); };
       var cx = document.createElement("button"); cx.className = "btn ghost"; cx.textContent = "I was sent a link";
       cx.onclick = function(){ cc.parentNode.removeChild(cc); make.style.display = ""; try { inp.focus(); } catch (e) {} };
-      cc.appendChild(ch); cc.appendChild(cp); cc.appendChild(cb); cc.appendChild(cx);
+      cc.appendChild(ch); cc.appendChild(cp); cc.appendChild(kl); cc.appendChild(ki); cc.appendChild(cb); cc.appendChild(cx);
       make.parentNode.insertBefore(cc, make.nextSibling);
     };
     main.appendChild(make);
@@ -13364,6 +13393,7 @@ function saveSetup(){
     if (FORM_OWNS.indexOf(k) === -1) draft[k] = state[k];
   });
   if (state && !state.adminKey) delete draft.adminKey;
+  if (creating && createKeyGiven) { draft.createKey = createKeyGiven; createKeyGiven = ""; }
   state = draft;
   bumpRev();
   save();
@@ -13435,6 +13465,43 @@ function sendRosters(onlyId, route){
    connects, even when this phone is off). Only a phone holding the
    admin key can make it, and the server checks the signature. */
 var pubPending = null, pubWarned = false;
+/* ---------------------------------------------- the creation code
+ *
+ * A family server may be set to take new families only from somebody
+ * who has its creation code (CREATE_KEY on the server). The code is
+ * asked for once, on creating the family, checked with the server
+ * before the form opens, and sent with the family's first publish;
+ * after that it is forgotten. Nobody who is invited ever sees it. */
+var createKeyGiven = "";
+function serverLocked(base){
+  base = String(base || DEFAULT_FS).replace(/\/+$/, "");
+  return netFetch(base + "/", {}, 1).then(function(r){ return r.json(); })
+    .then(function(d){ return !!(d && d.features && d.features.indexOf("createkey") !== -1); })
+    .catch(function(){ return null; });
+}
+function checkCreateKey(base, ck){
+  base = String(base || DEFAULT_FS).replace(/\/+$/, "");
+  return netFetch(base + "/ck", { method: "POST", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ ck: ck }) }, 1)
+    .then(function(r){ return r.json().then(function(d){ return { st: r.status, ok: !!(d && d.ok) }; }); })
+    .catch(function(){ return { st: 0, ok: false }; });
+}
+/* The server refused the family for want of the code (a legacy family
+   making its phone the admin, say): asked for here, and sent again. */
+var askingKey = false;
+function askCreateKey(){
+  if (askingKey || !state) return;
+  askingKey = true;
+  setTimeout(function(){
+    var ck = window.prompt(L("This family server takes new families only with its creation code. Ask the server's owner for it, then type it here:"), "");
+    askingKey = false;
+    ck = String(ck || "").trim();
+    if (!ck) { toast("The family isn't registered on the server yet — Settings → Family admin to try again"); return; }
+    state.createKey = ck; save();
+    publishFamily();
+  }, 50);
+}
+
 function publishFamily(){
   if (!canSign() || !useFS()) return Promise.resolve();
   /* Several changes in a row go out as one. */
@@ -13465,6 +13532,7 @@ function doPublish2(whole){
       var views = {};
       ids.forEach(function(id, i){ if (all[i + 1]) views[id] = all[i + 1]; });
       var frame = { k: "pub", fam: all[0].fam, sig: all[0].sig, views: views };
+      if (state.createKey) frame.ck = state.createKey;
       if (state.rekey) frame.reset = true;
       if (state.rotProof) frame.rot = state.rotProof;
       /* A big family can outgrow one live-connection message; plain
@@ -13472,10 +13540,13 @@ function doPublish2(whole){
       var big = JSON.stringify(frame).length > 48000;
       return fsRequest(frame, 15000, false, big).then(function(r){
         if (r && r.ok) {
+          /* Registered: the creation code has done its one job. */
+          if (state.createKey) { delete state.createKey; save(); }
           if (state.rekey) { delete state.rekey; save(); }
           if (state.rotProof) { delete state.rotProof; save(); }
           return;
         }
+        if (r && r.why === "createkey") { askCreateKey(); return; }
         if (r && r.status === "rekey" && !pubWarned) {
           pubWarned = true;
           toast("The family server still follows the old admin key. It switches to " +
