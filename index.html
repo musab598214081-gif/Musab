@@ -1328,6 +1328,22 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     </div>
 
     <div id="toneBlock" data-pages="ringtone">
+    <!-- Inside the family's Android app: nothing to choose here. Calls
+         ring with the phone's own ringtone, at its ring volume, vibrating
+         the way the phone does; everything else uses the phone's
+         notification sound. Changed in the phone's settings, like the
+         phone's own dialler. -->
+    <div id="toneApp" style="display:none">
+    <div class="sectiontitle">Your phone's sounds</div>
+    <p class="sub">Calls ring with your phone's own ringtone, at its ring volume, and vibrate the way your
+      phone does. Messages, photos, missed calls and buzzes use your phone's notification sound and volume.
+      Silent mode and Do Not Disturb are respected, just like the phone's own calls.</p>
+    <p class="sub">To change the ringtone or the volumes, use your phone's Sound &amp; vibration settings.
+      To change this app's notification sound, open its notification settings.</p>
+    <button class="btn ghost" id="toneAppBtn">Open this app's notification settings</button>
+    </div>
+
+    <div id="toneCustom">
     <p class="sub">The ringtone is only for someone calling you. Messages, photos, missed
       calls and buzzes are quiet while you're using the app — you see them on screen.
       These are your own settings on this phone.</p>
@@ -1338,18 +1354,21 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     <label for="ringVol">Ringtone volume</label>
     <input type="range" id="ringVol" class="vol" min="2" max="10" step="1">
     <label class="chk" id="ringVibRow"><input type="checkbox" id="ringVib"><span>Vibrate when a call comes in</span></label>
+    </div>
 
     <div class="sectiontitle">Messages and other notifications</div>
-    <label class="chk"><input type="checkbox" id="noteFg"><span>Play a short sound for new messages while the app is open</span></label>
+    <label class="chk"><input type="checkbox" id="noteFg"><span id="noteFgLabel">Play a short sound for new messages while the app is open</span></label>
     <div id="noteFgOpts">
       <div id="noteList" class="tonegrid"></div>
       <label for="noteVol">Sound volume</label>
       <input type="range" id="noteVol" class="vol" min="1" max="10" step="1">
     </div>
 
+    <div id="toneClosed">
     <div class="sectiontitle">With the app closed or in the background</div>
     <p class="sub" id="sndClosedNote"></p>
     <ol class="sndsteps" id="sndSteps"></ol>
+    </div>
     <button class="btn ghost" id="sndTest">Show a test notification</button>
     </div>
 
@@ -2472,6 +2491,13 @@ Object.assign(AR, {
 "With the app closed or in the background": "والتطبيق مغلق أو في الخلفية",
 "Show a test notification": "عرض إشعار تجريبي",
 "Silent while open": "صامت أثناء الاستخدام",
+"Your phone's sounds": "أصوات هاتفك",
+"Your phone's ringtone and notification sound": "نغمة رنين هاتفك وصوت إشعاراته",
+"Calls ring with your phone's own ringtone, at its ring volume, and vibrate the way your phone does. Messages, photos, missed calls and buzzes use your phone's notification sound and volume. Silent mode and Do Not Disturb are respected, just like the phone's own calls.": "ترن المكالمات بنغمة رنين هاتفك نفسها، وبمستوى صوت الرنين فيه، وتهتز كما يهتز هاتفك. وتستخدم الرسائل والصور والمكالمات الفائتة والنداءات صوت إشعارات هاتفك ومستواه. ويُحترم الوضع الصامت وعدم الإزعاج، تمامًا كمكالمات الهاتف نفسه.",
+"To change the ringtone or the volumes, use your phone's Sound & vibration settings. To change this app's notification sound, open its notification settings.": "لتغيير نغمة الرنين أو مستويات الصوت، استخدم إعدادات الصوت والاهتزاز في هاتفك. ولتغيير صوت إشعارات هذا التطبيق، افتح إعدادات إشعاراته.",
+"Open this app's notification settings": "فتح إعدادات إشعارات هذا التطبيق",
+"Play your phone's notification sound for new messages while the app is open": "تشغيل صوت إشعارات هاتفك للرسائل الجديدة والتطبيق مفتوح",
+"Open your phone's Settings, then Apps → Family Notifier → Notifications": "افتح إعدادات هاتفك، ثم التطبيقات ← Family Notifier ← الإشعارات",
 "This is how messages and other notifications look and sound.": "هكذا تبدو الرسائل والإشعارات الأخرى وتُسمع.",
 "Sent — it should appear in a moment": "تم الإرسال — سيظهر بعد لحظات",
 "Your iPhone alerts with its standard notification sound — web apps can't choose their own sound there. A call keeps alerting every few seconds until you answer or it ends; everything else alerts once.": "ينبّهك iPhone بصوت الإشعار القياسي — لا تستطيع تطبيقات الويب اختيار صوت خاص بها هناك. تواصل المكالمة التنبيه كل بضع ثوانٍ حتى ترد أو تنتهي؛ وكل ما عدا ذلك ينبّه مرة واحدة.",
@@ -3754,6 +3780,33 @@ var APP = (function(){
 function appPost(msg){ if (APP) { try { APP.helper(JSON.stringify(msg)); } catch (e) {} } }
 function appToken(){ try { return APP ? String(APP.pushToken() || "") : ""; } catch (e) { return ""; } }
 function appNotif(){ try { return APP ? String(APP.notifState() || "default") : "default"; } catch (e) { return "default"; } }
+/* Sounds inside the app are the phone's own, never the page's.
+ *
+ *   FamilyApp.ring(on, tag) -> String
+ *     on: true starts ringing an incoming call with the phone's own
+ *     ringtone (the one chosen in Sound & vibration), at the phone's
+ *     ring volume, vibrating the way the phone does; false stops it.
+ *     Starting it twice for the same tag keeps the one ring going.
+ *     Returns "ok" when it rings out loud, "silent" when the phone is
+ *     on silent or vibrate or in Do Not Disturb (the phone shows the
+ *     call without sound, as it would for its own dialler), "" if the
+ *     app could not tell.
+ *   FamilyApp.note() -> String
+ *     The phone's own notification sound, once, at its notification
+ *     volume - for a message, a buzz, a missed call while the app is
+ *     open. "ok" or "silent".
+ *   FamilyApp.openSoundSettings()
+ *     The phone's notification settings for this app.
+ *
+ * An app without ring() (an older build) gets the page's own sounds,
+ * as a browser does. */
+function appSounds(){ try { return !!(APP && typeof APP.ring === "function"); } catch (e) { return false; } }
+function appRing(on, tag){ try { return String(APP.ring(!!on, String(tag || "")) || ""); } catch (e) { return ""; } }
+function appNote(){ try { if (typeof APP.note === "function") return String(APP.note() || ""); } catch (e) {} return ""; }
+function appSoundSettings(){
+  try { if (typeof APP.openSoundSettings === "function") { APP.openSoundSettings(); return true; } } catch (e) {}
+  return false;
+}
 var appSubSent = "";
 function appSendSub(force){
   var t = appToken();
@@ -5073,12 +5126,7 @@ function outRoute(el, loud){
       outPlain(el, volumeWorks ? OUT_EAR : 1);
       return outInfo.how = "open";
     };
-    /* Not on iPhone: from iOS 26 Safari lists outputs and accepts
-       setSinkId, but reportedly ignores it for a call's sound - the
-       promise resolves while the sound stays where it was, and this would
-       then say "earpiece" over a loudspeaker. Until that is proven on a
-       real iPhone, an iPhone gets the honest note instead (fallback). */
-    if (el.setSinkId && target && !isIOS()) {
+    if (el.setSinkId && target) {
       /* Only claimed once the browser has actually switched. */
       return el.setSinkId(target.deviceId).then(function(){
         outPlain(el, 1);
@@ -7589,6 +7637,23 @@ function tone(opts){
   var key = loud ? toneName() : "_back", spec = TONES[key] || TONES.classic;
   var stops = [], on = true;
 
+  /* In the app, the phone rings - its own ringtone, ring volume and
+     vibration, and its own silent mode. The page makes no sound and
+     does not vibrate; it only says whether the phone is ringing out
+     loud, so the repeat notifications stop when it really is (on
+     silent they carry on, as they would for the phone's dialler). */
+  if (loud && appSounds()) {
+    var ntag = opts.tag;
+    var how = appRing(true, ntag);
+    reportAudible(ntag, how === "ok");
+    stops.push(function(){ appRing(false, ntag); reportAudible(ntag, false); });
+    toneStop = function(){
+      on = false;
+      stops.forEach(function(f){ try { f(); } catch (e) {} });
+    };
+    return;
+  }
+
   if (loud) {
     audioSession("playback");
     var el = ringElement();
@@ -7710,8 +7775,15 @@ function tone(opts){
 /* A single pass, for the preview buttons in Settings - the loud version,
    the one that will actually ring. */
 function previewTone(key){
-  unlockAudio();
   stopTone();
+  /* In the app: a few seconds of the phone's own ringtone. */
+  if (appSounds()) {
+    appRing(true, "");
+    var pv = setTimeout(function(){ appRing(false, ""); toneStop = null; }, 3000);
+    toneStop = function(){ clearTimeout(pv); appRing(false, ""); };
+    return;
+  }
+  unlockAudio();
   var el = ringElement();
   try { ringSrc(el, key, sndPrefs().rv); } catch (e) { playPattern(key); return; }
   el.loop = false; el.muted = false; el.volume = 1;
@@ -7829,6 +7901,9 @@ function notifySound(kind, opts){
   if (Date.now() - noteAt < 700) return;          /* a burst sounds once */
   noteAt = Date.now();
   if (call || group || ringLoud) return;          /* never over a call */
+  /* In the app: the phone's own notification sound, at its notification
+     volume, vibrating as the phone does - nothing of the page's. */
+  if (appSounds()) { appNote(); return; }
   try { if (navigator.vibrate && p.nvib && !opts.inChat) navigator.vibrate([100, 70, 100]); } catch (e) {}
   if (p.nt === "none") return;
   playNote(p.nt, opts.inChat ? p.nv * 0.5 : p.nv);
@@ -11854,8 +11929,10 @@ function paintSetNav(){
       { icon: ICON.phone, warn: !callsOk });
   var sp = sndPrefs();
   row("language", "Language · اللغة", LANG === "ar" ? "العربية" : "English", { icon: ICO_LANG });
-  row("ringtone", "Sounds", "Calls: " + (TONES[toneName()] || TONES.classic).name + " · Messages: " +
-      (sp.nfg ? TONES[sp.nt].name : "Silent while open"), { icon: ICON.bell });
+  row("ringtone", "Sounds", appSounds()
+      ? "Your phone's ringtone and notification sound"
+      : "Calls: " + (TONES[toneName()] || TONES.classic).name + " · Messages: " +
+        (sp.nfg ? TONES[sp.nt].name : "Silent while open"), { icon: ICON.bell });
   row("media", "Chats and media", mediaNavValue(), { icon: ICO_PHOTO });
   var nb = (state.blocked || []).filter(function(id){ return memberById(id); }).length;
   row("blocked", "Blocked people", nb ? nb + (nb > 1 ? " people" : " person") : "Nobody", { icon: ICO_BLOCK });
@@ -12749,6 +12826,21 @@ function paintTones(){
   var box = $("toneList");
   if (!box) return;
   var p = sndPrefs();
+  /* The app: the phone's ringtone, notification sound and volumes, so
+     there is nothing to pick here - only whether a message sounds
+     while the app is open, and where the phone's settings are. */
+  var native = appSounds();
+  $("toneApp").style.display = native ? "" : "none";
+  $("toneCustom").style.display = native ? "none" : "";
+  $("toneClosed").style.display = native ? "none" : "";
+  $("noteFgLabel").textContent = L(native
+    ? "Play your phone's notification sound for new messages while the app is open"
+    : "Play a short sound for new messages while the app is open");
+  if (native) {
+    $("noteFg").checked = p.nfg;
+    $("noteFgOpts").style.display = "none";
+    return;
+  }
   function grid(el, order, current, pick){
     el.innerHTML = "";
     order.forEach(function(key){
@@ -12850,10 +12942,16 @@ function sndTestNote(){
     sndSet("nfg", fg.checked);
     notePrimed = false;
     paintTones();
-    if (fg.checked) playNote(sndPrefs().nt, sndPrefs().nv);
+    if (!fg.checked) return;
+    if (appSounds()) appNote(); else playNote(sndPrefs().nt, sndPrefs().nv);
   };
   var t = $("sndTest");
   if (t) t.onclick = sndTestNote;
+  var ab = $("toneAppBtn");
+  if (ab) ab.onclick = function(){
+    if (!appSoundSettings())
+      toast(L("Open your phone's Settings, then Apps → Family Notifier → Notifications"));
+  };
 })();
 
 /* Whether this phone can ring with the page closed. Said in Settings,
