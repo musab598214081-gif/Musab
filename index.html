@@ -2860,7 +2860,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-02b";
+var VERSION  = "2026-11-02c";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -13484,6 +13484,20 @@ function renewSend(r){
   if (!m) {
     toast("This phone doesn't have " + renewWho(r) + "'s details — add them to the family again, then send the link");
     return;
+  }
+  /* A member's sign-in key stays on the phone that issued it (usually the
+     main admin's). A co-admin's phone doesn't hold it, so a link made here
+     would not sign that person in. The same fix as "Reset sign-in" in
+     their settings: a fresh key, made here. Asked first, because the phone
+     signed in as them now (if any) is signed out. */
+  var live = memberById(r.m);
+  if (live && live.id !== state.me && isAdmin() && !live.sk) {
+    if (!confirm("Send " + live.name + " a new link?\n\nTo sign them in from this phone, " + live.name +
+                 "'s sign-in is reset: the phone signed in as them now, if any, is signed out. " +
+                 "The phone that opens the new link becomes theirs.")) return;
+    live.sk = randSecret(); live.rk = Date.now();
+    if (state.invites) delete state.invites[live.id];
+    bumpRev(); save(); broadcastRoster();
   }
   /* A fresh code, whatever this phone had cached, then the share sheet
      (the tap is spent by then, so the app's own send box opens on a
