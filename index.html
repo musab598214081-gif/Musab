@@ -2615,6 +2615,16 @@ Object.assign(AR, {
 "This phone is offline. The invitation opens by itself as soon as it's back online.": "هذا الهاتف غير متصل. ستُفتح الدعوة تلقائيًا فور عودة الاتصال.",
 "The family server couldn't be reached. It's tried again by itself every little while — or tap below.": "تعذر الوصول إلى خادم العائلة. تُعاد المحاولة تلقائيًا بين حين وآخر — أو اضغط أدناه.",
 "Creation code": "رمز الإنشاء",
+"Let someone start their own family": "السماح لشخص بإنشاء عائلته الخاصة",
+"This family server only accepts new families from people who were given a code. Make one here and send it to the person; it works for one family and lasts 14 days. They type it on the app's first screen, under Create a new family.": "لا يقبل خادم العائلة هذا عائلات جديدة إلا ممن أُعطي رمزًا. أنشئ رمزًا هنا وأرسله للشخص؛ يعمل لعائلة واحدة ويدوم 14 يومًا. يكتبه في الشاشة الأولى للتطبيق تحت «إنشاء عائلة جديدة».",
+"Make a one-time code": "إنشاء رمز لمرة واحدة",
+"Making…": "جارٍ الإنشاء…",
+"Too many unused codes — wait until some expire": "رموز غير مستخدمة كثيرة — انتظر حتى تنتهي صلاحية بعضها",
+"Couldn't make a code — check the connection": "تعذر إنشاء الرمز — تحقق من الاتصال",
+"Send the code": "إرسال الرمز",
+"Code copied — send it to them": "تم نسخ الرمز — أرسله إليه",
+"Your code to create a family on Family Notifier: ": "رمزك لإنشاء عائلة في Family Notifier: ",
+" — open the app, tap \"Setting up a family for the first time?\" and type it. It works once, for 14 days.": " — افتح التطبيق، واضغط «هل تُنشئ عائلة للمرة الأولى؟» واكتبه. يعمل مرة واحدة، لمدة 14 يومًا.",
 "This server's creation code (from its owner)": "رمز إنشاء هذا الخادم (من مالكه)",
 "Type the creation code first — the server's owner has it": "اكتب رمز الإنشاء أولًا — مالك الخادم لديه",
 "Checking…": "جارٍ التحقق…",
@@ -2895,7 +2905,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-03b";
+var VERSION  = "2026-11-03c";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3563,7 +3573,7 @@ function fsFrame(f){
     /* media: pictures and files, with their limits (null: not set up on
        this server). A server that says anything about media at all also
        takes locations. */
-    fsCaps = { sfu: !!f.sfu, turn: !!f.turn, media: f.media || null, loc: "media" in f };
+    fsCaps = { sfu: !!f.sfu, turn: !!f.turn, media: f.media || null, loc: "media" in f, createkey: !!f.createkey };
     /* The server says whether it can hand out relay details. That answer
        used to be kept but never read: a phone that had once been told
        "no relay keys" ignored the server's relay for six hours even after
@@ -4596,6 +4606,39 @@ function paintAdmin(){
     code.className = "codebox"; code.textContent = maskLink(adminLink());
     box.appendChild(code);
     button("Copy recovery link", "ghost", function(){ copy(adminLink(), "Recovery link copied — keep it private"); });
+
+    /* On a server that takes new families only with a code: let a
+       person you trust start a family of their own, with a code that
+       works once and lasts two weeks. */
+    if (fsCaps.createkey) {
+      var h3 = document.createElement("label"); h3.textContent = "Let someone start their own family";
+      box.appendChild(h3);
+      para("This family server only accepts new families from people who were given a code. " +
+           "Make one here and send it to the person; it works for one family and lasts 14 days. " +
+           "They type it on the app's first screen, under Create a new family.");
+      var gb = button("Make a one-time code", "ghost", function(){
+        gb.disabled = true; gb.textContent = L("Making…");
+        fsRequest({ k: "ckgrant" }, 8000).then(function(r){
+          gb.disabled = false; gb.textContent = L("Make a one-time code");
+          if (!r || !r.ok) {
+            toast(r && r.status === "full" ? "Too many unused codes — wait until some expire" : "Couldn't make a code — check the connection");
+            return;
+          }
+          var shown = String(r.code).replace(/^(.{4})(.{4})$/, "$1-$2");
+          var cb2 = document.createElement("div"); cb2.className = "codebox"; cb2.textContent = shown;
+          cb2.setAttribute("translate", "no");
+          var txt = L("Your code to create a family on Family Notifier: ") + shown +
+                    L(" — open the app, tap \"Setting up a family for the first time?\" and type it. It works once, for 14 days.");
+          var sh = document.createElement("button"); sh.className = "btn";
+          sh.textContent = "Send the code";
+          sh.onclick = function(){
+            if (navigator.share) navigator.share({ title: "Family Notifier", text: txt }).catch(function(){});
+            else copy(txt, "Code copied — send it to them");
+          };
+          gb.parentNode.insertBefore(cb2, gb); gb.parentNode.insertBefore(sh, gb);
+        }).catch(function(){ gb.disabled = false; gb.textContent = L("Make a one-time code"); toast("Couldn't make a code — check the connection"); });
+      });
+    }
 
     var others = state.members.filter(function(m){ return m.id !== state.me; });
     if (others.length && primary) {
@@ -8750,8 +8793,13 @@ function recentRow(r, withDate, run){
  * remembered from an earlier one while it still waits to be redeemed).
  * pendingLink: the part after # of a link that could not be opened yet
  * (no connection), kept so it is tried again by itself. */
-var PENDING_KEY = "fmn-pending-link";
+var PENDING_KEY = "fmn-pending-link", INVITED_KEY = "fmn-invited";
 var inviteSeen = /[#&](i|j)=/.test(location.hash || "");
+/* Remembered on the phone: once any invitation has been opened here,
+   this browser is an invited one, however that first visit ended. */
+try { if (localStorage.getItem(INVITED_KEY)) inviteSeen = true; } catch (e) {}
+function markInvited(){ inviteSeen = true; try { localStorage.setItem(INVITED_KEY, "1"); } catch (e) {} }
+if (inviteSeen) markInvited();
 function pendingLink(){
   try { return localStorage.getItem(PENDING_KEY) || ""; } catch (e) { return ""; }
 }
@@ -8817,7 +8865,7 @@ function paintWelcome(main){
     var pb = document.createElement("button"); pb.className = "btn"; pb.textContent = "Open it now";
     pb.onclick = function(){ openPastedLink(pend); };
     var px = document.createElement("button"); px.className = "btn ghost"; px.textContent = "Forget this link";
-    px.onclick = function(){ setPendingLink(""); inviteSeen = false; paintMain(); };
+    px.onclick = function(){ setPendingLink(""); paintMain(); };
     pc.appendChild(ph); pc.appendChild(pp); pc.appendChild(pb); pc.appendChild(px);
     main.appendChild(pc);
   }
@@ -8957,7 +9005,7 @@ function redeemInvite(){
   var m = location.hash.match(/[#&]i=([2-9A-Za-z]{10})(&|$)/);
   if (!m) return false;
   var code = m[1].toUpperCase();
-  inviteSeen = true;
+  markInvited();
   var thisFrag = location.hash;
   var f = location.hash.match(/[#&]f=([A-Za-z0-9_-]+)/);
   var base = DEFAULT_FS;
@@ -9055,7 +9103,7 @@ function openPastedLink(text){
     toast(t ? "That isn't an invitation — it should hold a link or a 10-letter code" : "Paste the invitation first");
     return;
   }
-  inviteSeen = true;
+  markInvited();
   history.replaceState(null, "", location.pathname + frag);
   if (/[#&]i=/.test(frag)) { redeemInvite(); return; }
   readIntent();
@@ -14139,6 +14187,7 @@ function tryJoin(){
   var m = location.hash.match(/[#&]j=([A-Za-z0-9\-_]+)/);
   if (!m) return false;
   var cfg = decodeConfig(m[1]);
+  markInvited();
   /* Read who the link is for BEFORE tidying the address bar. The old
      order wiped the address first, so the "this is you" part of every
      personal link was lost and the phone asked "Which one are you?". */
