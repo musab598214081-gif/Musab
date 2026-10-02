@@ -2591,6 +2591,30 @@ Object.assign(AR, {
 "This phone will stop following the admin. Do the same on every phone in the family, then make one of them the admin. Continue?": "سيتوقف هذا الهاتف عن اتباع المشرف. افعل الشيء نفسه على كل هاتف في العائلة، ثم اجعل أحدها المشرف. هل تتابع؟"
 });
 Object.assign(AR, {
+"Were you sent an invitation?": "هل أُرسلت إليك دعوة؟",
+"Open the link on this phone and everything sets itself up. If the app opened empty instead, copy the link (or its code) from the message and tap Paste.": "افتح الرابط على هذا الهاتف وسيُعدّ كل شيء تلقائيًا. إذا فُتح التطبيق فارغًا، انسخ الرابط (أو رمزه) من الرسالة ثم اضغط «لصق».",
+"Paste my invitation": "لصق دعوتي",
+"Or type the link or code": "أو اكتب الرابط أو الرمز",
+"Invitation link or code": "رابط الدعوة أو رمزها",
+"Link, or its 10-letter code": "الرابط، أو رمزه المكوّن من 10 أحرف",
+"Open": "فتح",
+"What's copied isn't an invitation — copy the link from the message first": "ما نسخته ليس دعوة — انسخ الرابط من الرسالة أولًا",
+"Nothing is copied yet — copy the invitation link first": "لم يُنسخ شيء بعد — انسخ رابط الدعوة أولًا",
+"Paste it into the box below instead": "الصقه في المربع أدناه بدلًا من ذلك",
+"That isn't an invitation — it should hold a link or a 10-letter code": "هذه ليست دعوة — يجب أن تحتوي رابطًا أو رمزًا من 10 أحرف",
+"Paste the invitation first": "الصق الدعوة أولًا",
+"Setting up a family for the first time?": "هل تُنشئ عائلة للمرة الأولى؟",
+"Create a new family": "إنشاء عائلة جديدة",
+"Only one person does this — the one who then invites everyone else and manages the family. If somebody sent you a link, don't create a family: open their link above.": "شخص واحد فقط يفعل هذا — من يدعو الآخرين ويدير العائلة. إذا أرسل لك أحدهم رابطًا فلا تُنشئ عائلة: افتح رابطه أعلاه.",
+"I'm the one setting it up": "أنا من يقوم بالإعداد",
+"I was sent a link": "أُرسل إليّ رابط",
+"Your invitation is ready to open": "دعوتك جاهزة للفتح",
+"It couldn't be opened last time because there was no connection. It opens by itself the moment the phone is online.": "تعذر فتحها في المرة السابقة لعدم وجود اتصال. ستُفتح تلقائيًا فور اتصال الهاتف بالإنترنت.",
+"Open it now": "افتحها الآن",
+"Forget this link": "نسيان هذا الرابط",
+"This phone is offline. The invitation opens by itself as soon as it's back online.": "هذا الهاتف غير متصل. ستُفتح الدعوة تلقائيًا فور عودة الاتصال.",
+"The family server couldn't be reached. It's tried again by itself every little while — or tap below.": "تعذر الوصول إلى خادم العائلة. تُعاد المحاولة تلقائيًا بين حين وآخر — أو اضغط أدناه.",
+"Nobody manages this family yet. Whoever set it up can make their phone its admin from Settings.": "لا أحد يدير هذه العائلة بعد. يمكن لمن أنشأها جعل هاتفه مشرفًا لها من الإعدادات.",
 "Record a voice message": "تسجيل رسالة صوتية",
 "Delete voice message": "حذف الرسالة الصوتية",
 "Stop recording": "إيقاف التسجيل",
@@ -2853,16 +2877,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.12.0";
+var APP_VERSION = "1.13.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Expired invitations can ask for a new link; in the app, calls ring with your phone's own ringtone";
+var WHATS_NEW   = "Joining is one tap: paste the invitation (or its code) and you're in; invited phones are never offered a family of their own";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-02e";
+var VERSION  = "2026-11-03a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -2939,10 +2963,12 @@ function snapshot(){
   var members = (state.members || []).map(function(m){
     var o = {}; for (var k in m) if (k !== "sk") o[k] = m[k]; return o;
   });
+  var turn = state.turn ? Object.assign({}, state.turn) : null;
+  if (turn) delete turn.pass;                  /* a secret: never in the cookie */
   return { house: state.house, me: state.me, members: members,
-           rev: state.rev || 0, turn: state.turn || null,
+           rev: state.rev || 0, turn: turn,
            turn2: state.turn2 || null, route: state.route || null,
-           server: state.server || null, token: state.token || null,
+           server: state.server || null, token: null,
            fs: state.fs || null,
            tone: state.tone || "classic", snd: state.snd || null, blocked: state.blocked || [],
            lang: state.lang || null,
@@ -4533,6 +4559,12 @@ function paintAdmin(){
   }
 
   if (!state.admin) {
+    if (state.viaInvite) {
+      /* Invited into a family nobody manages yet: the admin role belongs
+         to whoever made the family, not to a phone that joined by link. */
+      para("Nobody manages this family yet. Whoever set it up can make their phone its admin from Settings.");
+      return;
+    }
     para("Nobody manages this family yet, so any phone can change the shared " +
          "settings. Make this phone the admin, and only it can change them.");
     button("Make this phone the family admin", "", function(){ becomeAdmin(false).then(openSetup); });
@@ -8694,6 +8726,54 @@ function recentRow(r, withDate, run){
   return d;
 }
 
+/* ------------------------------------------------- the first screen
+ *
+ * Almost everyone who sees this screen was sent an invitation: the one
+ * person who sets a family up does it once, everyone else joins. So
+ * the screen is about joining - paste (or type) the link or its code,
+ * and that is all - and creating a family is a deliberate second step
+ * underneath, hidden entirely while an invitation is being opened or
+ * one is waiting for the network. An invited person is never offered a
+ * family of their own by mistake: whatever role and contacts the admin
+ * gave them come with the invitation.
+ *
+ * inviteSeen: an invitation was opened on this phone (this visit, or
+ * remembered from an earlier one while it still waits to be redeemed).
+ * pendingLink: the part after # of a link that could not be opened yet
+ * (no connection), kept so it is tried again by itself. */
+var PENDING_KEY = "fmn-pending-link";
+var inviteSeen = /[#&](i|j)=/.test(location.hash || "");
+function pendingLink(){
+  try { return localStorage.getItem(PENDING_KEY) || ""; } catch (e) { return ""; }
+}
+function setPendingLink(frag){
+  try { if (frag) localStorage.setItem(PENDING_KEY, frag); else localStorage.removeItem(PENDING_KEY); } catch (e) {}
+}
+if (pendingLink()) inviteSeen = true;
+
+/* An invitation inside any text: a full link, the part after #, or the
+   bare 10-character code read out over the phone (spaces and dashes
+   between its letters are fine, so is lower case). Returns the hash
+   fragment to open, or "" when the text holds none. */
+function inviteFragFrom(text){
+  var t = String(text || "").trim();
+  if (!t) return "";
+  var i = t.indexOf("#");
+  if (i !== -1) {
+    var frag = t.slice(i).replace(/\s.*$/, "");
+    if (/[#&]i=[2-9A-Za-z]{10}(&|$)/.test(frag) || /[#&]j=[A-Za-z0-9\-_]+/.test(frag)) return frag;
+  }
+  /* A code on its own, or a link with the code but no #: the code is
+     ten characters from an alphabet without look-alikes. */
+  var CODE = /^[2-9A-HJ-NP-Z]{10}$/;
+  var toks = t.toUpperCase().split(/\s+/).map(function(x){ return x.replace(/[\-–—.,:;()]/g, ""); });
+  for (var k = 0; k < toks.length; k++) if (CODE.test(toks[k])) return "#i=" + toks[k];
+  /* The code written in groups ("K7P2 QX9M 4T"): the groups together. */
+  var joined = toks.join("");
+  if (CODE.test(joined)) return "#i=" + joined;
+  return "";
+}
+
 function paintWelcome(main){
   $("whoami").textContent = "not set up yet";
   var u = undoInfo();
@@ -8715,41 +8795,125 @@ function paintWelcome(main){
   var hello = document.createElement("p");
   hello.className = "greet"; hello.textContent = "Welcome";
   main.appendChild(hello);
+
+  /* A link that is still waiting for a connection: tried again as soon
+     as there is one (see redeemInvite), and said so here. */
+  var pend = pendingLink();
+  if (pend) {
+    var pc = document.createElement("div"); pc.className = "onb";
+    var ph = document.createElement("h3"); ph.textContent = "Your invitation is ready to open";
+    var pp = document.createElement("p");
+    pp.textContent = "It couldn't be opened last time because there was no connection. " +
+      "It opens by itself the moment the phone is online.";
+    var pb = document.createElement("button"); pb.className = "btn"; pb.textContent = "Open it now";
+    pb.onclick = function(){ openPastedLink(pend); };
+    var px = document.createElement("button"); px.className = "btn ghost"; px.textContent = "Forget this link";
+    px.onclick = function(){ setPendingLink(""); inviteSeen = false; paintMain(); };
+    pc.appendChild(ph); pc.appendChild(pp); pc.appendChild(pb); pc.appendChild(px);
+    main.appendChild(pc);
+  }
+
   var card = document.createElement("div"); card.className = "onb";
-  var h = document.createElement("h3"); h.textContent = "Were you sent a link?";
+  var h = document.createElement("h3"); h.textContent = "Were you sent an invitation?";
   var p = document.createElement("p");
-  p.textContent = "Open it on this phone and everything sets itself up. If this app opened " +
-    "empty (an iPhone Home Screen app starts empty), paste the link here instead.";
+  p.textContent = "Open the link on this phone and everything sets itself up. If the app opened " +
+    "empty instead, copy the link (or its code) from the message and tap Paste.";
   card.appendChild(h); card.appendChild(p);
-  /* Reading the clipboard needs the tap itself, and not every browser
-     allows it - the box below always works. */
-  if (navigator.clipboard && navigator.clipboard.readText) {
+  var inp = document.createElement("input");
+  var canClip = !!(navigator.clipboard && navigator.clipboard.readText);
+  /* The one tap that does it all: read the clipboard, find the
+     invitation in whatever was copied, open it. */
+  if (canClip) {
     var paste = document.createElement("button"); paste.className = "btn";
-    paste.textContent = "Paste my link";
+    paste.textContent = "Paste my invitation";
     paste.onclick = function(){
-      navigator.clipboard.readText().then(openPastedLink, function(){
+      paste.disabled = true;
+      navigator.clipboard.readText().then(function(text){
+        paste.disabled = false;
+        if (inviteFragFrom(text)) { openPastedLink(text); return; }
+        toast(String(text || "").trim() ? "What's copied isn't an invitation — copy the link from the message first"
+                                        : "Nothing is copied yet — copy the invitation link first");
+        try { inp.focus(); } catch (e) {}
+      }, function(){
+        paste.disabled = false;
         toast("Paste it into the box below instead");
         try { inp.focus(); } catch (e) {}
       });
     };
     card.appendChild(paste);
   }
-  var lb = document.createElement("label"); lb.htmlFor = "pasteLink"; lb.textContent = "Invite link";
-  var inp = document.createElement("input");
-  inp.type = "text"; inp.id = "pasteLink"; inp.placeholder = "Paste the link here";
-  inp.autocomplete = "off";
-  var go = document.createElement("button"); go.className = "btn ghost"; go.textContent = "Open link";
+  var lb = document.createElement("label"); lb.htmlFor = "pasteLink";
+  lb.textContent = canClip ? "Or type the link or code" : "Invitation link or code";
+  inp.type = "text"; inp.id = "pasteLink"; inp.placeholder = "Link, or its 10-letter code";
+  inp.autocomplete = "off"; inp.autocapitalize = "characters"; inp.spellcheck = false;
+  inp.setAttribute("inputmode", "text"); inp.setAttribute("enterkeyhint", "go");
+  /* Nothing more to tap once a whole invitation is in the box: pasted
+     text opens at once, and a code typed by hand opens as its tenth
+     letter goes in. */
+  inp.onpaste = function(e){
+    var cd = e.clipboardData || window.clipboardData;
+    var text = cd ? cd.getData("text") : "";
+    if (text && inviteFragFrom(text)) { e.preventDefault(); inp.value = text.trim(); openPastedLink(text); }
+  };
+  inp.oninput = function(){
+    var f = inviteFragFrom(inp.value);
+    if (f && /^#i=/.test(f) && !/#/.test(inp.value)) openPastedLink(inp.value);
+  };
+  var go = document.createElement("button"); go.className = "btn ghost"; go.textContent = "Open";
   go.onclick = function(){ openPastedLink(inp.value); };
   inp.onkeydown = function(e){ if (e.key === "Enter") openPastedLink(inp.value); };
   card.appendChild(lb); card.appendChild(inp); card.appendChild(go);
   main.appendChild(card);
+  welcomeClipWatch(true);
 
-  var make = document.createElement("button");
-  make.className = "more"; make.textContent = "Start a new family instead";
-  make.onclick = openSetup;
-  main.appendChild(make);
+  /* Creating a family: for the one person doing it, deliberately. Not
+     while an invitation is in play on this phone. */
+  if (!inviteSeen && !pend) {
+    var make = document.createElement("button");
+    make.className = "more"; make.textContent = "Setting up a family for the first time?";
+    make.onclick = function(){
+      make.style.display = "none";
+      var cc = document.createElement("div"); cc.className = "onb";
+      var ch = document.createElement("h3"); ch.textContent = "Create a new family";
+      var cp = document.createElement("p");
+      cp.textContent = "Only one person does this — the one who then invites everyone else and " +
+        "manages the family. If somebody sent you a link, don't create a family: open their link above.";
+      var cb = document.createElement("button"); cb.className = "btn"; cb.textContent = "I'm the one setting it up";
+      cb.onclick = function(){ openSetup(true); };
+      var cx = document.createElement("button"); cx.className = "btn ghost"; cx.textContent = "I was sent a link";
+      cx.onclick = function(){ cc.parentNode.removeChild(cc); make.style.display = ""; try { inp.focus(); } catch (e) {} };
+      cc.appendChild(ch); cc.appendChild(cp); cc.appendChild(cb); cc.appendChild(cx);
+      make.parentNode.insertBefore(cc, make.nextSibling);
+    };
+    main.appendChild(make);
+  }
   main.appendChild(creditLine());
 }
+
+/* While the first screen is up: when the person comes back to the app
+   (from copying the link in their messages, say) and the browser has
+   already allowed reading the clipboard, the invitation opens by itself
+   - no tap at all. Browsers that need a tap are left alone; the Paste
+   button is right there. */
+var clipWatchOn = false, clipTried = "";
+function welcomeClipWatch(on){
+  clipWatchOn = !!on;
+}
+function welcomeClipCheck(){
+  if (!clipWatchOn || state || !$("pasteLink")) return;
+  if (!navigator.permissions || !navigator.permissions.query || !navigator.clipboard || !navigator.clipboard.readText) return;
+  try {
+    navigator.permissions.query({ name: "clipboard-read" }).then(function(st){
+      if (!st || st.state !== "granted" || !$("pasteLink")) return;
+      return navigator.clipboard.readText().then(function(text){
+        var f = inviteFragFrom(text);
+        if (f && f !== clipTried && $("pasteLink")) { clipTried = f; openPastedLink(text); }
+      });
+    }).catch(function(){});
+  } catch (e) {}
+}
+window.addEventListener("focus", function(){ setTimeout(welcomeClipCheck, 150); });
+document.addEventListener("visibilitychange", function(){ if (!document.hidden) setTimeout(welcomeClipCheck, 150); });
 
 function creditLine(){
   var c = document.createElement("p"); c.className = "credit";
@@ -8764,6 +8928,8 @@ function redeemInvite(){
   var m = location.hash.match(/[#&]i=([2-9A-Za-z]{10})(&|$)/);
   if (!m) return false;
   var code = m[1].toUpperCase();
+  inviteSeen = true;
+  var thisFrag = location.hash;
   var f = location.hash.match(/[#&]f=([A-Za-z0-9_-]+)/);
   var base = DEFAULT_FS;
   if (f) { try { base = unb64u(f[1]); } catch (e) {} }
@@ -8783,7 +8949,13 @@ function redeemInvite(){
     /* An expired link need not be a dead end: the family server still
        knows whose it was, and can ask for a new one on your behalf. */
     var canAsk = expired && !!info.renew;
-    t.textContent = !expired ? "Check the internet connection and try again."
+    /* Not expired, just unreachable: the link is kept and opens by
+       itself when the connection is back (see retryPendingLink). */
+    if (!expired) { setPendingLink(thisFrag); schedulePendingRetry(); }
+    else setPendingLink("");
+    t.textContent = !expired ? (navigator.onLine === false
+                                  ? "This phone is offline. The invitation opens by itself as soon as it's back online."
+                                  : "The family server couldn't be reached. It's tried again by itself every little while — or tap below.")
       : canAsk && info.newer ? "A newer link was sent to you after this one — look for it in your messages first. " +
                  "If you can't find it, tap below and the family admin is notified to send you another."
       : canAsk ? "Invitations last 30 days. Tap below and the family admin is notified to send you a new link " +
@@ -8837,6 +9009,7 @@ function redeemInvite(){
     var h = "#j=" + d.j + "&m=" + d.m +
             (d.s && /^[A-Za-z0-9_-]{16,80}$/.test(d.s) ? "&s=" + d.s : "") +
             (d.p ? "&p=1" : "") + (d.by && /^[A-Za-z0-9]{3,16}$/.test(d.by) ? "&by=" + d.by : "");
+    setPendingLink("");
     history.replaceState(null, "", location.pathname + h);
     readIntent();
     if (!tryJoin()) paintMain();
@@ -8844,25 +9017,42 @@ function redeemInvite(){
   return true;
 }
 
-/* Any text holding an invite link: the part after # is what matters. */
+/* Any text holding an invitation - a link, the part after #, or the
+   bare code - opens it. */
 function openPastedLink(text){
   var t = String(text || "").trim();
-  var i = t.indexOf("#");
-  var frag = i === -1 ? "" : t.slice(i);
-  frag = frag.replace(/\s.*$/, "");
-  if (/[#&]i=[2-9A-Za-z]{10}/.test(frag)) {
-    history.replaceState(null, "", location.pathname + frag);
-    redeemInvite();
+  var frag = inviteFragFrom(t);
+  if (!frag) {
+    toast(t ? "That isn't an invitation — it should hold a link or a 10-letter code" : "Paste the invitation first");
     return;
   }
-  if (!/[#&]j=[A-Za-z0-9\-_]+/.test(frag)) {
-    toast(t ? "That isn't an invite link — it should contain #j=" : "Paste the link first");
-    return;
-  }
+  inviteSeen = true;
   history.replaceState(null, "", location.pathname + frag);
+  if (/[#&]i=/.test(frag)) { redeemInvite(); return; }
   readIntent();
   if (!tryJoin()) paintMain();
 }
+
+/* A link that could not be opened for want of a connection is kept and
+   tried again by itself: when the network comes back, when the app
+   comes to the front, and every little while meanwhile. */
+var pendingRetryTimer = null;
+function retryPendingLink(){
+  var frag = pendingLink();
+  if (!frag || state || call || group) return;
+  if (!navigator.onLine) return;
+  history.replaceState(null, "", location.pathname + frag);
+  redeemInvite();
+}
+function schedulePendingRetry(){
+  if (pendingRetryTimer) return;
+  pendingRetryTimer = setInterval(function(){
+    if (!pendingLink() || state) { clearInterval(pendingRetryTimer); pendingRetryTimer = null; return; }
+    retryPendingLink();
+  }, 20000);
+}
+window.addEventListener("online", function(){ setTimeout(retryPendingLink, 400); });
+document.addEventListener("visibilitychange", function(){ if (!document.hidden) setTimeout(retryPendingLink, 300); });
 
 /* ==================================================================== *
  * Chat - one conversation per person
@@ -11850,7 +12040,22 @@ function openMsgSheet(){
 
 var draft = null, chosenColour = COLOURS[0];
 
-function openSetup(){
+function openSetup(create){
+  /* Not in a family yet (first screen, or still joining): Settings is
+     only the language. Creating a family is asked for on purpose, from
+     the first screen's own button - never as a side effect of tapping
+     the gear while an invitation is being opened. */
+  if ((!state || joinForm) && create !== true) {
+    $("setupTitle").textContent = L("Language · اللغة");
+    Array.prototype.forEach.call(document.querySelectorAll("#setupSheet [data-pages]"), function(el){
+      el.classList.toggle("pg-off", (" " + el.getAttribute("data-pages") + " ").indexOf(" language ") === -1);
+    });
+    $("setBack").style.visibility = "hidden";
+    setPageNow = "language";
+    try { paintLang(); } catch (e) {}
+    openSheet("setupSheet");
+    return;
+  }
   draft = state ? JSON.parse(JSON.stringify(state))
                 : { house: rand(12), me:null, members:[], recent:[], turn:null };
   if (!draft.members.length) draft.members = [ newMember(""), newMember("") ];
@@ -13934,6 +14139,10 @@ function tryJoin(){
                           : (cfg.k || (same && prev.token) || null),
             fs:     older ? (prev.fs || null) : (cfg.fs || null) };
   if (state.adminKey === undefined) delete state.adminKey;
+  /* Set up from an invitation: this phone joined a family somebody else
+     made, so it is never offered a family of its own (see paintAdmin). */
+  state.viaInvite = (same && prev.me && prev.me === mine) ? prev.viaInvite : true;
+  if (state.viaInvite === undefined) delete state.viaInvite;
   /* The same person on the same phone (a call notification, their own
      link, an invite opened again): everything this phone already knows
      stays - only the family's details come from the link. It used to
@@ -14056,6 +14265,7 @@ function joinNow(raw){
   if (!m) { m = newMember(name); if (f.id) m.id = f.id; state.members.push(m); }
   m.name = name;
   state.me = m.id;
+  state.viaInvite = true;
   joinForm = null;
   if (state.admin) {
     state.joining = { name: name, by: f.by || null, at: Date.now() };
@@ -16478,7 +16688,10 @@ if (state) {
 })();
 
 readIntent();
+/* An invitation that waited for a connection last time: tried first. */
+if (!state && !location.hash && pendingLink()) history.replaceState(null, "", location.pathname + pendingLink());
 if (!redeemInvite() && !tryJoin()) paintMain();
+if (pendingLink() && !state) schedulePendingRetry();
 splashDone();
 setTimeout(paintBadge, 1500);
 if (state && state.me) { openStreams(); fsCheckPush().then(paintPushWarn); }
