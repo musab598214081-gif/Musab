@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-11-02a";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-11-02b";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var FONTS = "fmn-fonts-v1";   /* the app's font, kept here between launches */
@@ -218,7 +218,7 @@ var AR_NOTE = [
   [/^This is how messages and other notifications look and sound\.$/, "هكذا تبدو الرسائل والإشعارات الأخرى وتُسمع."]
 ];
 var AR_ACT = { Answer: "رد", Join: "انضمام", Decline: "رفض", "Call back": "معاودة الاتصال",
-               Approve: "موافقة", Reject: "رفض" };
+               Approve: "موافقة", Reject: "رفض", "Send link": "إرسال الرابط" };
 function tr(text) {
   if (!text) return text;
   /* A voice message named by an older family server, shown as one. */
@@ -370,7 +370,7 @@ function options(d, kind, quiet) {
   var o = {
     body: tr(d.body || ""),
     data: { url: url, answer: answer, dec: d.dec || null, kind: kind, tag: d.tag || null,
-            cb: d.cb || null, jr: d.jr || null, rej: d.rej || null },
+            cb: d.cb || null, jr: d.jr || null, rej: d.rej || null, rn: d.rn || null },
     timestamp: d.ts || Date.now()
   };
   var call = !!CALL_KINDS[kind];
@@ -389,6 +389,10 @@ function options(d, kind, quiet) {
     o.requireInteraction = true;
     o.actions = [{ action: "approve", title: "Approve" }];
     if (d.rej) o.actions.push({ action: "reject", title: "Reject" });
+  } else if (kind === "renew") {
+    /* Somebody's invitation expired and they asked for a new link. */
+    o.requireInteraction = true;
+    o.actions = [{ action: "sendlink", title: "Send link" }];
   } else if (kind === "missed") {
     if (d.cb) o.actions = [{ action: "callback", title: "Call back" }];
   } else if (kind === "msg") {
@@ -459,6 +463,8 @@ self.addEventListener("notificationclick", function (e) {
      itself opens the request so it can be looked at first. */
   if (d.kind === "approve" && d.jr)
     url = "./#" + (e.action === "approve" ? "approve=" : "jr=") + encodeURIComponent(d.jr);
+  else if (d.kind === "renew" && d.rn)
+    url = "./#" + (e.action === "sendlink" ? "renewsend=" : "renew=") + encodeURIComponent(d.rn);
   else if (e.action === "answer" && d.answer) url = d.answer;
   else if ((e.action === "callback" || d.kind === "missed") && d.cb)
     url = url + (url.indexOf("#") === -1 ? "#" : "&") + "cb=" + encodeURIComponent(d.cb);
