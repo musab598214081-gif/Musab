@@ -1005,6 +1005,19 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   .phrow .btn{width:auto;margin:0;padding:10px 16px}
   .profav.big{width:64px;height:64px;font-size:22px}
 
+  /* ---- Reactions and deleted messages ---- */
+  .bub.deleted .bt{font-style:italic;color:var(--mist)}
+  .bub.hasrx{margin-bottom:15px}
+  .brx{position:absolute;bottom:-15px;background:var(--hearth);border:2px solid var(--night);
+    border-radius:12px;padding:0 6px;font-size:13px;line-height:20px;white-space:nowrap}
+  .bub.out .brx{right:10px} .bub.in .brx{left:10px}
+  [dir=rtl] .bub.out .brx{right:auto;left:10px} [dir=rtl] .bub.in .brx{left:auto;right:10px}
+  #cmenu .rxrow{display:flex;gap:2px;padding:2px 2px 6px;margin-bottom:4px;
+    border-bottom:1px solid rgba(255,255,255,.08)}
+  #cmenu .rxrow button{width:38px;height:38px;padding:0;justify-content:center;font-size:21px;
+    border-radius:50%;flex:0 0 auto}
+  #cmenu .rxrow button.sel{background:rgba(232,176,75,.25)}
+
   /* ---- Blocking ---- */
   .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
@@ -2917,6 +2930,16 @@ Object.assign(AR, {
 "A faster first connection, and each phone's opening time in the family overview": "اتصال أول أسرع، ووقت فتح كل هاتف في نظرة العائلة العامة",
 "Opens in ": "يفتح خلال "
 });
+Object.assign(AR, {
+"React to messages, and delete your own messages for everyone": "تفاعل مع الرسائل، واحذف رسائلك للجميع",
+"This message was deleted": "تم حذف هذه الرسالة",
+"You deleted this message": "لقد حذفت هذه الرسالة",
+"Delete for everyone": "حذف للجميع",
+"Delete for me": "حذف لدي",
+"Delete this message for everyone?": "حذف هذه الرسالة للجميع؟",
+"It's removed from their phone too, and shows as deleted.": "ستُحذف من هاتفه أيضًا، وتظهر كرسالة محذوفة.",
+"Delete this message from this phone?": "حذف هذه الرسالة من هذا الهاتف؟"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3152,16 +3175,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.18.1";
+var APP_VERSION = "1.19.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "A faster first connection, and each phone's opening time in the family overview";
+var WHATS_NEW   = "React to messages, and delete your own messages for everyone";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-11a";
+var VERSION  = "2026-11-12a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3862,6 +3885,7 @@ function fsFrame(f){
     if (co && co.t === "creport") { fsSetSince(f.time); takeReport({ from: f.from, r: co.r }); return; }
     if (co && co.t === "typing") { fsSetSince(f.time); if (Date.now() + fsSkew - f.time < 8000 && !isBlocked(f.from)) typingFrom(f.from); return; }
     if (co && (co.t === "avq" || co.t === "avd")) { fsSetSince(f.time); photoTake(co, f.from); return; }
+    if (co && (co.t === "react" || co.t === "del")) { fsSetSince(f.time); chatSigTake(co, f.from); return; }
     fsSetSince(f.time);
     if (Date.now() - f.time > 120000) {
       var inner; try { inner = JSON.parse(f.body); } catch (e) { return; }
@@ -9318,6 +9342,96 @@ $("phPick").onclick = function(){ $("phFile").value = ""; $("phFile").click(); }
 $("phFile").onchange = function(){ if (this.files && this.files[0]) photoSet(this.files[0]); };
 $("phDel").onclick = function(){ photoApply({ v: 0 }); };
 
+/* ---- Reactions, and deleting messages ----
+   Both go from phone to phone like typing and photos: to the other
+   person, and to this person's own other phones (p: who the chat is
+   with). Only the writer of a message can delete it for everyone. */
+var REACTS = ["\u2764\uFE0F", "\uD83D\uDC4D", "\uD83D\uDE02", "\uD83D\uDE2E", "\uD83D\uDE22", "\uD83D\uDE4F"];
+function chatReactRow(pid, cid, m){
+  var menu = $("cmenu");
+  if (menu.hidden) return;
+  var row = document.createElement("div"); row.className = "rxrow";
+  var mine = m.rx && m.rx.me;
+  REACTS.forEach(function(e){
+    var b = document.createElement("button"); b.type = "button";
+    b.className = e === mine ? "sel" : ""; b.textContent = e;
+    b.setAttribute("aria-label", e); b.setAttribute("translate", "no");
+    b.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+    b.onclick = function(){ cmenuClose(); chatReact(pid, cid, e === mine ? "" : e); };
+    row.appendChild(b);
+  });
+  menu.insertBefore(row, menu.firstChild);
+  var r = menu.getBoundingClientRect(), vv = window.visualViewport;
+  var top0 = vv ? vv.offsetTop : 0, vh = vv ? vv.height : window.innerHeight;
+  if (r.bottom > top0 + vh - 8) menu.style.top = Math.max(top0 + 8, top0 + vh - r.height - 8) + "px";
+}
+function chatReact(pid, cid, e){
+  var m = chatFind(pid, cid);
+  if (!m || m.del || (e && REACTS.indexOf(e) === -1)) return;
+  m.rx = m.rx || {};
+  if (e) m.rx.me = e; else delete m.rx.me;
+  if (!m.rx.me && !m.rx.them) delete m.rx;
+  chatSave(); chatChanged(pid);
+  sendSig(pid, { t: "react", c: cid, e: e }).catch(function(){});
+  sendSig(state.me, { t: "react", c: cid, e: e, p: pid }).catch(function(){});
+}
+function chatWipeMsg(m){
+  if (m.a && m.a.id) {
+    var x = mediaXhr[m.c];
+    if (x) { try { x.abort(); } catch (e) {} }
+    mediaDrop([m.a.id]);
+  }
+  m.del = 1; m.t = "";
+  delete m.a; delete m.re; delete m.rx; delete m.why;
+  if (m.st === "failed" || m.st === "sending") m.st = "sent";
+  if (chatReply && chatReply.re && chatReply.re.c === m.c) chatReplyCancel();
+}
+function chatDeleteAsk(pid, cid, all){
+  if (!confirm(all ? "Delete this message for everyone?\n\nIt's removed from their phone too, and shows as deleted."
+                   : "Delete this message from this phone?")) return;
+  if (all) {
+    var m = chatFind(pid, cid);
+    if (!m || m.d !== "out") return;
+    chatWipeMsg(m);
+    chatSave(); chatChanged(pid);
+    sendSig(pid, { t: "del", c: cid }).catch(function(){});
+    sendSig(state.me, { t: "del", c: cid, p: pid }).catch(function(){});
+    return;
+  }
+  var st = chatStore(), list = st.by[pid] || [], i;
+  for (i = list.length - 1; i >= 0; i--) if (list[i].c === cid) break;
+  if (i < 0) return;
+  if (list[i].a && list[i].a.id) mediaDrop([list[i].a.id]);
+  list.splice(i, 1);
+  (st.gone[pid] = st.gone[pid] || {})[cid] = Date.now();
+  chatSave(); chatChanged(pid);
+}
+function chatSigTake(msg, from){
+  if (!state || !state.me || !from || typeof msg.c !== "string") return;
+  var mine = from === state.me;
+  var pid = mine ? msg.p : from;
+  if (!pid || pid === state.me || !memberById(pid)) return;
+  if (!mine && isBlocked(pid)) return;
+  var m = chatFind(pid, msg.c);
+  if (!m) {
+    /* Deleted before it reached this phone: it never shows. */
+    if (msg.t === "del") { (chatStore().gone[pid] = chatStore().gone[pid] || {})[msg.c] = Date.now(); chatSave(); }
+    return;
+  }
+  if (msg.t === "react") {
+    if (m.del) return;
+    var e = typeof msg.e === "string" && REACTS.indexOf(msg.e) !== -1 ? msg.e : "";
+    var k = mine ? "me" : "them";
+    m.rx = m.rx || {};
+    if (e) m.rx[k] = e; else delete m.rx[k];
+    if (!m.rx.me && !m.rx.them) delete m.rx;
+  } else {
+    if (m.del || (mine && m.d !== "out") || (!mine && m.d !== "in")) return;
+    chatWipeMsg(m);
+  }
+  chatSave(); chatChanged(pid);
+}
+
 function orderedPeople(list, keep){
   var key = list.map(function(m){ return m.id; }).sort().join();
   /* Anything but the home screen (the group picker) follows the home
@@ -10636,7 +10750,7 @@ function chatItems(pid){
    ones come in steps as you scroll back to the top. */
 var chatCache = { pid: null, map: {} };
 function chatSig(m){
-  return (m.st || "") + "|" + (m.why || "") + "|" + m.at + "|" + (m.re ? m.re.c : "") +
+  return (m.del ? "D|" : "") + (m.rx ? (m.rx.me || "") + "/" + (m.rx.them || "") + "|" : "") + (m.st || "") + "|" + (m.why || "") + "|" + m.at + "|" + (m.re ? m.re.c : "") +
          (m.a ? "|" + (m.a.gone ? "g" : "") + (m.a.up ? "u" : "") + (m.prep ? "p" : "") : "");
 }
 function chatRow(map, old, key, sig, make){
@@ -10745,6 +10859,14 @@ function chatBubble(pid, m){
     (m.a ? " media" + (m.a.k === "img" ? " photo" : "") + (m.t ? "" : " nocap") : "");
   d.setAttribute("data-c", m.c);
   if (chatFresh[m.c]) { d.classList.add("fresh"); delete chatFresh[m.c]; }
+  if (m.del) {
+    d.className = "bub deleted " + (m.d === "out" ? "out" : "in");
+    var dt = document.createElement("span"); dt.className = "bt";
+    dt.textContent = m.d === "out" ? "You deleted this message" : "This message was deleted";
+    var dm = document.createElement("span"); dm.className = "bm"; dm.textContent = timeOf(m.at);
+    d.appendChild(dt); d.appendChild(dm);
+    return d;
+  }
   if (m.re && m.re.c) {
     var q = document.createElement("div"); q.className = "bq";
     q.setAttribute("data-q", m.re.c);
@@ -10788,6 +10910,11 @@ function chatBubble(pid, m){
       chatReplyTpl.innerHTML = ICO_REPLY;
     }
     d.appendChild(chatReplyTpl.cloneNode(true));
+  }
+  if (m.rx && (m.rx.me || m.rx.them)) {
+    var rx = document.createElement("span"); rx.className = "brx"; rx.setAttribute("translate", "no");
+    rx.textContent = m.rx.me && m.rx.me === m.rx.them ? m.rx.me + " 2" : (m.rx.them || "") + (m.rx.me || "");
+    d.appendChild(rx); d.classList.add("hasrx");
   }
   return d;
 }
@@ -10868,7 +10995,7 @@ function quoteColour(id){ return id === state.me ? "var(--brass)" : "#7CC4F2"; }
 function chatReplyStart(pid, cid){
   if (!pid || pid !== chatOpenId) return;
   var m = chatFind(pid, cid);
-  if (!m) return;
+  if (!m || m.del) return;
   chatReply = { pid: pid, re: { c: m.c, f: m.d === "out" ? state.me : pid, t: chatSnippet(msgText(m)) } };
   chatReplyPaint();
   var i = $("chatInput");
@@ -10992,7 +11119,7 @@ function chatMsgMenu(el, opts){
   if (!m) return;
   opts = opts || {};
   var a = m.a;
-  var items = [{ label: "Reply", icon: ICO_REPLY, run: function(){ chatReplyStart(pid, cid); } }];
+  var items = m.del ? [] : [{ label: "Reply", icon: ICO_REPLY, run: function(){ chatReplyStart(pid, cid); } }];
   if (m.t) items.push({ label: "Copy", icon: ICO_COPY, run: function(){ copy(m.t, "Copied"); } });
   if (a && a.k === "loc") {
     items.push({ label: "Open in Maps", icon: ICO_PIN, run: function(){ openMaps(a); } });
@@ -11007,11 +11134,15 @@ function chatMsgMenu(el, opts){
   }
   if (m.d === "out" && m.st === "failed" && !m.why)
     items.push({ label: "Send again", icon: ICO_RETRY, run: function(){ chatRetryOne(pid, cid); } });
+  if (m.d === "out" && !m.del && m.st !== "sending")
+    items.push({ label: "Delete for everyone", icon: ICO_CLEAR, danger: true, run: function(){ chatDeleteAsk(pid, cid, true); } });
+  items.push({ label: "Delete for me", icon: ICO_CLEAR, danger: true, run: function(){ chatDeleteAsk(pid, cid, false); } });
   el.classList.add("sel");
   cmenuOpen(el.getBoundingClientRect(), items, {
     right: (m.d === "out") !== isRtl(), x: opts.x, y: opts.y, focus: opts.focus,
     onClose: function(){ el.classList.remove("sel"); }
   });
+  if (!m.del && !isBlocked(pid)) chatReactRow(pid, cid, m);
 }
 function chatRetryOne(pid, cid){
   var m = chatFind(pid, cid);
@@ -11312,6 +11443,7 @@ function attLabel(a){
 }
 function msgText(m){
   if (!m) return "";
+  if (m.del) return "This message was deleted";
   if (!m.a) return m.t || "";
   if (!m.t) return attLabel(m.a);
   return (m.a.k === "img" ? "\uD83D\uDCF7 " : m.a.k === "loc" ? "\uD83D\uDCCD " : "\uD83D\uDCCE ") + m.t;
