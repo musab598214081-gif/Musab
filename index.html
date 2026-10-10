@@ -2994,6 +2994,36 @@ Object.assign(AR, {
 "From": "من",
 "Until": "حتى"
 });
+Object.assign(AR, {
+"Your account is open on one device at a time; a new device needs your approval": "حسابك مفتوح على جهاز واحد في كل مرة؛ والجهاز الجديد يحتاج موافقتك",
+"Confirm it's you": "أكّد أنه أنت",
+"Already open on another device": "مفتوح بالفعل على جهاز آخر",
+"another device": "جهاز آخر",
+"It can be open on one device at a time. On that device, open Family Notifier and tap Allow — this device then signs in, and that one signs out.": "يمكن فتحه على جهاز واحد في كل مرة. على ذلك الجهاز، افتح Family Notifier واضغط «سماح» — فيسجّل هذا الجهاز الدخول، ويسجّل ذاك الخروج.",
+"My other device is lost — ask the admin": "جهازي الآخر مفقود — اطلب من المشرف",
+"The family admin has been asked": "تم إبلاغ مشرف العائلة",
+"Check again": "التحقق مجددًا",
+"You signed in on another device": "سجّلت الدخول على جهاز آخر",
+"This device wasn't approved": "لم تتم الموافقة على هذا الجهاز",
+"Family Notifier can be open on one device at a time. To use it here instead, sign in again and allow it on your other device.": "يمكن فتح Family Notifier على جهاز واحد في كل مرة. لاستخدامه هنا بدلًا من ذلك، سجّل الدخول مجددًا ووافق عليه من جهازك الآخر.",
+"The sign-in was turned down. If that was a mistake, try again, then allow it on your other device.": "تم رفض تسجيل الدخول. إن كان ذلك خطأ، حاول مجددًا ثم وافق عليه من جهازك الآخر.",
+"Sign in on this device": "تسجيل الدخول على هذا الجهاز",
+"Sign-in request": "طلب تسجيل دخول",
+"Moving to a new device": "انتقال إلى جهاز جديد",
+"A new device wants to open Family Notifier as you. If it's you, allow it — this device then signs out.": "جهاز جديد يريد فتح Family Notifier باسمك. إن كنت أنت، فوافق — وسيسجّل هذا الجهاز الخروج.",
+"Their other device is lost or not at hand. Allowing signs it out.": "جهازه الآخر مفقود أو غير متاح. الموافقة تسجّل خروجه منه.",
+"Allow": "سماح",
+"Deny": "رفض",
+"Allow the new device?": "السماح للجهاز الجديد؟",
+"This device will then sign out.": "سيسجّل هذا الجهاز الخروج بعدها.",
+"That request has expired": "انتهت صلاحية ذلك الطلب",
+"Approved — this device is now signed in": "تمت الموافقة — هذا الجهاز مسجّل الدخول الآن",
+"iPhone app": "تطبيق iPhone",
+"iPhone browser": "متصفح iPhone",
+"Android browser": "متصفح Android",
+"Android Home Screen app": "تطبيق Android على الشاشة الرئيسية",
+"Windows computer": "حاسوب Windows"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3229,16 +3259,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.21.0";
+var APP_VERSION = "1.22.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Photos on notifications, reply from a notification, and quiet hours";
+var WHATS_NEW   = "Your account is open on one device at a time; a new device needs your approval";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-14a";
+var VERSION  = "2026-11-15a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3881,7 +3911,8 @@ function fsConnect(){
   fsClose();
   if (state.authBad) return;               /* see takeAuthFail */
   var url = fsBase().replace(/^http/, "ws") + "/ws?me=" + encodeURIComponent(state.me)
-          + "&since=" + fsSince() + "&sec=" + encodeURIComponent(mySec());
+          + "&since=" + fsSince() + "&sec=" + encodeURIComponent(mySec())
+          + "&dk=" + encodeURIComponent(myDk()) + "&dl=" + encodeURIComponent(devLabel());
   var ws;
   try { ws = new WebSocket(url); } catch (e) { fsSchedule(); return; }
   fsWs = ws; fsConnectAt = Date.now();
@@ -3984,7 +4015,15 @@ function fsFrame(f){
   } else if (f.k === "rot") {
     takeRot(f.text, f.sig);
   } else if (f.k === "auth" && f.ok === false) {
-    takeAuthFail();
+    takeAuthFail(f);
+  } else if (f.k === "devreq") {
+    if (f.req && f.req.who) { devReqs[f.req.who] = f.req; paintMain(); notifySound("info"); }
+  } else if (f.k === "devdone") {
+    if (devReqs[f.who]) { delete devReqs[f.who]; paintMain(); }
+  } else if (f.k === "devok") {
+    devApproved();
+  } else if (f.k === "devno") {
+    devDenied();
   } else if (f.k === "blocks") {
     blockTake(f.list);
   } else if (f.k === "caps") {
@@ -4070,6 +4109,7 @@ function fsRequest(frame, timeout, keepalive, viaHttp){
   var body = {}; for (var k in frame) body[k] = frame[k];
   body.me = state.me;
   body.sec = mySec();
+  body.dk = myDk();
   var opts = { method: "POST", headers: { "Content-Type": "application/json" },
                body: JSON.stringify(body) };
   if (keepalive) opts.keepalive = true;
@@ -4091,7 +4131,7 @@ function fsSendPres(){
      sent in that window raised no notification. */
   if (fsPres !== "on" && useFS()) {
     try {
-      var body = { k: "pres", s: s, me: state.me, sec: mySec() };
+      var body = { k: "pres", s: s, me: state.me, sec: mySec(), dk: myDk() };
       fetch(fsBase() + "/send", { method: "POST", headers: { "Content-Type": "application/json" },
                                  body: JSON.stringify(body), keepalive: true }).catch(function(){});
     } catch (e) {}
@@ -4402,13 +4442,13 @@ function ringPush(memberId, title, message, answerable, kind, opt){
    so a phone whose browser replaced it keeps ringing by itself. */
 var fsSkew = 0;
 function swConfig(){
-  if (useFS()) appPost({ t: "cfg", send: fsBase() + "/send", me: state.me, sec: mySec(), skew: fsSkew,
+  if (useFS()) appPost({ t: "cfg", send: fsBase() + "/send", me: state.me, sec: mySec(), dk: myDk(), skew: fsSkew,
                          url: location.origin + location.pathname, name: nameOf(state.me) });
   if (!useFS() || !("serviceWorker" in navigator)) return;
   fsVapidKey().then(function(key){
     return navigator.serviceWorker.getRegistration().then(function(reg){
       var w = reg && (reg.active || reg.waiting || reg.installing);
-      if (w) w.postMessage({ t: "cfg", send: fsBase() + "/send", me: state.me, key: key, sec: mySec(),
+      if (w) w.postMessage({ t: "cfg", send: fsBase() + "/send", me: state.me, key: key, sec: mySec(), dk: myDk(),
                              skew: fsSkew });
     });
   }).catch(function(){});
@@ -4643,7 +4683,7 @@ try {
    alone for a few hours. */
 function autoRelayLink(){
   if (!useFS()) return null;
-  return fsBase() + "/turn?me=" + encodeURIComponent(state.me) + "&sec=" + encodeURIComponent(mySec());
+  return fsBase() + "/turn?me=" + encodeURIComponent(state.me) + "&sec=" + encodeURIComponent(mySec()) + "&dk=" + encodeURIComponent(myDk());
 }
 function cfLink(){
   if (state && state.turn2 && state.turn2.api) return state.turn2.api;
@@ -8974,6 +9014,7 @@ function paintMain(){
   if (!state || !state.me) { paintWelcome(main); return; }
 
   $("whoami").textContent = "You are " + nameOf(state.me);
+  if (devWait) { paintDevWait(main); return; }
   if (state.authBad) { paintAuthBad(main); return; }
   if (state.joining) { paintJoining(main); return; }
   if (state.removed) { paintRemoved(main); return; }
@@ -8990,6 +9031,7 @@ function paintMain(){
   }
   paintJoinReqs(main);
   paintRenewReqs(main);
+  paintDevReqs(main);
   paintSetupCard(main);
   paintInstallCard(main);
   if (bar) {
@@ -9609,6 +9651,134 @@ function photoToApp(ids){
   var map = {}, k = 0;
   ids.forEach(function(id){ if (PH[id] && PH[id].url) { map[id] = PH[id].url; k++; } });
   if (k) appPost({ t: "photos", map: map });
+}
+
+/* ---- One device per member ----
+   Each device has its own key (myDk), kept on the device. The family
+   server lets a member in on one device at a time: a different device
+   waits here until the member's current device - or an admin - allows
+   it, and that signs the other device out. */
+var devWait = null, devReqs = {};
+function myDk(){
+  var k = null;
+  try { k = localStorage.getItem("fmn-dk"); } catch (e) {}
+  if (!k && state && state.dk) k = state.dk;
+  if (!k) k = randSecret();
+  try { localStorage.setItem("fmn-dk", k); } catch (e) {}
+  if (state && state.dk !== k) { state.dk = k; save(); }
+  return k;
+}
+function devLabel(){
+  if (APP) return "Android app";
+  var ua = navigator.userAgent || "";
+  if (isIOS()) return isStandalone() ? "iPhone app" : "iPhone browser";
+  if (isAndroid()) return isStandalone() ? "Android Home Screen app" : "Android browser";
+  if (/Windows/.test(ua)) return "Windows computer";
+  if (/Mac/.test(ua)) return "Mac";
+  return "computer";
+}
+/* An admin's (or co-admin's) own new device: approved with the family key. */
+function devSelfApprove(){
+  if (!canSign() || !isAdminId(state.me) || !fsWs) return;
+  var ws = fsWs;
+  secHash("dev:" + myDk()).then(function(dh){
+    var text = JSON.stringify(["dev", state.house, state.me, dh, Date.now() + fsSkew]);
+    return crypto.subtle.importKey("jwk", state.adminKey, SIGN_ALG, false, ["sign"]).then(function(key){
+      return crypto.subtle.sign(SIGN_USE, key, new TextEncoder().encode(text));
+    }).then(function(sig){
+      try { ws.send(JSON.stringify({ k: "devsign", text: text, sig: bytesToB64u(sig) })); } catch (e) {}
+    });
+  }).catch(function(){});
+}
+function devApproved(){
+  devWait = null;
+  if (state && state.authBad) { delete state.authBad; save(); }
+  toast("Approved — this device is now signed in");
+  paintMain();
+  setTimeout(function(){ fsRetry = 1000; fsConnect(); }, 300);
+}
+function devDenied(){
+  devWait = null;
+  if (!state) return;
+  state.authBad = "denied"; save();
+  fsClose(); paintMain();
+}
+function paintDevWait(main){
+  var hello = document.createElement("p"); hello.className = "greet";
+  hello.textContent = "Confirm it's you";
+  main.appendChild(hello);
+  var card = document.createElement("div"); card.className = "onb";
+  var h = document.createElement("h3"); h.textContent = "Already open on another device";
+  var who = document.createElement("p");
+  who.textContent = nameOf(state.me) + " · " + (devWait.cur || "another device");
+  var p = document.createElement("p"); p.style.marginTop = "8px";
+  p.textContent = "It can be open on one device at a time. On that device, open Family Notifier and tap Allow — this device then signs in, and that one signs out.";
+  card.appendChild(h); card.appendChild(who); card.appendChild(p);
+  if (state.admin && !(canSign() && isAdminId(state.me))) {
+    var ask = document.createElement("button"); ask.className = "btn ghost";
+    ask.textContent = devWait.asked ? "The family admin has been asked" : "My other device is lost — ask the admin";
+    ask.disabled = !!devWait.asked;
+    ask.onclick = function(){
+      try { if (fsWs) fsWs.send(JSON.stringify({ k: "devask" })); } catch (e) {}
+      devWait.asked = true; paintMain();
+    };
+    card.appendChild(ask);
+  }
+  var again = document.createElement("button"); again.className = "btn ghost"; again.textContent = "Check again";
+  again.onclick = function(){ fsClose(); fsRetry = 1000; fsConnect(); };
+  card.appendChild(again);
+  main.appendChild(card);
+}
+function paintReplaced(main){
+  var denied = state.authBad === "denied";
+  var hello = document.createElement("p"); hello.className = "greet"; hello.textContent = "Signed out";
+  main.appendChild(hello);
+  var card = document.createElement("div"); card.className = "onb";
+  var h = document.createElement("h3");
+  h.textContent = denied ? "This device wasn't approved" : "You signed in on another device";
+  var p = document.createElement("p");
+  p.textContent = denied ? "The sign-in was turned down. If that was a mistake, try again, then allow it on your other device."
+                         : "Family Notifier can be open on one device at a time. To use it here instead, sign in again and allow it on your other device.";
+  var b = document.createElement("button"); b.className = "btn"; b.textContent = "Sign in on this device";
+  b.onclick = function(){ delete state.authBad; save(); devWait = null; fsRetry = 1000; fsConnect(); paintMain(); };
+  card.appendChild(h); card.appendChild(p); card.appendChild(b);
+  main.appendChild(card);
+}
+function paintDevReqs(main){
+  Object.keys(devReqs).forEach(function(who){
+    var r = devReqs[who], mine = who === state.me, m = memberById(who);
+    var box = document.createElement("div"); box.className = "req";
+    var top = document.createElement("div"); top.className = "top";
+    var dot = document.createElement("span"); dot.className = "dot";
+    dot.style.background = m ? m.colour : "#9CB0C4";
+    setFace(dot, m, r.name);
+    var tx = document.createElement("div"); tx.className = "tx";
+    var b = document.createElement("b"); b.textContent = mine ? "Sign-in request" : "Moving to a new device";
+    var s1 = document.createElement("small");
+    s1.textContent = (mine ? "" : (r.name || nameOf(who)) + " · ") + (r.l || "another device");
+    var s2 = document.createElement("small");
+    s2.textContent = mine ? "A new device wants to open Family Notifier as you. If it's you, allow it — this device then signs out."
+                          : "Their other device is lost or not at hand. Allowing signs it out.";
+    tx.appendChild(b); tx.appendChild(s1); tx.appendChild(s2);
+    top.appendChild(dot); top.appendChild(tx);
+    var row = document.createElement("div"); row.className = "row";
+    var yes = document.createElement("button"); yes.className = "btn green"; yes.textContent = "Allow";
+    var no = document.createElement("button"); no.className = "btn ghost"; no.textContent = "Deny";
+    function decide(ok){
+      if (ok && mine && !confirm("Allow the new device?\n\nThis device will then sign out.")) return;
+      yes.disabled = no.disabled = true;
+      fsRequest({ k: "devdecide", who: who, ok: ok }, 10000).then(function(res){
+        if (state && state.authBad) return;
+        delete devReqs[who]; paintMain();
+        if (!res || !res.ok) toast(res && res.status === "gone" ? "That request has expired" : "Couldn't reach the family server — try again");
+      });
+    }
+    yes.onclick = function(){ decide(true); };
+    no.onclick = function(){ decide(false); };
+    row.appendChild(yes); row.appendChild(no);
+    box.appendChild(top); box.appendChild(row);
+    main.appendChild(box);
+  });
 }
 
 function orderedPeople(list, keep){
@@ -11972,6 +12142,7 @@ function mediaUpload(pid, m){
         x.open("PUT", fsBase() + "/blob/" + a.id);
         x.setRequestHeader("X-Me", state.me);
         x.setRequestHeader("X-Sec", mySec());
+        x.setRequestHeader("X-Dk", myDk());
         x.setRequestHeader("X-Kind", a.k);
         x.timeout = 10 * 60 * 1000;
         x.upload.onprogress = function(e){ if (e.lengthComputable) mediaSetProg(a.id, e.loaded / e.total); };
@@ -12031,7 +12202,7 @@ function mediaFetch(pid, m, auto){
          per photo instead of two. */
       return fetch(fsBase() + "/blob/" + id, { method: "POST", cache: "no-store",
                                               headers: { "Content-Type": "text/plain" },
-                                              body: JSON.stringify({ me: state.me, sec: mySec() }) })
+                                              body: JSON.stringify({ me: state.me, sec: mySec(), dk: myDk() }) })
         .then(function(r){
           if (r.status === 404 || r.status === 410) throw { gone: 1 };
           if (!r.ok) throw { st: r.status };
@@ -15436,13 +15607,24 @@ function sendJoin(){
    else holds it (this is an old copy, or a copied link), or the admin
    reset it. Retrying would only be turned away again, so this phone
    stops and says what to do - open the new link the admin sends. */
-function takeAuthFail(){
-  if (!state || state.authBad) return;
-  state.authBad = true; save();
+function takeAuthFail(f){
+  if (!state) return;
+  var why = f && f.why;
+  if (why === "device") {
+    /* Another device is this member's: wait here for approval. The
+       connection stays open, so the answer arrives at once. */
+    devWait = { cur: (f && f.cur) || "", at: Date.now(), asked: !!(devWait && devWait.asked) };
+    paintMain();
+    devSelfApprove();
+    return;
+  }
+  if (state.authBad) return;
+  state.authBad = why === "replaced" ? "replaced" : true; save();
   fsClose();
   paintMain();
 }
 function paintAuthBad(main){
+  if (state.authBad === "replaced" || state.authBad === "denied") { paintReplaced(main); return; }
   var hello = document.createElement("p"); hello.className = "greet";
   hello.textContent = "Signed out";
   main.appendChild(hello);

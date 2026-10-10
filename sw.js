@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-11-14a";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-11-15a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var FONTS = "fmn-fonts-v1";   /* the app's font, kept here between launches */
@@ -99,7 +99,7 @@ function ringStop(tag) {
   return savedCfg().then(function (cfg) {
     if (!cfg || !cfg.send || !tag) return;
     return fetch(cfg.send, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ me: cfg.me, sec: cfg.sec || undefined, k: "ringstop", tag: tag }),
+      body: JSON.stringify({ me: cfg.me, sec: cfg.sec || undefined, dk: cfg.dk || undefined, k: "ringstop", tag: tag }),
       keepalive: true }).catch(function () {});
   });
 }
@@ -574,7 +574,7 @@ self.addEventListener("message", function (e) {
        (the family server only believes a phone that holds it). */
     e.waitUntil(caches.open(CFG).then(function (c) {
       return c.put("cfg", new Response(JSON.stringify({ send: m.send, me: m.me, key: m.key,
-                                                        sec: m.sec || null,
+                                                        sec: m.sec || null, dk: m.dk || null,
                                                         skew: typeof m.skew === "number" ? m.skew : 0 })));
     }));
   } else if (m.t === "quiet") {
@@ -612,7 +612,7 @@ self.addEventListener("pushsubscriptionchange", function (e) {
         userVisibleOnly: true, applicationServerKey: fromB64u(cfg.key)
       }).then(function (sub) {
         return fetch(cfg.send, { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ me: cfg.me, sec: cfg.sec || undefined, k: "sub", sub: sub.toJSON() }) });
+          body: JSON.stringify({ me: cfg.me, sec: cfg.sec || undefined, dk: cfg.dk || undefined, k: "sub", sub: sub.toJSON() }) });
       });
     }).catch(function () {}));
 });
