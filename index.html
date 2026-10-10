@@ -3054,7 +3054,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-07a";
+var VERSION  = "2026-11-07b";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -13240,7 +13240,7 @@ $("updGo").onclick = applyUpdate;
 function shellSane(html){
   var t = String(html || "");
   if (t.indexOf("</html>") === -1) return false;
-  var a = t.lastIndexOf("<script>"), b = t.lastIndexOf("</script>");
+  var a = t.lastIndexOf("<scr" + "ipt>"), b = t.lastIndexOf("</scr" + "ipt>");
   if (a === -1 || b < a) return false;
   try { new Function(t.slice(a + 8, b)); return true; }
   catch (e) { return !(e instanceof SyntaxError); }

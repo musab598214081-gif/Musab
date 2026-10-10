@@ -10,6 +10,6 @@ jobs:
           node-version: 20
       - name: The page's script and sw.js must parse
         run: |
-          python3 -c "import re;s=open('index.html',encoding='utf-8').read();open('app.js','w',encoding='utf-8').write(re.findall(r'<script>(.*?)</script>',s,re.S)[-1])"
+          python3 -c "s=open('index.html',encoding='utf-8').read();a=s.rfind('<script>')+8;b=s.rfind('</script>');open('app.js','w',encoding='utf-8').write(s[a:b])"
           node --check app.js
           node --check sw.js
