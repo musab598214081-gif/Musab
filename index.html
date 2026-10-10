@@ -2989,7 +2989,7 @@ var APP_AUTHOR  = "Musab B.";
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-06a";
+var VERSION  = "2026-11-06b";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3039,7 +3039,7 @@ var AVATARS = ["\uD83D\uDC69","\uD83D\uDC68","\uD83D\uDC75","\uD83D\uDC74","\uD8
                "\uD83D\uDC38","\uD83D\uDC27","\uD83E\uDD8B","\uD83C\uDF38","\u2B50","\uD83C\uDF19",
                "\u2764\uFE0F","\uD83D\uDD25","\u26BD","\uD83C\uDFB8"];
 function validAv(a){ return typeof a === "string" && AVATARS.indexOf(a) !== -1; }
-function face(m){ return (m && m.av) ? m.av : (m ? face(m) : "?"); }
+function face(m){ return (m && m.av) ? m.av : initials(m ? m.name : "?"); }
 function faceOf(id, name){
   var m = memberById(id);
   return (m && m.av) ? m.av : initials(name || (m && m.name) || "?");
