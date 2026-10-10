@@ -884,6 +884,33 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   .strow span{color:var(--mist)} .strow b{font-weight:600;text-align:right}
   @media (prefers-reduced-motion:reduce){ .stbar span{transition:none} }
 
+  /* ---- The family window: views, sorting, favourites, characters ---- */
+  .homebar .optbtn{flex:0 0 auto;width:48px;border:0;border-radius:12px;background:var(--hearth);
+    color:var(--mist);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .homebar .optbtn svg{width:20px;height:20px}
+  .homebar .optbtn.on{background:#22364D;color:var(--paper)}
+  .viewnote{font-size:12.5px;color:var(--mist);margin:0 2px 8px;display:flex;gap:6px;flex-wrap:wrap}
+  .viewnote span{background:var(--hearth);border-radius:999px;padding:3px 9px}
+  .person.row{padding:8px 10px;margin-bottom:6px;border-radius:14px}
+  .person.row .dot{width:40px;height:40px;font-size:15px;margin-right:12px}
+  .person.row .nm{font-size:15.5px}
+  .person.cardv{padding:14px 12px 14px 14px}
+  .person.cardv .dot{width:56px;height:56px;font-size:21px}
+  .fav{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--brass);
+    color:var(--brass-ink);font-size:11px;line-height:18px;text-align:center;
+    box-shadow:0 0 0 2px var(--night);pointer-events:none}
+  .tile .fav{left:-4px;top:-4px}
+  .person .dot .fav{right:-4px;top:-4px;box-shadow:0 0 0 2px var(--hearth)}
+  [dir=rtl] .tile .fav{left:auto;right:-4px}
+  [dir=rtl] .person .dot .fav{right:auto;left:-4px}
+  [dir=rtl] .person.row .dot{margin-right:0;margin-left:12px}
+  .avgrid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .avopt{width:42px;height:42px;border-radius:50%;border:2px solid transparent;background:var(--night);
+    color:var(--paper);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;padding:0;font-family:inherit}
+  .avopt.sel{border-color:var(--brass)}
+  .avopt.none{font-size:11px;font-weight:700;color:var(--mist)}
+
   /* ---- Blocking ---- */
   .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
@@ -1231,6 +1258,9 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
       <input type="text" id="meName" placeholder="Your name" autocomplete="off" maxlength="40">
       <label>Your colour</label>
       <div class="swatches" id="meSwatches"></div>
+      <label>Your character</label>
+      <p class="sub small">Shown in place of your initials, on every phone.</p>
+      <div id="meAvGrid"></div>
       <button class="btn" id="meSave">Save</button>
     </div>
 
@@ -1242,6 +1272,9 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
       </div>
       <label>Your colour</label>
       <div class="swatches" id="swatches"></div>
+      <label>Your character</label>
+      <p class="sub small">Shown in place of your initials, on every phone.</p>
+      <div id="avGrid"></div>
     </div>
 
     <div id="membersBlock" data-pages="setup family">
@@ -2700,7 +2733,17 @@ Object.assign(AR, {
 "Voice messages, camera sharing in calls on phones, and a faster start": "رسائل صوتية، ومشاركة الكاميرا في المكالمات على الهواتف، وبدء تشغيل أسرع",
 "Custom colour": "لون مخصص",
 "Lightened a little so your initials stay readable": "تم تفتيحه قليلًا لتبقى أحرف اسمك مقروءة",
-" can't hear you — switching to the relay": " لا يسمعك — جارٍ التحويل إلى خادم الترحيل"
+" can't hear you — switching to the relay": " لا يسمعك — جارٍ التحويل إلى خادم الترحيل",
+"Grid": "شبكة", "List": "قائمة", "Cards": "بطاقات",
+"Sort": "الترتيب", "most contacted": "الأكثر تواصلًا", "A to Z": "أبجديًا", "online first": "المتصلون أولًا",
+"Online first": "المتصلون أولًا", "Show everyone": "عرض الجميع", "Show online now": "عرض المتصلين الآن",
+"Show favourites": "عرض المفضلين", "Favourites": "المفضلون",
+"View, sort and filter": "العرض والترتيب والتصفية",
+"Pin to favourites": "تثبيت في المفضلة", "Unpin from favourites": "إزالة من المفضلة",
+" pinned to the top": " ثُبّت في الأعلى", " removed from favourites": " أُزيل من المفضلة",
+"No favourites yet — open someone and tap ⋮ → Pin to favourites": "لا مفضلين بعد — افتح شخصًا واضغط ⋮ ← تثبيت في المفضلة",
+"Your character": "شخصيتك", "Initials": "الأحرف",
+"Shown in place of your initials, on every phone.": "تظهر بدلًا من أحرف اسمك، على كل الهواتف."
 });
 /*I18N_MORE*/
 
@@ -2937,16 +2980,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.14.0";
+var APP_VERSION = "1.15.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Pick any colour for yourself in Settings → You, and calls that work from the first second";
+var WHATS_NEW   = "The family window: grid, list or cards, search, sorting, favourites, and a character of your own";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-05a";
+var VERSION  = "2026-11-06a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -2987,6 +3030,52 @@ function customSwatch(current, pick){
   };
   lab.appendChild(inp);
   return lab;
+}
+/* A character in place of the initials - chosen in Settings → You,
+   carried with the family, so every phone shows the same one. */
+var AVATARS = ["\uD83D\uDC69","\uD83D\uDC68","\uD83D\uDC75","\uD83D\uDC74","\uD83D\uDC67","\uD83D\uDC66",
+               "\uD83E\uDDD1","\uD83D\uDC76","\uD83E\uDDD5","\uD83D\uDC73","\uD83E\uDDD4","\uD83D\uDC71",
+               "\uD83D\uDC31","\uD83D\uDC36","\uD83E\uDD8A","\uD83D\uDC3B","\uD83D\uDC3C","\uD83E\uDD81",
+               "\uD83D\uDC38","\uD83D\uDC27","\uD83E\uDD8B","\uD83C\uDF38","\u2B50","\uD83C\uDF19",
+               "\u2764\uFE0F","\uD83D\uDD25","\u26BD","\uD83C\uDFB8"];
+function validAv(a){ return typeof a === "string" && AVATARS.indexOf(a) !== -1; }
+function face(m){ return (m && m.av) ? m.av : (m ? face(m) : "?"); }
+function faceOf(id, name){
+  var m = memberById(id);
+  return (m && m.av) ? m.av : initials(name || (m && m.name) || "?");
+}
+function avatarGrid(current, pick){
+  var box = document.createElement("div"); box.className = "avgrid";
+  var none = document.createElement("button"); none.type = "button";
+  none.className = "avopt none" + (current ? "" : " sel"); none.textContent = "Initials";
+  none.onclick = function(){ pick(""); };
+  box.appendChild(none);
+  AVATARS.forEach(function(a){
+    var b = document.createElement("button"); b.type = "button";
+    b.className = "avopt" + (a === current ? " sel" : ""); b.textContent = a;
+    b.setAttribute("translate", "no");
+    b.onclick = function(){ pick(a); };
+    box.appendChild(b);
+  });
+  return box;
+}
+var chosenAv = "", meAv = "";
+function paintAvGrid(){
+  var box = $("avGrid"); if (!box) return;
+  box.innerHTML = "";
+  box.appendChild(avatarGrid(chosenAv, function(a){
+    chosenAv = a; paintAvGrid(); paintProfAv();
+    if (state && draft) draft.members.forEach(function(d){
+      if (d.id === state.me) { if (a) d.av = a; else delete d.av; }
+    });
+    if ($("members")) paintMembers();
+    contactsChanged();
+  }));
+}
+function paintMeAvGrid(){
+  var box = $("meAvGrid"); if (!box) return;
+  box.innerHTML = "";
+  box.appendChild(avatarGrid(meAv, function(a){ meAv = a; paintMeAvGrid(); }));
 }
 var QUICK = ["Call me", "Come here please", "Dinner is ready",
              "Are you OK?", "I'm on my way", "Ring me when free"];
@@ -3281,6 +3370,7 @@ function others(){
 }
 function cloneMember(m, keepContacts){
   var o = { id: m.id, name: m.name, colour: m.colour };
+  if (m.av) o.av = m.av;
   /* When a sign-in was last reset - not secret; lets the admins' phones
      tell whose invite key they hold is out of date. */
   if (keepContacts && m.rk) o.rk = m.rk;
@@ -4857,9 +4947,9 @@ function takeSignedFamily(fam){
        the family carries it, and sent again if it has been a while. */
     var mine = memberById(state.me), rq = state.renameReq;
     if (rq && mine) {
-      if (mine.name === rq.name && mine.colour === rq.colour) delete state.renameReq;
+      if (mine.name === rq.name && mine.colour === rq.colour && (mine.av || "") === (rq.av || "")) delete state.renameReq;
       else {
-        mine.name = rq.name; mine.colour = rq.colour;
+        mine.name = rq.name; mine.colour = rq.colour; if (rq.av) mine.av = rq.av; else delete mine.av;
         if (Date.now() - (rq.at || 0) > 3600000) setTimeout(sendRename, 1500);
       }
     }
@@ -4922,6 +5012,8 @@ function applyLock(){
     if (document.activeElement !== $("meName")) $("meName").value = mine ? mine.name : "";
     meColour = meColour || (mine && mine.colour) || COLOURS[0];
     paintMeSwatches();
+    meAv = (mine && mine.av) || "";
+    paintMeAvGrid();
   }
   if ($("approverName")) $("approverName").textContent = state && state.admin
     ? nameOf(state.admin.id) : "the admin";
@@ -5056,7 +5148,7 @@ function showCallScreen(peerId, incoming){
   var m = memberById(peerId);
   $("callPeer").textContent = m ? m.name : "Someone";
   var av = $("callAvatar");
-  av.textContent = initials(m ? m.name : "?");
+  av.textContent = (m ? face(m) : "?");
   paintWho($("call"), m && m.colour);
   $("callQual").className = "qual";
   $("callNote").textContent = "";
@@ -8213,7 +8305,7 @@ function showBuzz(from, what){
   var rest = m ? String(from).slice(m.name.length).trim() : "";
   $("ringFrom").textContent = name;
   $("ringKind").textContent = rest || "is buzzing you";
-  $("ringAvatar").textContent = initials(name);
+  $("ringAvatar").textContent = m ? face(m) : initials(name);
   paintWho($("ring"), m && m.colour);
   $("ringWhat").textContent = LX(what || "wants your attention");
   $("ring").classList.add("on");
@@ -8409,9 +8501,11 @@ function paintMain(){
   if (state.joining) { paintJoining(main); return; }
   if (state.removed) { paintRemoved(main); return; }
 
-  var big = state.members.filter(function(m){ return m.id !== state.me && shown(m); })
-                          .length >= PANEL_FROM;
-  if (!big) {
+  var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
+  /* Four people or more: the family window - tabs, a view of your own
+     choosing, search, sorting and favourites. Fewer: the simple screen. */
+  var bar = others.length >= BAR_FROM;
+  if (!bar) {
     var hello = document.createElement("p");
     hello.className = "greet";
     hello.textContent = greeting() + ", " + String(nameOf(state.me)).split(/\s+/)[0];
@@ -8421,7 +8515,7 @@ function paintMain(){
   paintRenewReqs(main);
   paintSetupCard(main);
   paintInstallCard(main);
-  if (big) {
+  if (bar) {
     paintPanel(main);
     paintPushWarn();
     paintStatus(streamLive());
@@ -8429,7 +8523,6 @@ function paintMain(){
     return;
   }
 
-  var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
   if (!others.length) {
     var none = document.createElement("p");
     none.className = "hint";
@@ -8438,29 +8531,47 @@ function paintMain(){
       : "Nobody to call yet. " + nameOf(state.admin.id) + " decides who you can reach.";
     main.appendChild(none);
   }
+  homePeople(others).forEach(function(m){ main.appendChild(personCard(m, "")); });
+  if (others.length >= 2) main.appendChild(groupButton());
 
-  others.forEach(function(m){
-    var card = document.createElement("div");
-    card.className = "person";
-    card.setAttribute("data-who", m.name);
-    card.setAttribute("data-id", m.id);
-    card.setAttribute("role", "button");
-    card.tabIndex = 0;
-    var dot = document.createElement("span");
-    dot.className = "dot"; dot.style.background = m.colour;
-    dot.textContent = initials(m.name);
-    var pd = document.createElement("span"); pd.className = "pdot";
-    dot.appendChild(pd);
-    var nm = document.createElement("span");
-    nm.className = "nm"; nm.textContent = m.name;
-    var pr = document.createElement("span"); pr.className = "pres";
-    nm.appendChild(pr);
-    var last = lastWith(m.name);
-    var sub = document.createElement("span");
-    sub.className = "sub" + (last && last.missed ? " missed" : "");
-    sub.textContent = last ? last.text : "Tap to chat, call or buzz";
-    nm.appendChild(sub);
+  statusLine(main);
+  var tabs = document.createElement("div");
+  tabs.className = "tabs"; tabs.id = "histTabs";
+  main.appendChild(tabs);
+  var box = document.createElement("div"); box.id = "recentBox";
+  main.appendChild(box);
 
+  paintRecent();
+  paintPushWarn();
+  paintStatus(streamLive());
+  paintPresence();
+}
+
+/* One person: a card with Buzz and Call ("" or "cards"), or a row of
+   the list ("list"). */
+function personCard(m, mode){
+  var card = document.createElement("div");
+  card.className = "person" + (mode === "list" ? " row" : mode === "cards" ? " cardv" : "");
+  card.setAttribute("data-who", m.name);
+  card.setAttribute("data-id", m.id);
+  card.setAttribute("role", "button");
+  card.tabIndex = 0;
+  var dot = document.createElement("span");
+  dot.className = "dot"; dot.style.background = m.colour;
+  dot.textContent = face(m);
+  var pd = document.createElement("span"); pd.className = "pdot";
+  dot.appendChild(pd);
+  var nm = document.createElement("span");
+  nm.className = "nm"; nm.textContent = m.name;
+  var pr = document.createElement("span"); pr.className = "pres";
+  nm.appendChild(pr);
+  var last = lastWith(m.name);
+  var sub = document.createElement("span");
+  sub.className = "sub" + (last && last.missed ? " missed" : "");
+  sub.textContent = last ? last.text : "Tap to chat, call or buzz";
+  nm.appendChild(sub);
+  card.appendChild(dot); card.appendChild(nm);
+  if (mode !== "list") {
     var go = document.createElement("span");
     go.className = "go";
     var bz = document.createElement("button");
@@ -8477,38 +8588,19 @@ function paintMain(){
       nightCheck([m.id], function(){ startCall(m.id); });
     };
     go.appendChild(bz); go.appendChild(cl);
-
-    card.appendChild(dot); card.appendChild(nm); card.appendChild(go);
-    card.onclick = function(){ openAct(m.id); };
-    card.onkeydown = function(ev){ if (ev.key === "Enter") openAct(m.id); };
-    main.appendChild(card);
-  });
-
-  if (others.length >= 2) {
-    var gb = document.createElement("button");
-    gb.className = "grpbtn";
-    gb.innerHTML = '<span class="ic">' + ICON.group + '</span><span>Group call' +
-                   '<small>Call several people at once</small></span>';
-    gb.onclick = function(){ unlockAudio(); askNotify(); openGroupPicker("new"); };
-    main.appendChild(gb);
+    card.appendChild(go);
   }
-
-  var st = document.createElement("div");
-  st.className = "status"; st.id = "statusLine";
-  st.style.marginTop = "14px";
-  st.innerHTML = '<span class="led"></span><span>Connecting…</span>';
-  main.appendChild(st);
-
-  var tabs = document.createElement("div");
-  tabs.className = "tabs"; tabs.id = "histTabs";
-  main.appendChild(tabs);
-  var box = document.createElement("div"); box.id = "recentBox";
-  main.appendChild(box);
-
-  paintRecent();
-  paintPushWarn();
-  paintStatus(streamLive());
-  paintPresence();
+  card.onclick = function(){ openAct(m.id); };
+  card.onkeydown = function(ev){ if (ev.key === "Enter") openAct(m.id); };
+  return card;
+}
+function groupButton(){
+  var gb = document.createElement("button");
+  gb.className = "grpbtn";
+  gb.innerHTML = '<span class="ic">' + ICON.group + '</span><span>Group call' +
+                 '<small>Call several people at once</small></span>';
+  gb.onclick = function(){ unlockAudio(); askNotify(); openGroupPicker("new"); };
+  return gb;
 }
 
 /* ------------------------------------------------ the doorbell panel
@@ -8527,7 +8619,87 @@ function paintMain(){
  * out when the screen is first drawn and then kept, so a name never
  * jumps away from under a finger. Small families keep the big cards,
  * with their one-tap call button - easier for grandparents. */
-var PANEL_FROM = 7, SEARCH_FROM = 13;
+var PANEL_FROM = 7, SEARCH_FROM = 5, BAR_FROM = 4;
+/* How this person likes the family shown - the view, the order and who
+   is listed. Theirs alone, kept on this phone. */
+var HOME_PREF_KEY = "fmn-home";
+function homePref(){
+  try { var o = JSON.parse(localStorage.getItem(HOME_PREF_KEY) || "{}"); return o && typeof o === "object" ? o : {}; }
+  catch (e) { return {}; }
+}
+function homeSet(k, v){
+  var o = homePref(); o[k] = v;
+  try { localStorage.setItem(HOME_PREF_KEY, JSON.stringify(o)); } catch (e) {}
+}
+function homeView(n){
+  var v = homePref().view;
+  return ["grid", "list", "cards"].indexOf(v) !== -1 ? v : (n >= PANEL_FROM ? "grid" : "cards");
+}
+function homeSort(){ var v = homePref().sort; return ["recent", "name", "online"].indexOf(v) !== -1 ? v : "recent"; }
+function homeFilter(){ var v = homePref().filter; return ["all", "online", "fav"].indexOf(v) !== -1 ? v : "all"; }
+/* Favourites: pinned to the top of every view, with a star. */
+function isFav(id){ return !!(state && state.favs && state.favs.indexOf(id) !== -1); }
+function favToggle(id){
+  if (!state || !memberById(id)) return;
+  var was = isFav(id);
+  state.favs = (state.favs || []).filter(function(x){ return x !== id; });
+  if (!was) state.favs.push(id);
+  save();
+  toast(nameOf(id) + (was ? " removed from favourites" : " pinned to the top"));
+  if (chatOpenId) paintCardNotes(); else paintMain();
+}
+function rankPres(id){ var k = presenceOf(id).k; return k === "on" ? 2 : k === "away" ? 1 : 0; }
+/* The people to show, in the chosen order: favourites first, then the
+   rest by most contacted, by name, or online first. */
+function homePeople(list){
+  var f = homeFilter(), srt = homeSort();
+  var out = list.filter(function(m){
+    if (f === "online" && !rankPres(m.id)) return false;
+    if (f === "fav" && !isFav(m.id)) return false;
+    return true;
+  });
+  if (srt === "recent") out = orderedPeople(out, true);
+  else if (srt === "name") out.sort(function(a, b){ return String(a.name).localeCompare(String(b.name)); });
+  else out.sort(function(a, b){ return (rankPres(b.id) - rankPres(a.id)) || String(a.name).localeCompare(String(b.name)); });
+  return out.filter(function(m){ return isFav(m.id); }).concat(out.filter(function(m){ return !isFav(m.id); }));
+}
+/* Somebody came or went: the order follows, without redrawing. */
+function homeReorder(){
+  var box = $("panel") || $("people");
+  if (!box || !state || !state.me) return;
+  var nodes = Array.prototype.slice.call(box.querySelectorAll("[data-id]"));
+  if (!nodes.length) return;
+  var byId = {}; nodes.forEach(function(x){ byId[x.getAttribute("data-id")] = x; });
+  var list = homePeople(others().filter(function(m){ return byId[m.id]; }));
+  var want = {}; list.forEach(function(m){ want[m.id] = 1; });
+  nodes.forEach(function(x){
+    if (want[x.getAttribute("data-id")]) x.removeAttribute("data-out"); else x.setAttribute("data-out", "1");
+  });
+  var grp = $("grpTile");
+  list.forEach(function(m){ box.insertBefore(byId[m.id], grp && grp.parentNode === box ? grp : null); });
+  filterPanel();
+}
+var ICO_SLIDERS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M19 7h1M4 12h2M12 12h8M4 17h11M21 17h-1"/><circle cx="16" cy="7" r="2.2"/><circle cx="9" cy="12" r="2.2"/><circle cx="18" cy="17" r="2.2"/></svg>';
+var ICO_STAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8Z"/></svg>';
+function homeMenu(btn, focus){
+  if (cmenuLast && cmenuLast.anchor === btn && Date.now() - cmenuLast.skipClick < 600) return;
+  var v = homeView(others().length), srt = homeSort(), f = homeFilter();
+  function it(label, on, k, val){
+    return { label: (on ? "\u2713 " : "") + label,
+             run: function(){ homeSet(k, val); panelOrder = null; paintMain(); } };
+  }
+  cmenuOpen(btn.getBoundingClientRect(), [
+    it("Grid", v === "grid", "view", "grid"),
+    it("List", v === "list", "view", "list"),
+    it("Cards", v === "cards", "view", "cards"),
+    it("Sort: most contacted", srt === "recent", "sort", "recent"),
+    it("Sort: A to Z", srt === "name", "sort", "name"),
+    it("Sort: online first", srt === "online", "sort", "online"),
+    it("Show everyone", f === "all", "filter", "all"),
+    it("Show online now", f === "online", "filter", "online"),
+    it("Show favourites", f === "fav", "filter", "fav")
+  ], { anchor: btn, focus: focus, right: !isRtl() });
+}
 var homeTab = "family", panelOrder = null, panelKey = "", panelFind = "", findOpen = false;
 
 function orderedPeople(list, keep){
@@ -8577,15 +8749,15 @@ function paintHomeTabs(){
 }
 
 function paintPanel(main){
-  var others = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
+  var all = state.members.filter(function(m){ return m.id !== state.me && shown(m); });
+  var view = homeView(all.length), filt = homeFilter(), srt = homeSort();
   var bar = document.createElement("div"); bar.className = "homebar";
   var seg = document.createElement("div");
   seg.className = "tabs hometabs"; seg.id = "homeTabs";
   bar.appendChild(seg);
   /* Search sits behind a small button, so it costs no room until it is
-     wanted - on a small phone that row is the difference between the
-     whole family on one screen and scrolling. */
-  if (homeTab === "family" && others.length >= SEARCH_FROM) {
+     wanted; the view, order and who is listed behind another. */
+  if (homeTab === "family" && all.length >= SEARCH_FROM) {
     var fb = document.createElement("button");
     fb.className = "findbtn" + (findOpen ? " on" : ""); fb.innerHTML = ICON.search;
     fb.setAttribute("aria-label", findOpen ? "Close search" : "Find someone");
@@ -8600,6 +8772,14 @@ function paintPanel(main){
     };
     bar.appendChild(fb);
   }
+  if (homeTab === "family") {
+    var ob = document.createElement("button");
+    ob.className = "optbtn" + (filt !== "all" ? " on" : ""); ob.innerHTML = ICO_SLIDERS;
+    ob.setAttribute("aria-label", "View, sort and filter");
+    ob.setAttribute("aria-haspopup", "menu");
+    ob.onclick = function(e){ homeMenu(ob, e.detail === 0); };
+    bar.appendChild(ob);
+  }
   main.appendChild(bar);
   paintHomeTabs();
 
@@ -8607,14 +8787,14 @@ function paintPanel(main){
     var tabs = document.createElement("div");
     tabs.className = "tabs"; tabs.id = "histTabs"; tabs.style.marginTop = "6px";
     main.appendChild(tabs);
-    var box = document.createElement("div"); box.id = "recentBox";
-    main.appendChild(box);
+    var rbox = document.createElement("div"); rbox.id = "recentBox";
+    main.appendChild(rbox);
     paintRecent();
     statusLine(main);
     return;
   }
 
-  if (others.length >= SEARCH_FROM && findOpen) {
+  if (all.length >= SEARCH_FROM && findOpen) {
     var find = document.createElement("input");
     find.type = "search"; find.className = "find"; find.id = "findPerson";
     find.placeholder = "Find someone"; find.autocomplete = "off";
@@ -8624,31 +8804,51 @@ function paintPanel(main){
     main.appendChild(find);
   }
 
-  var grid = document.createElement("div");
-  grid.className = "panel"; grid.id = "panel";
-  orderedPeople(others, true).forEach(function(m){
-    var b = document.createElement("button");
-    b.className = "tile";
-    b.setAttribute("data-id", m.id);
-    b.setAttribute("data-who", m.name);
-    var av = document.createElement("span");
-    av.className = "av"; av.style.background = m.colour;
-    av.textContent = initials(m.name);
-    var nm = document.createElement("span");
-    nm.className = "nm"; nm.textContent = m.name;
-    b.appendChild(av); b.appendChild(nm);
-    b.onclick = function(){ openAct(m.id); };
-    grid.appendChild(b);
-  });
-  if (others.length >= 2) {
-    var gb = document.createElement("button");
-    gb.className = "tile grp"; gb.id = "grpTile";
-    gb.innerHTML = '<span class="av">' + ICON.group + '</span><span class="nm">Group call</span>';
-    gb.setAttribute("aria-label", "Group call — call several people at once");
-    gb.onclick = function(){ unlockAudio(); askNotify(); openGroupPicker("new"); };
-    grid.appendChild(gb);
+  /* Said in a word when it is not everyone in their usual order. */
+  var chips = [];
+  if (filt === "online") chips.push("Online now");
+  if (filt === "fav") chips.push("Favourites");
+  if (srt === "name") chips.push("A to Z");
+  if (srt === "online") chips.push("Online first");
+  if (chips.length) {
+    var vn = document.createElement("div"); vn.className = "viewnote";
+    chips.forEach(function(t){ var sp = document.createElement("span"); sp.textContent = t; vn.appendChild(sp); });
+    main.appendChild(vn);
   }
-  main.appendChild(grid);
+
+  var list = homePeople(all), box;
+  if (view === "grid") {
+    box = document.createElement("div");
+    box.className = "panel"; box.id = "panel";
+    list.forEach(function(m){
+      var b = document.createElement("button");
+      b.className = "tile";
+      b.setAttribute("data-id", m.id);
+      b.setAttribute("data-who", m.name);
+      var av = document.createElement("span");
+      av.className = "av"; av.style.background = m.colour;
+      av.textContent = face(m);
+      var nm = document.createElement("span");
+      nm.className = "nm"; nm.textContent = m.name;
+      b.appendChild(av); b.appendChild(nm);
+      b.onclick = function(){ openAct(m.id); };
+      box.appendChild(b);
+    });
+    if (all.length >= 2) {
+      var gb = document.createElement("button");
+      gb.className = "tile grp"; gb.id = "grpTile";
+      gb.innerHTML = '<span class="av">' + ICON.group + '</span><span class="nm">Group call</span>';
+      gb.setAttribute("aria-label", "Group call — call several people at once");
+      gb.onclick = function(){ unlockAudio(); askNotify(); openGroupPicker("new"); };
+      box.appendChild(gb);
+    }
+  } else {
+    box = document.createElement("div");
+    box.className = "people"; box.id = "people";
+    list.forEach(function(m){ box.appendChild(personCard(m, view)); });
+    if (all.length >= 2) { var g2 = groupButton(); g2.id = "grpTile"; box.appendChild(g2); }
+  }
+  main.appendChild(box);
   var none = document.createElement("p");
   none.className = "hint"; none.id = "findNone"; none.style.display = "none";
   main.appendChild(none);
@@ -8672,8 +8872,10 @@ function statusLine(main){
 /* Narrows the panel as you type - without redrawing it, so the box
    keeps the keyboard. Matches any part of any word of the name. */
 function filterPanel(){
-  var q = String(panelFind || "").trim().toLowerCase(), shownN = 0;
-  Array.prototype.forEach.call(document.querySelectorAll("#panel .tile[data-id]"), function(t){
+  var q = String(panelFind || "").trim().toLowerCase(), shownN = 0, total = 0;
+  Array.prototype.forEach.call(document.querySelectorAll("#panel .tile[data-id], #people .person[data-id]"), function(t){
+    if (t.hasAttribute("data-out")) { t.style.display = "none"; return; }
+    total++;
     var hit = !q || String(t.getAttribute("data-who")).toLowerCase().indexOf(q) !== -1;
     t.style.display = hit ? "" : "none";
     if (hit) shownN++;
@@ -8681,8 +8883,15 @@ function filterPanel(){
   var g = $("grpTile"); if (g) g.style.display = q ? "none" : "";
   var none = $("findNone");
   if (none) {
-    none.style.display = q && !shownN ? "" : "none";
-    none.textContent = "Nobody called \u201c" + panelFind.trim() + "\u201d in your family.";
+    if (q) {
+      none.style.display = shownN ? "none" : "";
+      none.textContent = "Nobody called \u201c" + panelFind.trim() + "\u201d in your family.";
+    } else {
+      var f = homeFilter();
+      none.style.display = total ? "none" : "";
+      none.textContent = f === "online" ? "Nobody is online right now"
+        : f === "fav" ? "No favourites yet — open someone and tap \u22EE \u2192 Pin to favourites" : "";
+    }
   }
 }
 
@@ -8708,6 +8917,11 @@ function paintTileNotes(){
       moon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>';
       av.appendChild(moon);
     } else if (moon && !(tt && tt.night)) moon.remove();
+    var fs = av.querySelector(".fav");
+    if (isFav(id) && !fs) {
+      fs = document.createElement("span"); fs.className = "fav"; fs.textContent = "\u2605";
+      fs.setAttribute("aria-hidden", "true"); av.appendChild(fs);
+    } else if (fs && !isFav(id)) fs.remove();
     t.setAttribute("aria-label", name + ", " + st.text + (tt ? ", " + tt.short : "") +
       (last && last.count ? ", " + last.count + (last.msgOnly ? " new message" : " missed call") +
                             (last.count > 1 ? "s" : "") : ""));
@@ -8716,7 +8930,7 @@ function paintTileNotes(){
   var sum = $("presSum");
   if (sum) {
     var on = 0, away = 0;
-    Array.prototype.forEach.call(document.querySelectorAll("#panel .tile[data-id]"), function(t){
+    Array.prototype.forEach.call(document.querySelectorAll("#panel .tile[data-id], #people .person[data-id]"), function(t){
       var k = presenceOf(t.getAttribute("data-id")).k;
       if (k === "on") on++; else if (k === "away") away++;
     });
@@ -8746,6 +8960,13 @@ function paintCardNotes(){
       bd = document.createElement("span"); bd.className = "badge" + (last.msgOnly ? " msg" : "");
       bd.textContent = last.count;
       dot.appendChild(bd);
+    }
+    if (dot) {
+      var fs = dot.querySelector(".fav"), fav = !!(bid && isFav(bid));
+      if (fav && !fs) {
+        fs = document.createElement("span"); fs.className = "fav"; fs.textContent = "\u2605";
+        fs.setAttribute("aria-hidden", "true"); dot.appendChild(fs);
+      } else if (fs && !fav) fs.remove();
     }
   });
   paintBadge();
@@ -9664,7 +9885,7 @@ function chatBanner(pid, text){
   var m = memberById(pid);
   b.innerHTML = "";
   var av = document.createElement("span"); av.className = "cav";
-  av.style.background = m ? m.colour : "#5B8DEF"; av.textContent = initials(m ? m.name : "?");
+  av.style.background = m ? m.colour : "#5B8DEF"; av.textContent = (m ? face(m) : "?");
   var tx = document.createElement("span"); tx.className = "btx";
   var nm = document.createElement("b"); nm.textContent = nameOf(pid);
   var bd = document.createElement("span"); bd.textContent = LX(text);
@@ -9698,7 +9919,7 @@ function openChat(id){
   chatCache = { pid: null, map: {} };
   chatReply = null; chatReplyPaint();
   var av = $("chatAv");
-  av.textContent = initials(m.name); av.style.background = m.colour;
+  av.textContent = face(m); av.style.background = m.colour;
   $("chatName").textContent = m.name;
   chatPaintSub();
   $("chatInput").value = ""; chatGrow();
@@ -10242,6 +10463,8 @@ function chatClear(pid){
     if (cmenuLast && cmenuLast.anchor === more && Date.now() - cmenuLast.skipClick < 600) return;
     var pid = chatOpenId, blocked = isBlocked(pid);
     cmenuOpen(more.getBoundingClientRect(), [
+      { label: isFav(pid) ? "Unpin from favourites" : "Pin to favourites", icon: ICO_STAR,
+        run: function(){ favToggle(pid); } },
       blocked ? { label: "Unblock " + nameOf(pid), icon: ICO_BLOCK, run: function(){ blockSet(pid, false); } }
               : { label: "Block " + nameOf(pid), icon: ICO_BLOCK, danger: true, run: function(){ blockAsk(pid); } },
       { label: "Clear chat", icon: ICO_CLEAR, danger: true, run: function(){ chatClearAsk(pid); } }
@@ -11567,7 +11790,7 @@ function paintBlocked(){
     var m = memberById(id);
     var row = document.createElement("div"); row.className = "blkrow";
     var av = document.createElement("span"); av.className = "cav";
-    av.style.background = m.colour; av.textContent = initials(m.name);
+    av.style.background = m.colour; av.textContent = face(m);
     var nm = document.createElement("b"); nm.textContent = m.name;
     var ub = document.createElement("button"); ub.textContent = "Unblock";
     ub.onclick = function(){ ub.disabled = true; blockSet(id, false).then(function(){ ub.disabled = false; }); };
@@ -12346,6 +12569,7 @@ function openSetup(create){
 
   chosenColour = (state && memberById(state.me))
     ? memberById(state.me).colour : COLOURS[0];
+  chosenAv = (state && memberById(state.me) && memberById(state.me).av) || "";
 
   $("verTag").textContent = APP_VERSION;
   $("buildTag").textContent = "build " + VERSION;
@@ -12357,7 +12581,7 @@ function openSetup(create){
      whole sheet from opening, so tapping Settings did nothing at all. */
   function safe(f){ try { f(); } catch (e) {
     try { console.error(e); toast("Part of Settings failed: " + e.message); } catch (x) {} } }
-  safe(paintSwatches); safe(paintMembers); safe(paintTones);
+  safe(paintSwatches); safe(paintAvGrid); safe(paintMembers); safe(paintTones);
   $("shareArea").style.display = state ? "block" : "none";
   if (state) { safe(paintInvites);
                safe(function(){ $("mineLink").textContent = maskLink(personalLink()); }); }
@@ -12438,7 +12662,7 @@ function paintSetNav(){
     b.setAttribute("data-go", page);
     var ic = document.createElement("span"); ic.className = "navic";
     if (opts.avatar) {
-      ic.className = "navav"; ic.style.background = opts.avatar; ic.textContent = initials(title);
+      ic.className = "navav"; ic.style.background = opts.avatar; ic.textContent = face(mine);
     } else ic.innerHTML = opts.icon || "";
     var tx = document.createElement("span"); tx.className = "navtx";
     var t = document.createElement("b"); t.textContent = title;
@@ -12493,7 +12717,7 @@ function newMember(name){
 function paintProfAv(){
   var av = $("profAv"); if (!av) return;
   av.style.background = chosenColour;
-  av.textContent = initials($("myName").value || "?");
+  av.textContent = chosenAv || initials($("myName").value || "?");
 }
 function paintSwatches(){
   var box = $("swatches"); box.innerHTML = "";
@@ -12560,7 +12784,7 @@ function paintMembers(){
     var md = document.createElement("button");
     md.className = "mdot" + (open ? " open" : "");
     md.style.background = isMe ? chosenColour : m.colour;
-    md.textContent = initials(m.name || "?");
+    md.textContent = face(m);
     md.setAttribute("aria-label", "Colour" + (privacy && !isMe ? " and who they see" : "") + " for " + (m.name || "this person"));
     md.setAttribute("aria-expanded", open ? "true" : "false");
     md.onclick = function(){ openContacts = open ? null : m.id; paintMembers(); };
@@ -12570,7 +12794,7 @@ function paintMembers(){
     inp.placeholder = "Name"; inp.autocomplete = "off";
     inp.setAttribute("aria-label", isMe ? "Your name" : "Name");
     inp.oninput = function(){
-      m.name = inp.value; md.textContent = initials(inp.value || "?");
+      m.name = inp.value; md.textContent = m.av || initials(inp.value || "?");
       if (isMe) { $("myName").value = inp.value; paintProfAv(); }
     };
     inp.onchange = function(){ contactsChanged(); };
@@ -12607,7 +12831,7 @@ function paintMembers(){
         if (!d) return;
         var mi = document.createElement("span"); mi.className = "mini";
         mi.style.background = id === state.me ? chosenColour : d.colour;
-        mi.textContent = initials(d.name || "?");
+        mi.textContent = face(d);
         dots.appendChild(mi);
       });
       if (sum.ids.length) sl.appendChild(dots);
@@ -12711,6 +12935,8 @@ function contactsChanged(){
       }
       var col = m.id === state.me ? chosenColour : d.colour;
       if (col && col !== m.colour && validColour(col)) { m.colour = col; recoloured = true; }
+      var av = m.id === state.me ? chosenAv : (d.av || "");
+      if (av !== (m.av || "") && (!av || validAv(av))) { if (av) m.av = av; else delete m.av; recoloured = true; }
       var want = d.c ? d.c.filter(function(id){ return id !== d.id && !!memberById(id); })
                      : null;
       var have = m.c || null;
@@ -13176,7 +13402,7 @@ function paintCoAdmins(box, para, button, primary){
     if (!memberById(id)) return;
     var row = document.createElement("div"); row.className = "corow";
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = (memberById(id) || {}).colour || "#9CB0C4"; dot.textContent = initials(nameOf(id));
+    dot.style.background = (memberById(id) || {}).colour || "#9CB0C4"; dot.textContent = faceOf(id);
     var tx = document.createElement("span"); tx.className = "tx";
     var b = document.createElement("b"); b.textContent = nameOf(id) + (id === state.me ? " (you)" : "");
     var sm = document.createElement("small");
@@ -13441,7 +13667,7 @@ function paintInvites(){
     row.className = "invrow";
     var dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = m.colour;
-    dot.textContent = initials(m.name);
+    dot.textContent = face(m);
     var nm = document.createElement("span");
     nm.className = "nm"; nm.textContent = m.name;
     /* How long their link has left - so it can be sent again before it
@@ -13704,6 +13930,7 @@ function saveSetup(){
       { mine = draft.members[i]; break; }
   if (!mine) { mine = newMember(myName); draft.members.push(mine); }
   mine.name = myName; mine.colour = chosenColour;
+  if (chosenAv) mine.av = chosenAv; else delete mine.av;
 
   if (draft.members.length < 2) { toast("Add at least one other person"); return; }
 
@@ -13979,7 +14206,7 @@ function paintPending(){
     var m = p.member, done = !!memberById(m.id) || p.done;
     var row = document.createElement("div"); row.className = "invrow";
     var dot = document.createElement("span");
-    dot.className = "dot"; dot.style.background = m.colour; dot.textContent = initials(m.name);
+    dot.className = "dot"; dot.style.background = m.colour; dot.textContent = face(m);
     var nm = document.createElement("span"); nm.className = "nm";
     nm.textContent = m.name;
     var st = document.createElement("span");
@@ -14181,7 +14408,7 @@ function paintRenewReqs(main){
     var top = document.createElement("div"); top.className = "top";
     var dot = document.createElement("span"); dot.className = "dot";
     dot.style.background = m && validColour(m.colour) ? m.colour : "#9CB0C4";
-    dot.textContent = m ? initials(m.name) : "?";
+    dot.textContent = m ? face(m) : "?";
     var tx = document.createElement("div"); tx.className = "tx";
     var b = document.createElement("b"); b.textContent = who + " needs a new link";
     var sm = document.createElement("small");
@@ -14359,16 +14586,17 @@ function saveMyDetails(){
   if (!name) { toast("Type your name first"); return; }
   var mine = memberById(state.me);
   var colour = meColour || (mine && mine.colour) || COLOURS[0];
-  if (mine && mine.name === name && mine.colour === colour && !state.renameReq) {
+  var av = meAv || "";
+  if (mine && mine.name === name && mine.colour === colour && (mine.av || "") === av && !state.renameReq) {
     toast("Saved"); return;
   }
-  if (mine) { mine.name = name; mine.colour = colour; }
+  if (mine) { mine.name = name; mine.colour = colour; if (av) mine.av = av; else delete mine.av; }
   if (state.joining) {
     /* Not in yet: the request to join carries the new name. */
     state.joining.name = name; save(); sendJoin(); paintMain();
     toast("Saved"); return;
   }
-  state.renameReq = { name: name, colour: colour, at: 0 };
+  state.renameReq = { name: name, colour: colour, av: av, at: 0 };
   save(); sendRename(); paintMain();
   toast("Saved — " + (state.admin ? nameOf(state.admin.id) + "'s phone passes it on to the family"
                                   : "sent to the family"));
@@ -14379,7 +14607,7 @@ function sendRename(){
   /* To every admin: whichever is around puts it into the family. */
   adminIds().forEach(function(id){
     sendSig(id, { t: "rename", from: state.me, name: state.renameReq.name,
-                  colour: state.renameReq.colour }).catch(function(){});
+                  colour: state.renameReq.colour, av: state.renameReq.av || "" }).catch(function(){});
   });
 }
 /* On the admin's phone. */
@@ -14389,11 +14617,13 @@ function takeRename(msg){
   if (!m) return;
   var name = String(msg.name || "").trim().slice(0, 40);
   var colour = validColour(msg.colour) ? msg.colour : m.colour;
-  if (!name || (name === m.name && colour === m.colour)) { broadcastRoster(m.id); return; }
+  var av = msg.av === "" ? "" : validAv(msg.av) ? msg.av : (m.av || "");
+  if (!name || (name === m.name && colour === m.colour && av === (m.av || ""))) { broadcastRoster(m.id); return; }
   var was = m.name;
   m.name = name; m.colour = colour;
+  if (av) m.av = av; else delete m.av;
   if (draft && draft !== state && draft.members) draft.members.forEach(function(d){
-    if (d.id === m.id) { d.name = name; d.colour = colour; }
+    if (d.id === m.id) { d.name = name; d.colour = colour; if (av) d.av = av; else delete d.av; }
   });
   bumpRev(); save(); broadcastRoster(); paintMain();
   if ($("setupSheet").classList.contains("on")) paintMembers();
@@ -15645,7 +15875,7 @@ function paintOverview(){
     var card = document.createElement("div"); card.className = "ov";
     var top = document.createElement("div"); top.className = "top";
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = m.colour; dot.textContent = initials(m.name);
+    dot.style.background = m.colour; dot.textContent = face(m);
     var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = m.name;
     var sm = document.createElement("small");
     var pr = m.id === state.me ? { text: "This phone" } : presenceOf(m.id);
@@ -15941,6 +16171,7 @@ function paintPresence(){
       }
     }
   });
+  if (homeSort() === "online" || homeFilter() === "online") homeReorder();
 }
 /* The clock moves: their times are redrawn every minute. */
 setInterval(function(){ if (state && state.me && !document.hidden) paintPresence(); }, 60000);
@@ -16109,7 +16340,7 @@ function openGroupPicker(mode, preset){
       t.setAttribute("aria-label", m.name + ", " + st0.text);
       t.innerHTML = '<span class="av"></span><span class="nm"></span>';
       t.querySelector(".av").style.background = m.colour;
-      t.querySelector(".av").textContent = initials(m.name);
+      t.querySelector(".av").textContent = face(m);
       t.querySelector(".nm").textContent = m.name;
       mark(t, m.id);
       t.onclick = function(){
@@ -16126,7 +16357,7 @@ function openGroupPicker(mode, preset){
     b.className = "pick" + (picked[m.id] ? " sel" : "");
     b.setAttribute("aria-pressed", picked[m.id] ? "true" : "false");
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = m.colour; dot.textContent = initials(m.name);
+    dot.style.background = m.colour; dot.textContent = face(m);
     var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = m.name;
     var st = document.createElement("small"); st.textContent = presenceOf(m.id).text;
     st.className = "pres " + presenceOf(m.id).k;
@@ -17004,7 +17235,7 @@ function paintGroup(){
     gState("Group call" + (rest.length ? " with " + gList(rest) : ""));
     var halo = document.createElement("div"); halo.className = "halo";
     halo.innerHTML = '<span class="wave"></span><span class="wave"></span><span class="wave"></span>';
-    var av = document.createElement("div"); av.className = "avatar"; av.textContent = initials(by.name);
+    var av = document.createElement("div"); av.className = "avatar"; av.textContent = faceOf(g.by, by.name);
     halo.appendChild(av); grid.appendChild(halo);
     if (inv.length) {
       var p = document.createElement("p"); p.className = "gmore";
@@ -17033,7 +17264,7 @@ function paintGroup(){
     var t = document.createElement("div");
     t.className = "gt"; t.setAttribute("data-id", id);
     paintWho(t, who.colour);
-    var av = document.createElement("div"); av.className = "av"; av.textContent = initials(who.name);
+    var av = document.createElement("div"); av.className = "av"; av.textContent = faceOf(id, who.name);
     var nm = document.createElement("div"); nm.className = "nm";
     nm.textContent = id === me ? "You" : who.name;
     var st = document.createElement("div"); st.className = "st";
