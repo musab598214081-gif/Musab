@@ -272,6 +272,15 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   .swatch{width:36px;height:36px;border-radius:50%;border:3px solid transparent;
     cursor:pointer;margin:0 10px 10px 0}
   .swatch.sel{border-color:var(--paper)}
+  /* Any colour at all: the rainbow swatch opens the phone's own picker. */
+  .swatch.custom{position:relative;display:block;overflow:hidden;
+    background:conic-gradient(#FF3B30,#FFCC00,#34C759,#30B0FF,#AF52DE,#FF3B30)}
+  .swatch.custom input{position:absolute;inset:-8px;width:200%;height:200%;opacity:0;
+    cursor:pointer;border:0;padding:0;margin:0}
+  .swatch.custom::after{content:"+";position:absolute;inset:0;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:700;font-size:20px;line-height:1;
+    text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
+  .swatches.mini .swatch.custom::after{font-size:16px}
 
   .memberrow{display:flex;align-items:center;margin-bottom:8px}
   .memberrow input{flex:1;margin-right:8px}
@@ -2688,7 +2697,10 @@ Object.assign(AR, {
 "The camera was refused — allow it in the phone's settings for this app": "تم رفض الكاميرا — اسمح بها من إعدادات الهاتف لهذا التطبيق",
 "Couldn't start the camera": "تعذر تشغيل الكاميرا",
 "Couldn't switch the camera": "تعذر تبديل الكاميرا",
-"Voice messages, camera sharing in calls on phones, and a faster start": "رسائل صوتية، ومشاركة الكاميرا في المكالمات على الهواتف، وبدء تشغيل أسرع"
+"Voice messages, camera sharing in calls on phones, and a faster start": "رسائل صوتية، ومشاركة الكاميرا في المكالمات على الهواتف، وبدء تشغيل أسرع",
+"Custom colour": "لون مخصص",
+"Lightened a little so your initials stay readable": "تم تفتيحه قليلًا لتبقى أحرف اسمك مقروءة",
+" can't hear you — switching to the relay": " لا يسمعك — جارٍ التحويل إلى خادم الترحيل"
 });
 /*I18N_MORE*/
 
@@ -2925,16 +2937,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.13.0";
+var APP_VERSION = "1.14.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Joining is one tap: paste the invitation (or its code) and you're in; invited phones are never offered a family of their own";
+var WHATS_NEW   = "Pick any colour for yourself in Settings → You, and calls that work from the first second";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-04e";
+var VERSION  = "2026-11-05a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -2943,6 +2955,39 @@ var STOREKEY = "familyNotifyer.v2";
 
 var COLOURS = ["#FF9500","#FF3B30","#FFCC00","#34C759","#00C7BE",
                "#30B0FF","#5856D6","#AF52DE","#FF2D55","#A2845E"];
+/* Any #rrggbb is a colour. A custom one too dark for the initials drawn
+   on it (always night-blue) is lightened just enough to read. */
+function validColour(c){ return typeof c === "string" && /^#[0-9A-Fa-f]{6}$/.test(c); }
+function readableColour(hex){
+  var h = String(hex).slice(1).toLowerCase(), n = parseInt(h, 16);
+  var r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+  var lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  if (lum >= 0.38) return { colour: "#" + h, changed: false };
+  var f = (0.38 - lum) / (1 - lum);
+  var mix = function(x){ return ("0" + Math.round(x + (255 - x) * f).toString(16)).slice(-2); };
+  return { colour: "#" + mix(r) + mix(g) + mix(b), changed: true };
+}
+/* The rainbow swatch: a colour picker, shown as the chosen colour once
+   that colour is not one of the presets. */
+function customSwatch(current, pick){
+  var own = validColour(current) && COLOURS.indexOf(current) === -1;
+  var lab = document.createElement("label");
+  lab.className = "swatch custom" + (own ? " sel" : "");
+  lab.title = L("Custom colour");
+  if (own) lab.style.background = current;
+  var inp = document.createElement("input");
+  inp.type = "color";
+  inp.value = validColour(current) ? current.toLowerCase() : "#5b8def";
+  inp.setAttribute("aria-label", L("Custom colour"));
+  inp.oninput = function(){ lab.style.background = inp.value; };
+  inp.onchange = function(){
+    var r = readableColour(inp.value);
+    if (r.changed) toast("Lightened a little so your initials stay readable");
+    pick(r.colour);
+  };
+  lab.appendChild(inp);
+  return lab;
+}
 var QUICK = ["Call me", "Come here please", "Dinner is ready",
              "Are you OK?", "I'm on my way", "Ring me when free"];
 var SAFE = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -5557,6 +5602,7 @@ function markConnected(){
   keepAwake();
   prioritiseAudio();
   watchAudio();
+  setTimeout(micSanity, 1500);
   $("call").classList.remove("incoming");
   $("callNote").textContent = "";
   /* Where the sound is going, if it is not the private earpiece. */
@@ -5564,6 +5610,18 @@ function markConnected(){
   startTimer();
   setTimeout(showRoute, 600);
   scrHello();
+}
+
+/* Just after connecting: the sender really has a live, unmuted track. */
+function micSanity(){
+  if (!call || !call.pc || call.state !== "connected") return;
+  var s = call.pc.getSenders().filter(function(x){
+    if (call.scrTx && x === call.scrTx.sender) return false;
+    return x.track && x.track.kind === "audio";
+  })[0];
+  var t = s && s.track;
+  if (!t || t.readyState !== "live" || t.muted) { if (!call.muted) swapMic(); return; }
+  if (!call.muted && !t.enabled) t.enabled = true;
 }
 
 function markFailed(){
@@ -5667,13 +5725,26 @@ function fallBack(ours){
    browser never shows it - it never settles at all. The call then sits
    on "Asking for the microphone..." for ever with no way out but
    reloading the page. Race it against a clock. */
-function micStream(){
+var micEver = false;
+function micStream(fresh){
   /* Echo cancellation, noise suppression and automatic level, asked for
      by name. Most browsers default to them, some do not on every
      device, and a speakerphone call without echo cancellation is the
      "I can hear myself" call. A browser that refuses the constraints
      gets the plain request instead of no call. */
   audioSession("play-and-record");   /* see keepAwake */
+  if (fresh) {
+    /* A call starting. The phone goes into call mode BEFORE the
+       microphone opens: Android keeps a capture that was started in
+       normal mode silent on some phones when the mode changes under it.
+       On an iPhone the page's audio engine, made on the first tap, is
+       closed before the first microphone is asked for - a WebKit habit:
+       a context that predates the first getUserMedia leaves that track
+       silent. It is made again, after, by whatever next needs it. */
+    var nat = nativeAudio();
+    if (nat) { try { nat.set("earpiece"); } catch (e) {} }
+    if (isIOS() && !micEver) audioCtxReset();
+  }
   var media = navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true,
              autoGainControl: true, channelCount: 1 },
@@ -5690,7 +5761,31 @@ function micStream(){
       rej(e);
     }, 20000);
   });
-  return Promise.race([media, timeout]);
+  return Promise.race([media, timeout]).then(function(stream){ micEver = true; return micReady(stream); });
+}
+function audioCtxReset(){
+  if (!audioCtx) return;
+  outChains.slice().forEach(function(c){ outChainOff(c.el); });
+  var old = audioCtx; audioCtx = null;
+  try { old.close(); } catch (e) {}
+}
+/* The track just handed over must be live and carrying sound. A track
+   that starts muted is given a moment to wake; one that stays dead is
+   asked for again - once - rather than sent into the call as silence. */
+function micReady(stream){
+  var t = stream.getAudioTracks()[0];
+  if (!t || (t.readyState === "live" && !t.muted)) return Promise.resolve(stream);
+  return new Promise(function(res){
+    var done = false;
+    function ok(){ if (done) return; done = true; res(stream); }
+    t.onunmute = ok;
+    setTimeout(function(){
+      if (done) return; done = true;
+      if (t.readyState === "live" && !t.muted) { res(stream); return; }
+      stopStream(stream);
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(res, function(){ res(stream); });
+    }, 1500);
+  });
 }
 
 /* ---------------------------------------------------------- microphone
@@ -5842,7 +5937,7 @@ function startCall(peerId){
      permission question could hold the ring back for many seconds.) */
   call.rang = true;
   call.ringP = ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true);
-  var micP = micStream().then(function(stream){
+  var micP = micStream(true).then(function(stream){
     if (call && call.state === "calling") {
       setCallState("Connecting…");
       $("callNote").textContent = "";
@@ -6245,7 +6340,7 @@ function answer(){
   /* Warmed up while ringing: the relay details are here and the path
      is already being reserved - no waiting for either now. */
   var warm = call.warmPc || null;
-  Promise.all([micStream(), warm ? Promise.resolve(true) : ensureRelay()])
+  Promise.all([micStream(true), warm ? Promise.resolve(true) : ensureRelay()])
     .then(function(got){
       var stream = got[0];
       if (!call) { stopStream(stream); return null; }
@@ -6840,6 +6935,7 @@ function watchAudio(){
       sampleUsage(stats);
       sampleQuality(stats);
       try { checkVoice(stats); } catch (e) {}
+      try { checkOneWay(stats); } catch (e) {}
       var got = 0;
       stats.forEach(function(r){
         if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio"))
@@ -6855,9 +6951,38 @@ function watchAudio(){
         stalls++;
       }
       last = got;
-      if (stalls === 3) noSound();
+      /* Every six seconds of silence another step is taken (see
+         noSound) - it used to try once and then never again. */
+      if (stalls >= 3 && stalls % 3 === 0) noSound(stalls / 3);
     }).catch(function(){});
   }, 2000);
+}
+
+/* The other phone reports back (RTCP) what it receives from this one.
+   Packets going out and nothing coming back for a while means this
+   phone's sound is dropped on the way - they hear nothing, though this
+   phone hears them. The receiving side used to be the only one that
+   could notice; now the side that is unheard moves the call to the
+   relay itself. */
+function checkOneWay(stats){
+  if (!call || call.state !== "connected" || call.recovering || call.forcedRelay) return;
+  var o = call.oneWay = call.oneWay || { sent: 0, rr: 0, dead: 0, seen: false };
+  var sent = 0, rr = 0;
+  stats.forEach(function(r){
+    var audio = r.kind === "audio" || r.mediaType === "audio";
+    if (r.type === "outbound-rtp" && audio) sent += r.packetsSent || 0;
+    if (r.type === "remote-inbound-rtp" && audio) { o.seen = true; rr += (r.roundTripTimeMeasurements || 0) + (r.timestamp || 0); }
+  });
+  var sending = sent > o.sent, heard = rr !== o.rr;
+  o.sent = sent; o.rr = rr;
+  if (!sending || heard) { o.dead = 0; return; }
+  o.dead++;
+  /* Twelve seconds of sending into silence. A browser that never
+     reports RTCP at all is given the benefit of the doubt. */
+  if (o.dead < 6 || (!o.seen && !/Chrome|Chromium|Android/.test(navigator.userAgent))) return;
+  o.dead = 0;
+  $("callNote").textContent = nameOf(call.peer) + " can't hear you — switching to the relay";
+  noSound(1);
 }
 
 /* ---------------------------------------------------------- usage
@@ -7043,7 +7168,7 @@ function checkVoice(stats){
   if (!call.muted && outE !== null && v.outE !== null && outE - v.outE <= 1e-10) v.outDead++;
   else v.outDead = 0;
   v.outE = outE;
-  if (!call.muted && (gone || v.outDead >= 4) && Date.now() - v.fixedAt > 20000) {
+  if (!call.muted && (gone || v.outDead >= 3) && Date.now() - v.fixedAt > 20000) {
     v.fixedAt = Date.now(); v.outDead = 0;
     $("callNote").textContent = "Your microphone stopped — restarting it";
     swapMic();
@@ -7204,12 +7329,16 @@ function paintUsage(){
   paintFamUsage();
 }
 
-function noSound(){
+function noSound(stage){
   if (!call) return;
+  stage = stage || 1;
   /* Nothing arriving can also be their microphone dying (some phones
-     then send nothing at all): ask their phone to restart it too - it
-     costs one message, and it is the fix when that is the cause. */
-  sendSig(call.peer, { t: "micchk", call: call.id, from: state.me }).catch(function(){});
+     then send nothing at all): ask their phone to restart it too - but
+     not every six seconds. */
+  if (Date.now() - (call.micAskAt || 0) > 20000) {
+    call.micAskAt = Date.now();
+    sendSig(call.peer, { t: "micchk", call: call.id, from: state.me }).catch(function(){});
+  }
   /* Silent through Cloudflare: try the other routes rather than give up. */
   if (call.viaCloudflare && !call.fellBack) {
     sendSig(call.peer, { t:"fallback", call: call.id, from: state.me }).catch(function(){});
@@ -12368,18 +12497,21 @@ function paintProfAv(){
 }
 function paintSwatches(){
   var box = $("swatches"); box.innerHTML = "";
+  function pick(c){
+    chosenColour = c; paintSwatches(); paintProfAv();
+    /* Your own dot in the family list follows, and the family is told. */
+    if (state && draft) draft.members.forEach(function(d){ if (d.id === state.me) d.colour = c; });
+    if ($("members")) paintMembers();
+    contactsChanged();
+  }
   COLOURS.forEach(function(c){
     var s = document.createElement("div");
     s.className = "swatch" + (c === chosenColour ? " sel" : "");
     s.style.background = c;
-    s.onclick = function(){
-      chosenColour = c; paintSwatches(); paintProfAv();
-      /* Your own dot in the family list follows. */
-      if (state && draft) draft.members.forEach(function(d){ if (d.id === state.me) d.colour = c; });
-      if ($("members")) paintMembers();
-    };
+    s.onclick = function(){ pick(c); };
     box.appendChild(s);
   });
+  box.appendChild(customSwatch(chosenColour, pick));
 }
 
 var openContacts = null;
@@ -12578,7 +12710,7 @@ function contactsChanged(){
         if (m.id === state.me) $("myName").value = name;
       }
       var col = m.id === state.me ? chosenColour : d.colour;
-      if (col && col !== m.colour && COLOURS.indexOf(col) !== -1) { m.colour = col; recoloured = true; }
+      if (col && col !== m.colour && validColour(col)) { m.colour = col; recoloured = true; }
       var want = d.c ? d.c.filter(function(id){ return id !== d.id && !!memberById(id); })
                      : null;
       var have = m.c || null;
@@ -12624,6 +12756,10 @@ function contactsPanel(m, withContacts){
     };
     sw.appendChild(d);
   });
+  sw.appendChild(customSwatch(isMe ? chosenColour : m.colour, function(c){
+    if (isMe) { chosenColour = c; paintSwatches(); paintProfAv(); }
+    m.colour = c; paintMembers(); contactsChanged();
+  }));
   p.appendChild(sw);
   if (!withContacts) return p;
   var cl2 = document.createElement("div"); cl2.className = "clab"; cl2.textContent = "Can see";
@@ -13905,7 +14041,7 @@ function approveJoin(id){
   /* In touch with you, and with whoever invited them - nobody else
      until you choose (Settings → the person → who they see). */
   var added = { id: id, name: req.name,
-                colour: COLOURS.indexOf(req.colour) !== -1 ? req.colour
+                colour: validColour(req.colour) ? req.colour
                         : COLOURS[Math.floor(Math.random() * COLOURS.length)],
                 c: [state.me] };
   if (by && by.id !== state.me) { added.c.push(by.id); added.by = by.id; }
@@ -13949,7 +14085,7 @@ function paintJoinReqs(main){
     box.setAttribute("aria-label", r.name + " wants to join");
     var top = document.createElement("div"); top.className = "top";
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = COLOURS.indexOf(r.colour) !== -1 ? r.colour : "#9CB0C4";
+    dot.style.background = validColour(r.colour) ? r.colour : "#9CB0C4";
     dot.textContent = initials(r.name);
     var tx = document.createElement("div"); tx.className = "tx";
     var b = document.createElement("b"); b.textContent = r.name + " wants to join";
@@ -14044,7 +14180,7 @@ function paintRenewReqs(main){
     box.setAttribute("aria-label", who + " needs a new link");
     var top = document.createElement("div"); top.className = "top";
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = m && COLOURS.indexOf(m.colour) !== -1 ? m.colour : "#9CB0C4";
+    dot.style.background = m && validColour(m.colour) ? m.colour : "#9CB0C4";
     dot.textContent = m ? initials(m.name) : "?";
     var tx = document.createElement("div"); tx.className = "tx";
     var b = document.createElement("b"); b.textContent = who + " needs a new link";
@@ -14215,6 +14351,7 @@ function paintMeSwatches(){
     sw.onclick = function(){ meColour = c; paintMeSwatches(); };
     box.appendChild(sw);
   });
+  box.appendChild(customSwatch(meColour, function(c){ meColour = c; paintMeSwatches(); }));
 }
 function saveMyDetails(){
   if (!state || !state.me) return;
@@ -14251,7 +14388,7 @@ function takeRename(msg){
   var m = memberById(msg.from);
   if (!m) return;
   var name = String(msg.name || "").trim().slice(0, 40);
-  var colour = COLOURS.indexOf(msg.colour) !== -1 ? msg.colour : m.colour;
+  var colour = validColour(msg.colour) ? msg.colour : m.colour;
   if (!name || (name === m.name && colour === m.colour)) { broadcastRoster(m.id); return; }
   var was = m.name;
   m.name = name; m.colour = colour;
@@ -16053,7 +16190,7 @@ function groupStart(ids){
   group.want = ids.slice();
   showGroupScreen();
   gNote("Your browser should be asking to allow the microphone");
-  Promise.all([micStream(), ensureRelay()]).then(function(got){
+  Promise.all([micStream(true), ensureRelay()]).then(function(got){
     if (!group) { stopStream(got[0]); return false; }
     group.stream = got[0];
     gNote("");
@@ -16131,7 +16268,7 @@ function groupFromCall(ids){
   group.stream = call.stream ? call.stream.clone() : null;
   $("callNote").textContent = "Adding " + gList(ids.map(nameOf)) + "…";
   var g = group;
-  (group.stream ? Promise.resolve(group.stream) : micStream()).then(function(s){
+  (group.stream ? Promise.resolve(group.stream) : micStream(true)).then(function(s){
     if (group !== g) { stopStream(s); return false; }
     g.stream = s;
     return groupEnter("open");
@@ -16172,7 +16309,7 @@ function groupMoveIn(msg){
   group.moveFrom = msg.from; group.moveCall = call.id;
   group.stream = call.stream ? call.stream.clone() : null;
   var g = group;
-  (g.stream ? Promise.resolve(g.stream) : micStream()).then(function(s){
+  (g.stream ? Promise.resolve(g.stream) : micStream(true)).then(function(s){
     if (group !== g) { stopStream(s); return; }
     g.stream = s;
     return groupEnter("join");
@@ -16260,7 +16397,7 @@ function groupAccept(){
   g.state = "joining";
   paintGroup();
   gNote("Your browser should be asking to allow the microphone");
-  Promise.all([micStream(), ensureRelay()]).then(function(got){
+  Promise.all([micStream(true), ensureRelay()]).then(function(got){
     if (group !== g) { stopStream(got[0]); return; }
     g.stream = got[0];
     gNote("");
