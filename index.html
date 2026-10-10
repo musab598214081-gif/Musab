@@ -996,6 +996,13 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   .viewin{animation:viewin .16s ease-out}
   @media (prefers-reduced-motion:reduce){ .bub.fresh,.viewin{animation:none} }
 
+  /* ---- Photo avatars ---- */
+  .hasph{background-size:cover !important;background-position:center !important;
+    background-repeat:no-repeat !important}
+  .phrow{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap}
+  .phrow .btn{width:auto;margin:0;padding:10px 16px}
+  .profav.big{width:64px;height:64px;font-size:22px}
+
   /* ---- Blocking ---- */
   .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
@@ -1392,6 +1399,17 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
       </p>
       <div id="inviteList"></div>
       </div>
+    </div>
+
+    <div id="photoBlock" data-pages="profile" style="display:none">
+      <div class="sectiontitle">Your photo</div>
+      <p class="sub">Shown in place of your character or initials, to the people in your family.</p>
+      <div class="phrow">
+        <span class="profav big" id="phPrev" aria-hidden="true"></span>
+        <button class="btn ghost" id="phPick">Choose a photo</button>
+        <button class="btn ghost" id="phDel">Remove</button>
+      </div>
+      <input type="file" id="phFile" accept="image/*" hidden>
     </div>
 
     <div id="mineBlock" data-pages="profile">
@@ -2883,6 +2901,16 @@ Object.assign(AR, {
 "typing…": "يكتب…",
 "1 new message": "رسالة جديدة واحدة"
 });
+Object.assign(AR, {
+"Your own photo, shown to your family in place of your initials": "صورتك الخاصة، تظهر لعائلتك بدلًا من أحرف اسمك",
+"Your photo": "صورتك",
+"Shown in place of your character or initials, to the people in your family.": "تظهر بدلًا من شخصيتك أو أحرف اسمك، لأفراد عائلتك.",
+"Choose a photo": "اختيار صورة",
+"Change photo": "تغيير الصورة",
+"Photo saved — it reaches everyone's phone": "تم حفظ الصورة — تصل إلى هواتف الجميع",
+"Photo removed": "تمت إزالة الصورة",
+"Couldn't read this picture — try another one": "تعذرت قراءة هذه الصورة — جرّب صورة أخرى"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3118,16 +3146,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.17.0";
+var APP_VERSION = "1.18.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Hold a person for quick actions, see when someone is typing, search inside a chat, and a marker for new messages";
+var WHATS_NEW   = "Your own photo, shown to your family in place of your initials";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-09a";
+var VERSION  = "2026-11-10a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3509,6 +3537,7 @@ function others(){
 function cloneMember(m, keepContacts){
   var o = { id: m.id, name: m.name, colour: m.colour };
   if (m.av) o.av = m.av;
+  if (m.ph) o.ph = m.ph;
   /* When a sign-in was last reset - not secret; lets the admins' phones
      tell whose invite key they hold is out of date. */
   if (keepContacts && m.rk) o.rk = m.rk;
@@ -3826,6 +3855,7 @@ function fsFrame(f){
     if (co && /^co-/.test(String(co.t))) { fsSetSince(f.time); takeCo(co, f.from); return; }
     if (co && co.t === "creport") { fsSetSince(f.time); takeReport({ from: f.from, r: co.r }); return; }
     if (co && co.t === "typing") { fsSetSince(f.time); if (Date.now() + fsSkew - f.time < 8000 && !isBlocked(f.from)) typingFrom(f.from); return; }
+    if (co && (co.t === "avq" || co.t === "avd")) { fsSetSince(f.time); photoTake(co, f.from); return; }
     fsSetSince(f.time);
     if (Date.now() - f.time > 120000) {
       var inner; try { inner = JSON.parse(f.body); } catch (e) { return; }
@@ -5087,9 +5117,11 @@ function takeSignedFamily(fam){
        the family carries it, and sent again if it has been a while. */
     var mine = memberById(state.me), rq = state.renameReq;
     if (rq && mine) {
-      if (mine.name === rq.name && mine.colour === rq.colour && (mine.av || "") === (rq.av || "")) delete state.renameReq;
+      if (mine.name === rq.name && mine.colour === rq.colour && (mine.av || "") === (rq.av || "") &&
+          (rq.ph === undefined || (mine.ph || 0) === rq.ph)) delete state.renameReq;
       else {
         mine.name = rq.name; mine.colour = rq.colour; if (rq.av) mine.av = rq.av; else delete mine.av;
+        if (rq.ph !== undefined) { if (rq.ph) mine.ph = rq.ph; else delete mine.ph; }
         if (Date.now() - (rq.at || 0) > 3600000) setTimeout(sendRename, 1500);
       }
     }
@@ -5288,7 +5320,7 @@ function showCallScreen(peerId, incoming){
   var m = memberById(peerId);
   $("callPeer").textContent = m ? m.name : "Someone";
   var av = $("callAvatar");
-  av.textContent = (m ? face(m) : "?");
+  setFace(av, m);
   paintWho($("call"), m && m.colour);
   $("callQual").className = "qual";
   $("callNote").textContent = "";
@@ -8644,7 +8676,7 @@ function showBuzz(from, what){
   var rest = m ? String(from).slice(m.name.length).trim() : "";
   $("ringFrom").textContent = name;
   $("ringKind").textContent = rest || "is buzzing you";
-  $("ringAvatar").textContent = m ? face(m) : initials(name);
+  setFace($("ringAvatar"), m, name);
   paintWho($("ring"), m && m.colour);
   $("ringWhat").textContent = LX(what || "wants your attention");
   $("ring").classList.add("on");
@@ -8897,7 +8929,7 @@ function personCard(m, mode){
   card.tabIndex = 0;
   var dot = document.createElement("span");
   dot.className = "dot"; dot.style.background = m.colour;
-  dot.textContent = face(m);
+  setFace(dot, m);
   var pd = document.createElement("span"); pd.className = "pdot";
   dot.appendChild(pd);
   var nm = document.createElement("span");
@@ -9167,6 +9199,119 @@ function chatSearchGo(i){
   $("chatFindX").onclick = chatSearchClose;
 })();
 
+/* ---- Photo avatars ----
+   The family record only says that someone has a photo, and which
+   version (m.ph). The photo itself - a small square JPEG - travels
+   from its owner's phone to the people they are in touch with, and is
+   kept on each phone. A phone that lacks it asks the owner's phone. */
+var PH = {}, photoAsked = {}, photoSaveTimer = null, photoPaintTimer = null;
+var PHOTO_KEY = "familyNotifyer.photos";
+idbGet(PHOTO_KEY).then(function(o){
+  if (!o || typeof o !== "object") return;
+  for (var k in o) if (!PH[k] || PH[k].v < o[k].v) PH[k] = o[k];
+  if (state && state.me) paintMain();
+});
+function photoSave(){
+  clearTimeout(photoSaveTimer);
+  photoSaveTimer = setTimeout(function(){ idbPut(JSON.parse(JSON.stringify(PH)), PHOTO_KEY); }, 400);
+}
+function photoWant(m){
+  if (!state || !state.me || !m || m.id === state.me || isBlocked(m.id)) return;
+  if (Date.now() - (photoAsked[m.id] || 0) < 1800000) return;
+  photoAsked[m.id] = Date.now();
+  sendSig(m.id, { t: "avq", v: m.ph }).catch(function(){});
+}
+function photoUrl(m){
+  if (!m || !m.ph) return null;
+  if (state && m.id === state.me) return (state.myPhoto && state.myPhoto.d) || null;
+  var e = PH[m.id];
+  if (!e || e.v < m.ph) photoWant(m);
+  return e ? e.url : null;
+}
+function setFace(el, m, name){
+  if (!el) return;
+  var u = photoUrl(m);
+  el.textContent = u ? "" : (m ? face(m) : initials(name || "?"));
+  el.style.backgroundImage = u ? 'url("' + u + '")' : "";
+  el.classList.toggle("hasph", !!u);
+}
+function photoRepaint(id){
+  clearTimeout(photoPaintTimer);
+  photoPaintTimer = setTimeout(function(){
+    if (chatOpenId === id) setFace($("chatAv"), memberById(id));
+    var a = document.activeElement;
+    if (a && (a.id === "findPerson" || a.id === "chatInput")) return;
+    paintMain();
+  }, 300);
+}
+function photoTake(msg, from){
+  if (!state || !state.me || !from || from === state.me || !memberById(from) || isBlocked(from)) return;
+  if (msg.t === "avq") {
+    var p = state.myPhoto;
+    if (p && p.d) sendSig(from, { t: "avd", v: p.v, d: p.d }).catch(function(){});
+    return;
+  }
+  var v = Number(msg.v) || 0, d = String(msg.d || "");
+  if (!v || d.length > 30000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(d)) return;
+  if (PH[from] && PH[from].v >= v) return;
+  PH[from] = { v: v, url: d };
+  photoSave();
+  photoRepaint(from);
+}
+function photoSet(file){
+  if (!state || !state.me || !file) return;
+  decodeImg(file).then(function(src){
+    var S = 160, c = document.createElement("canvas");
+    c.width = c.height = S;
+    var x = c.getContext("2d"), side = Math.min(src.w, src.h);
+    x.fillStyle = "#0F1B2A"; x.fillRect(0, 0, S, S);
+    x.imageSmoothingQuality = "high";
+    x.drawImage(src.img, (src.w - side) / 2, (src.h - side) / 2, side, side, 0, 0, S, S);
+    src.done();
+    var d = c.toDataURL("image/jpeg", 0.8);
+    if (d.length > 18000) d = c.toDataURL("image/jpeg", 0.6);
+    c.width = c.height = 0;
+    if (d.length > 24000 || d.indexOf("data:image/jpeg") !== 0) throw new Error("big");
+    photoApply({ v: Date.now(), d: d });
+  }).catch(function(){ toast("Couldn't read this picture — try another one"); });
+}
+function photoApply(p){
+  if (!state || !state.me) return;
+  var v = p.d ? p.v : 0;
+  state.myPhoto = p.d ? { v: v, d: p.d } : null;
+  if (p.d) PH[state.me] = { v: v, url: p.d }; else delete PH[state.me];
+  photoSave();
+  var mine = memberById(state.me);
+  if (mine) { if (v) mine.ph = v; else delete mine.ph; }
+  if (draft && draft.members) draft.members.forEach(function(d){
+    if (d.id === state.me) { if (v) d.ph = v; else delete d.ph; }
+  });
+  if (canSign() || !state.admin) { bumpRev(); save(); broadcastRoster(); }
+  else if (mine) {
+    state.renameReq = { name: mine.name, colour: mine.colour, av: mine.av || "", ph: v, at: 0 };
+    save(); sendRename();
+  }
+  if (p.d) others().forEach(function(m){
+    if (!isBlocked(m.id)) sendSig(m.id, { t: "avd", v: v, d: p.d }).catch(function(){});
+  });
+  paintPhotoBlock(); paintMain();
+  toast(p.d ? "Photo saved — it reaches everyone's phone" : "Photo removed");
+}
+function paintPhotoBlock(){
+  var b = $("photoBlock");
+  if (!b) return;
+  b.style.display = state && state.me ? "" : "none";
+  if (!state || !state.me) return;
+  var mine = memberById(state.me), pv = $("phPrev");
+  pv.style.background = mine ? mine.colour : "#5B8DEF";
+  setFace(pv, mine);
+  $("phDel").style.display = state.myPhoto ? "" : "none";
+  $("phPick").textContent = state.myPhoto ? "Change photo" : "Choose a photo";
+}
+$("phPick").onclick = function(){ $("phFile").value = ""; $("phFile").click(); };
+$("phFile").onchange = function(){ if (this.files && this.files[0]) photoSet(this.files[0]); };
+$("phDel").onclick = function(){ photoApply({ v: 0 }); };
+
 function orderedPeople(list, keep){
   var key = list.map(function(m){ return m.id; }).sort().join();
   /* Anything but the home screen (the group picker) follows the home
@@ -9292,7 +9437,7 @@ function paintPanel(main){
       b.setAttribute("data-who", m.name);
       var av = document.createElement("span");
       av.className = "av"; av.style.background = m.colour;
-      av.textContent = face(m);
+      setFace(av, m);
       var nm = document.createElement("span");
       nm.className = "nm"; nm.textContent = m.name;
       b.appendChild(av); b.appendChild(nm);
@@ -10353,7 +10498,7 @@ function chatBanner(pid, text){
   var m = memberById(pid);
   b.innerHTML = "";
   var av = document.createElement("span"); av.className = "cav";
-  av.style.background = m ? m.colour : "#5B8DEF"; av.textContent = (m ? face(m) : "?");
+  av.style.background = m ? m.colour : "#5B8DEF"; setFace(av, m);
   var tx = document.createElement("span"); tx.className = "btx";
   var nm = document.createElement("b"); nm.textContent = nameOf(pid);
   var bd = document.createElement("span"); bd.textContent = LX(text);
@@ -10387,7 +10532,7 @@ function openChat(id){
   chatCache = { pid: null, map: {} };
   chatReply = null; chatReplyPaint();
   var av = $("chatAv");
-  av.textContent = face(m); av.style.background = m.colour;
+  av.style.background = m.colour; setFace(av, m);
   $("chatName").textContent = m.name;
   chatPaintSub();
   $("chatInput").value = ""; chatGrow();
@@ -12269,7 +12414,7 @@ function paintBlocked(){
     var m = memberById(id);
     var row = document.createElement("div"); row.className = "blkrow";
     var av = document.createElement("span"); av.className = "cav";
-    av.style.background = m.colour; av.textContent = face(m);
+    av.style.background = m.colour; setFace(av, m);
     var nm = document.createElement("b"); nm.textContent = m.name;
     var ub = document.createElement("button"); ub.textContent = "Unblock";
     ub.onclick = function(){ ub.disabled = true; blockSet(id, false).then(function(){ ub.disabled = false; }); };
@@ -13060,7 +13205,7 @@ function openSetup(create){
      whole sheet from opening, so tapping Settings did nothing at all. */
   function safe(f){ try { f(); } catch (e) {
     try { console.error(e); toast("Part of Settings failed: " + e.message); } catch (x) {} } }
-  safe(paintSwatches); safe(paintAvGrid); safe(paintMembers); safe(paintTones);
+  safe(paintSwatches); safe(paintAvGrid); safe(paintMembers); safe(paintTones); safe(paintPhotoBlock);
   $("shareArea").style.display = state ? "block" : "none";
   if (state) { safe(paintInvites);
                safe(function(){ $("mineLink").textContent = maskLink(personalLink()); }); }
@@ -13141,7 +13286,7 @@ function paintSetNav(){
     b.setAttribute("data-go", page);
     var ic = document.createElement("span"); ic.className = "navic";
     if (opts.avatar) {
-      ic.className = "navav"; ic.style.background = opts.avatar; ic.textContent = face(mine);
+      ic.className = "navav"; ic.style.background = opts.avatar; setFace(ic, mine);
     } else ic.innerHTML = opts.icon || "";
     var tx = document.createElement("span"); tx.className = "navtx";
     var t = document.createElement("b"); t.textContent = title;
@@ -13263,7 +13408,7 @@ function paintMembers(){
     var md = document.createElement("button");
     md.className = "mdot" + (open ? " open" : "");
     md.style.background = isMe ? chosenColour : m.colour;
-    md.textContent = face(m);
+    setFace(md, m);
     md.setAttribute("aria-label", "Colour" + (privacy && !isMe ? " and who they see" : "") + " for " + (m.name || "this person"));
     md.setAttribute("aria-expanded", open ? "true" : "false");
     md.onclick = function(){ openContacts = open ? null : m.id; paintMembers(); };
@@ -13310,7 +13455,7 @@ function paintMembers(){
         if (!d) return;
         var mi = document.createElement("span"); mi.className = "mini";
         mi.style.background = id === state.me ? chosenColour : d.colour;
-        mi.textContent = face(d);
+        setFace(mi, d);
         dots.appendChild(mi);
       });
       if (sum.ids.length) sl.appendChild(dots);
@@ -13901,7 +14046,7 @@ function paintCoAdmins(box, para, button, primary){
     if (!memberById(id)) return;
     var row = document.createElement("div"); row.className = "corow";
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = (memberById(id) || {}).colour || "#9CB0C4"; dot.textContent = faceOf(id);
+    dot.style.background = (memberById(id) || {}).colour || "#9CB0C4"; setFace(dot, memberById(id));
     var tx = document.createElement("span"); tx.className = "tx";
     var b = document.createElement("b"); b.textContent = nameOf(id) + (id === state.me ? " (you)" : "");
     var sm = document.createElement("small");
@@ -14166,7 +14311,7 @@ function paintInvites(){
     row.className = "invrow";
     var dot = document.createElement("span");
     dot.className = "dot"; dot.style.background = m.colour;
-    dot.textContent = face(m);
+    setFace(dot, m);
     var nm = document.createElement("span");
     nm.className = "nm"; nm.textContent = m.name;
     /* How long their link has left - so it can be sent again before it
@@ -14705,7 +14850,7 @@ function paintPending(){
     var m = p.member, done = !!memberById(m.id) || p.done;
     var row = document.createElement("div"); row.className = "invrow";
     var dot = document.createElement("span");
-    dot.className = "dot"; dot.style.background = m.colour; dot.textContent = face(m);
+    dot.className = "dot"; dot.style.background = m.colour; setFace(dot, m);
     var nm = document.createElement("span"); nm.className = "nm";
     nm.textContent = m.name;
     var st = document.createElement("span");
@@ -15106,7 +15251,7 @@ function sendRename(){
   /* To every admin: whichever is around puts it into the family. */
   adminIds().forEach(function(id){
     sendSig(id, { t: "rename", from: state.me, name: state.renameReq.name,
-                  colour: state.renameReq.colour, av: state.renameReq.av || "" }).catch(function(){});
+                  colour: state.renameReq.colour, av: state.renameReq.av || "", ph: state.renameReq.ph }).catch(function(){});
   });
 }
 /* On the admin's phone. */
@@ -15117,12 +15262,14 @@ function takeRename(msg){
   var name = String(msg.name || "").trim().slice(0, 40);
   var colour = validColour(msg.colour) ? msg.colour : m.colour;
   var av = msg.av === "" ? "" : validAv(msg.av) ? msg.av : (m.av || "");
-  if (!name || (name === m.name && colour === m.colour && av === (m.av || ""))) { broadcastRoster(m.id); return; }
+  var ph = typeof msg.ph === "number" && msg.ph >= 0 ? msg.ph : (m.ph || 0);
+  if (!name || (name === m.name && colour === m.colour && av === (m.av || "") && ph === (m.ph || 0))) { broadcastRoster(m.id); return; }
   var was = m.name;
   m.name = name; m.colour = colour;
   if (av) m.av = av; else delete m.av;
+  if (ph) m.ph = ph; else delete m.ph;
   if (draft && draft !== state && draft.members) draft.members.forEach(function(d){
-    if (d.id === m.id) { d.name = name; d.colour = colour; if (av) d.av = av; else delete d.av; }
+    if (d.id === m.id) { d.name = name; d.colour = colour; if (av) d.av = av; else delete d.av; if (ph) d.ph = ph; else delete d.ph; }
   });
   bumpRev(); save(); broadcastRoster(); paintMain();
   if ($("setupSheet").classList.contains("on")) paintMembers();
@@ -16384,7 +16531,7 @@ function paintOverview(){
     var card = document.createElement("div"); card.className = "ov";
     var top = document.createElement("div"); top.className = "top";
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = m.colour; dot.textContent = face(m);
+    dot.style.background = m.colour; setFace(dot, m);
     var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = m.name;
     var sm = document.createElement("small");
     var pr = m.id === state.me ? { text: "This phone" } : presenceOf(m.id);
@@ -16866,7 +17013,7 @@ function openGroupPicker(mode, preset){
     b.className = "pick" + (picked[m.id] ? " sel" : "");
     b.setAttribute("aria-pressed", picked[m.id] ? "true" : "false");
     var dot = document.createElement("span"); dot.className = "dot";
-    dot.style.background = m.colour; dot.textContent = face(m);
+    dot.style.background = m.colour; setFace(dot, m);
     var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = m.name;
     var st = document.createElement("small"); st.textContent = presenceOf(m.id).text;
     st.className = "pres " + presenceOf(m.id).k;
@@ -17744,7 +17891,7 @@ function paintGroup(){
     gState("Group call" + (rest.length ? " with " + gList(rest) : ""));
     var halo = document.createElement("div"); halo.className = "halo";
     halo.innerHTML = '<span class="wave"></span><span class="wave"></span><span class="wave"></span>';
-    var av = document.createElement("div"); av.className = "avatar"; av.textContent = faceOf(g.by, by.name);
+    var av = document.createElement("div"); av.className = "avatar"; setFace(av, memberById(g.by), by.name);
     halo.appendChild(av); grid.appendChild(halo);
     if (inv.length) {
       var p = document.createElement("p"); p.className = "gmore";
@@ -17773,7 +17920,7 @@ function paintGroup(){
     var t = document.createElement("div");
     t.className = "gt"; t.setAttribute("data-id", id);
     paintWho(t, who.colour);
-    var av = document.createElement("div"); av.className = "av"; av.textContent = faceOf(id, who.name);
+    var av = document.createElement("div"); av.className = "av"; setFace(av, memberById(id), who.name);
     var nm = document.createElement("div"); nm.className = "nm";
     nm.textContent = id === me ? "You" : who.name;
     var st = document.createElement("div"); st.className = "st";
