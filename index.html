@@ -1410,6 +1410,12 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     <button class="btn ghost" id="micAllow">Allow the microphone now</button>
     </div>
 
+    <div id="reportBlock" data-pages="calls">
+    <div class="sectiontitle">A call that didn't sound right?</div>
+    <p class="sub">Sends how your last call connected — never what was said — to the family admin, so the problem can be found.</p>
+    <button class="btn ghost" id="reportBtn">Report my last call</button>
+    </div>
+
     <div id="langBlock" data-pages="language">
     <p class="sub">The language of the app on this phone. It opens again in the one you choose.</p>
     <div class="tonegrid" id="langList"></div>
@@ -1575,6 +1581,12 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
       <p class="notice" id="stWarn" style="display:none"></p>
       <div class="strows" id="stRows"></div>
       <button class="btn ghost" id="stRefresh">Count again now</button>
+    </div>
+
+    <div id="creportBlock" data-pages="usage" style="display:none">
+      <div class="sectiontitle">Calls with problems</div>
+      <p class="sub">Phones report a call here by themselves when its sound needed fixing or it didn't connect, or when someone taps Report my last call. Only how the call connected is sent — never what was said, or who it was with.</p>
+      <div id="creportList"></div>
     </div>
 
     <div id="overviewBlock" data-pages="usage" style="display:none">
@@ -2810,6 +2822,32 @@ Object.assign(AR, {
 "Your character": "شخصيتك", "Initials": "الأحرف",
 "Shown in place of your initials, on every phone.": "تظهر بدلًا من أحرف اسمك، على كل الهواتف."
 });
+Object.assign(AR, {
+"Clearer calls that start faster, and call problems reported to the admin automatically": "مكالمات أوضح تبدأ أسرع، وإبلاغ المشرف بمشكلات المكالمات تلقائيًا",
+"Calls with problems": "مكالمات بها مشكلات",
+"Phones report a call here by themselves when its sound needed fixing or it didn't connect, or when someone taps Report my last call. Only how the call connected is sent — never what was said, or who it was with.": "تُبلغ الهواتف عن المكالمة هنا تلقائيًا عندما يحتاج صوتها إلى إصلاح أو لم تتصل، أو عندما يضغط أحدهم «الإبلاغ عن آخر مكالمة». يُرسل فقط كيف اتصلت المكالمة — وليس ما قيل أبدًا، ولا مع من كانت.",
+"A call that didn't sound right?": "مكالمة لم يكن صوتها جيدًا؟",
+"Sends how your last call connected — never what was said — to the family admin, so the problem can be found.": "يرسل كيف اتصلت آخر مكالمة لك — وليس ما قيل أبدًا — إلى مشرف العائلة، ليُعثر على المشكلة.",
+"Report my last call": "الإبلاغ عن آخر مكالمة",
+"No call on this phone yet": "لا توجد مكالمة على هذا الهاتف بعد",
+"This family has no admin to send it to": "لا يوجد مشرف لهذه العائلة لإرساله إليه",
+"Saved — see Settings → Usage": "تم الحفظ — راجع الإعدادات ← الاستخدام",
+"No problems reported yet.": "لم يُبلَّغ عن مشكلات بعد.",
+"didn't connect": "لم تتصل",
+"sound was poor for much of the call": "كان الصوت ضعيفًا معظم المكالمة",
+"no sound arriving": "لا يصل صوت",
+"the other phone heard nothing": "الهاتف الآخر لم يسمع شيئًا",
+"tried other routes": "جُرّبت طرق أخرى",
+"moved to the relay": "نُقلت إلى خادم الترحيل",
+"microphone restarted": "أُعيد تشغيل الميكروفون",
+"the other phone asked for a microphone restart": "طلب الهاتف الآخر إعادة تشغيل الميكروفون",
+"connection dropped": "انقطع الاتصال",
+"sound came back": "عاد الصوت",
+"never connected": "لم تتصل أبدًا",
+"reported by the person": "أبلغ عنها الشخص",
+"computer": "حاسوب",
+"Android app": "تطبيق Android"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3045,16 +3083,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.15.1";
+var APP_VERSION = "1.16.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "A safety net: the app can no longer be left stuck by a bad update";
+var WHATS_NEW   = "Clearer calls that start faster, and call problems reported to the admin automatically";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-07b";
+var VERSION  = "2026-11-08a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3751,6 +3789,7 @@ function fsFrame(f){
        (f.from), never with a name written inside the message. */
     var co = null; try { co = JSON.parse(f.body); } catch (e) {}
     if (co && /^co-/.test(String(co.t))) { fsSetSince(f.time); takeCo(co, f.from); return; }
+    if (co && co.t === "creport") { fsSetSince(f.time); takeReport({ from: f.from, r: co.r }); return; }
     fsSetSince(f.time);
     if (Date.now() - f.time > 120000) {
       var inner; try { inner = JSON.parse(f.body); } catch (e) { return; }
@@ -5575,6 +5614,47 @@ function tuneAudio(pc){
   } catch (e) {}
 }
 
+/* The voice codec, tuned for speech: Opus with its own error correction
+   on, mono, at 32 kbps. Each phone says what it wants to receive, so
+   this is applied to what arrives from the other phone - it sets how
+   THIS phone encodes - and works whatever version the other phone
+   runs. One place for every call, group calls included. */
+function tuneSdp(sdp){
+  sdp = String(sdp || "");
+  var m = /a=rtpmap:(\d+) opus\/48000[^\r\n]*\r?\n/i.exec(sdp);
+  if (!m) return sdp;
+  var pt = m[1], nl = sdp.indexOf("\r\n") !== -1 ? "\r\n" : "\n";
+  var want = { useinbandfec: "1", stereo: "0", "sprop-stereo": "0", maxaveragebitrate: "32000" };
+  function params(o){ return Object.keys(o).map(function(k){ return k + "=" + o[k]; }).join(";"); }
+  var f = new RegExp("a=fmtp:" + pt + " ([^\\r\\n]*)").exec(sdp);
+  if (!f) {
+    var at = m.index + m[0].length;
+    return sdp.slice(0, at) + "a=fmtp:" + pt + " " + params(want) + nl + sdp.slice(at);
+  }
+  var have = {};
+  f[1].split(";").forEach(function(kv){
+    var i = kv.indexOf("=");
+    if (i > 0) have[kv.slice(0, i).trim()] = kv.slice(i + 1).trim();
+  });
+  for (var k in want) have[k] = want[k];
+  return sdp.slice(0, f.index) + "a=fmtp:" + pt + " " + params(have) + sdp.slice(f.index + f[0].length);
+}
+(function(){
+  try {
+    var P = window.RTCPeerConnection && window.RTCPeerConnection.prototype;
+    if (!P || P.__fmnTuned) return;
+    var orig = P.setRemoteDescription;
+    P.setRemoteDescription = function(d){
+      var args = Array.prototype.slice.call(arguments);
+      if (d && d.sdp && (d.type === "offer" || d.type === "answer")) {
+        try { args[0] = { type: d.type, sdp: tuneSdp(d.sdp) }; } catch (e) {}
+      }
+      return orig.apply(this, args);
+    };
+    P.__fmnTuned = true;
+  } catch (e) {}
+})();
+
 /* Which voice codec a call ended up with, for the call's record. Read
    from what the two phones agreed: the browser's own statistics name
    only the codec inside RED (Opus), so they can't tell the two apart. */
@@ -5771,7 +5851,7 @@ function markConnected(){
 
 /* Just after connecting: the sender really has a live, unmuted track. */
 function micSanity(){
-  if (!call || !call.pc || call.state !== "connected") return;
+  if (!call || !call.pc || call.state !== "connected" || !call.micOn) return;
   var s = call.pc.getSenders().filter(function(x){
     if (call.scrTx && x === call.scrTx.sender) return false;
     return x.track && x.track.kind === "audio";
@@ -5781,12 +5861,132 @@ function micSanity(){
   if (!call.muted && !t.enabled) t.enabled = true;
 }
 
+/* What happened in a call, for its report: a few short steps, each
+   with the second of the call it happened at. */
+function callStep(code){
+  if (!call) return;
+  call.steps = call.steps || [];
+  var l = call.steps[call.steps.length - 1];
+  if (l && l[0] === code) return;
+  if (call.steps.length < 20)
+    call.steps.push([code, call.t0 ? Math.round((Date.now() - call.t0) / 1000) : 0]);
+}
+/* The microphone joins the call as soon as both it and the call's voice
+   channel exist - the call no longer waits for the microphone prompt
+   before it starts connecting. The other phone is told when it
+   arrives, so silence before then is not taken for a broken network. */
+function micAttach(){
+  if (!call || !call.stream || !call.tx || call.micOn) return;
+  var t = call.stream.getAudioTracks()[0];
+  if (!t) return;
+  call.micOn = true;
+  t.enabled = !call.muted;
+  call.tx.sender.replaceTrack(t).catch(function(){});
+  if (call.micWaitSent) sendSig(call.peer, { t: "micon", call: call.id, from: state.me }).catch(function(){});
+  if (call.state === "connected") prioritiseAudio();
+}
+var STEP_TEXT = {
+  "no-sound-in": "no sound arriving",
+  "they-hear-nothing": "the other phone heard nothing",
+  "other-routes": "tried other routes",
+  "relay": "moved to the relay",
+  "mic-restart": "microphone restarted",
+  "asked-mic": "the other phone asked for a microphone restart",
+  "reconnect": "connection dropped",
+  "sound-back": "sound came back",
+  "never-connected": "never connected",
+  "user": "reported by the person"
+};
+/* The call's record: kept on this phone (for Report my last call), and
+   sent to the admin by itself when the call needed fixing. How it
+   connected only - never what was said, nor who it was with. */
+function callReport(how, q, bytes, secs){
+  if (!call) return;
+  var r = { at: call.t0 || Date.now(), secs: secs || 0, out: call.out ? 1 : 0, how: how || "",
+            codec: q ? q.codec : "", rtt: q ? q.rtt : 0, loss: q ? q.loss : 0, poor: q && q.poor ? 1 : 0,
+            steps: (call.steps || []).slice(),
+            dev: isIOS() ? "iPhone" : isAndroid() ? (APP ? "Android app" : "Android") : "computer",
+            v: APP_VERSION };
+  try { localStorage.setItem("fmn-lastcall", JSON.stringify(r)); } catch (e) {}
+  if (r.steps.length || r.poor) sendReport(r);
+}
+function sendReport(r){
+  if (!state || !state.admin) return;
+  if (isAdmin()) { takeReport({ from: state.me, r: r }); return; }
+  sendSig(state.admin.id, { t: "creport", r: r }).catch(function(){});
+}
+function takeReport(msg){
+  if (!isAdmin() || !msg || !msg.r || typeof msg.r !== "object") return;
+  var m = memberById(msg.from);
+  if (!m || !famLedger) return;
+  var r = msg.r;
+  var steps = Array.isArray(r.steps) ? r.steps.filter(function(x){
+    return Array.isArray(x) && STEP_TEXT[x[0]];
+  }).slice(0, 20).map(function(x){ return [x[0], Math.max(0, Math.min(86400, Number(x[1]) || 0))]; }) : [];
+  var clean = { who: m.id, at: Number(r.at) || Date.now(), secs: Math.max(0, Number(r.secs) || 0),
+    out: r.out ? 1 : 0, how: String(r.how || "").slice(0, 60), codec: String(r.codec || "").slice(0, 8),
+    rtt: Math.max(0, Number(r.rtt) || 0), loss: Math.max(0, Number(r.loss) || 0),
+    poor: r.poor ? 1 : 0, steps: steps, dev: String(r.dev || "").slice(0, 20),
+    v: String(r.v || "").slice(0, 12) };
+  var h = famLedger[state.house] || (famLedger[state.house] = { people: {} });
+  h.reports = (h.reports || []).filter(function(x){ return !(x.who === clean.who && x.at === clean.at); });
+  h.reports.unshift(clean);
+  h.reports = h.reports.slice(0, 60);
+  writeJSON(FAMUSEKEY, famLedger);
+  paintReports();
+}
+function paintReports(){
+  var block = $("creportBlock");
+  if (!block) return;
+  var on = !!(state && isAdmin());
+  block.style.display = on ? "block" : "none";
+  if (!on) return;
+  var h = famLedger && famLedger[state.house], list = (h && h.reports) || [];
+  var box = $("creportList");
+  box.innerHTML = "";
+  if (!list.length) {
+    var p = document.createElement("p"); p.className = "sub";
+    p.textContent = "No problems reported yet.";
+    box.appendChild(p);
+    return;
+  }
+  list.slice(0, 20).forEach(function(r){
+    var d = document.createElement("div"); d.className = "log";
+    var ic = document.createElement("span"); ic.className = "ic call";
+    ic.innerHTML = r.out ? ICON.outArr : ICON.inArr;
+    var tx = document.createElement("span"); tx.className = "tx";
+    var b = document.createElement("b"); b.textContent = nameOf(r.who);
+    tx.appendChild(b);
+    var det = document.createElement("span"); det.className = "det";
+    det.textContent = [r.secs ? fmtLength(r.secs * 1000) : "didn't connect", r.dev, r.how,
+      r.rtt ? r.rtt + " ms" : "", r.loss ? (r.loss / 100).toFixed(1) + "% lost" : "", r.codec, r.v]
+      .filter(Boolean).join(" · ");
+    tx.appendChild(det);
+    var st = document.createElement("span"); st.className = "det";
+    var steps = r.steps || [];
+    if (!steps.length && r.poor) st.textContent = "sound was poor for much of the call";
+    steps.forEach(function(x, i){
+      if (i) st.appendChild(document.createTextNode(" → "));
+      var sp = document.createElement("span");
+      sp.textContent = (STEP_TEXT[x[0]] || x[0]) + " (" + fmtDur(x[1] * 1000) + ")";
+      st.appendChild(sp);
+    });
+    tx.appendChild(st);
+    var tm = document.createElement("span"); tm.className = "tm";
+    tm.textContent = dayLabel(r.at) === "Today" ? timeOf(r.at) : dayLabel(r.at) + " " + timeOf(r.at);
+    d.appendChild(ic); d.appendChild(tx); d.appendChild(tm);
+    box.appendChild(d);
+  });
+}
+
 function markFailed(){
   if (!call || call.state === "connected" || call.state === "failed") return;
   if (relayOnly() && call.pc) { fallBack(true); return; }
   /* The relay itself did not work - do not keep insisting on it. */
   if (call.forcedRelay && state.preferRelay) { state.preferRelay = false; save(); }
   call.state = "failed";
+  callStep("never-connected");
+  callReport("", null, 0, 0);
   stopTone();
   if (call.watchdog) { clearTimeout(call.watchdog); call.watchdog = null; }
   $("callNote").textContent = (state.turn && (state.turn.url || state.turn.api))
@@ -5863,6 +6063,7 @@ function relayCheck(){
 function fallBack(ours){
   if (!call || !call.pc || call.fellBack) return;
   call.fellBack = true;
+  callStep("other-routes");
   call.viaCloudflare = false;
   call.forcedRelay = false;
   /* The relays already failed: the restart need not wait for them. */
@@ -6094,25 +6295,32 @@ function startCall(peerId){
      permission question could hold the ring back for many seconds.) */
   call.rang = true;
   call.ringP = ringPush(peerId, nameOf(state.me) + CALLTAG, "Tap to answer", true);
-  var micP = micStream(true).then(function(stream){
-    if (call && call.state === "calling") {
-      setCallState("Connecting…");
-      $("callNote").textContent = "";
-    }
-    return stream;
+  var c0 = call;
+  micStream(true).then(function(stream){
+    if (call !== c0) { stopStream(stream); return; }
+    call.stream = stream;
+    watchMic(stream);
+    if ($("callNote").textContent === L("Your browser should be asking to allow it")) $("callNote").textContent = "";
+    micAttach();
+  }, function(err){
+    if (call !== c0) return;
+    toast(callError(err, "start"));
+    hangUp("failed");
   });
-  Promise.all([micP, ensureRelay()])
-    .then(function(got){
-      var stream = got[0];
-      if (!call) { stopStream(stream); return null; }
+  ensureRelay()
+    .then(function(){
+      if (!call || call !== c0) return null;
+      if (call.state === "calling") setCallState("Connecting…");
       /* A phone that has needed the relay before goes straight to it,
          rather than sitting through six silent seconds again. */
       call.viaCloudflare = routeMode() === "cloudflare" && cloudflareServers().length > 0;
       call.forcedRelay = call.viaCloudflare || !!(state.preferRelay && hasRelay());
-      call.stream = stream;
-      watchMic(stream);
       call.pc = newPeer(peerId);
-      stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
+      /* The call's voice channel, made before the microphone answers:
+         the call connects while the prompt is still up, and the
+         microphone joins the moment it is allowed (micAttach). */
+      call.tx = call.pc.addTransceiver("audio", { direction: "sendrecv", streams: [new MediaStream()] });
+      micAttach();
       tuneAudio(call.pc);
       return call.pc.createOffer();
     })
@@ -6121,7 +6329,7 @@ function startCall(peerId){
       return call.pc.setLocalDescription(offer).then(function(){
         return sendSig(peerId, { t:"offer", call: call.id, from: state.me, v: 2,
                                  sentAt: Date.now(), relay: !!call.forcedRelay,
-                                 cf: !!call.viaCloudflare,
+                                 cf: !!call.viaCloudflare, nomic: call.micOn ? 0 : (call.micWaitSent = 1),
                                  sdp: call.pc.localDescription.sdp })
           .then(function(r){
             /* Refused: the call never left this phone. It used to go on
@@ -6305,7 +6513,7 @@ function onSignal(msg){
     }
     call = { id: msg.call, peer: msg.from, out: false, pc: null,
              stream: null, state: "incoming", offer: msg.sdp, pending: [],
-             wantRelay: !!msg.relay, wantCf: !!msg.cf, offerMsg: msg };
+             wantRelay: !!msg.relay, wantCf: !!msg.cf, offerMsg: msg, peerNoMic: !!msg.nomic };
     /* Opening the app after a missed call used to ring as if the call
        were happening now: the offer was still on the server, and nothing
        said the caller had given up. So an offer that wasn't heard live -
@@ -6365,6 +6573,7 @@ function onSignal(msg){
   if (msg.t === "scr") { call.scrTheirs = !!msg.on; call.scrTheirKind = msg.kind === "cam" ? "cam" : "screen"; scrPaint(); return; }
 
   if (msg.t === "answer" && call.pc) {
+    call.peerNoMic = !!msg.nomic && !call.peerMicAt;
     stopTone();
     setCallState("Connecting…");
     call.state = "answered";
@@ -6417,6 +6626,7 @@ function onSignal(msg){
     return;
   }
   if (msg.t === "restart") { if (call.out) restartIce(); return; }
+  if (msg.t === "micon") { call.peerNoMic = false; call.peerMicAt = Date.now(); if (call.voice) call.voice.inDead = 0; return; }
   if (msg.t === "mute") {
     call.theyMuted = !!msg.on;
     if (call.voice) call.voice.inDead = 0;
@@ -6427,7 +6637,8 @@ function onSignal(msg){
   }
   if (msg.t === "micchk") {
     /* They hear nothing from this phone: get the microphone again. */
-    if (!call.muted && call.state === "connected") {
+    if (!call.muted && call.micOn && call.state === "connected") {
+      callStep("asked-mic");
       $("callNote").textContent = nameOf(call.peer) + " can't hear you — restarting your microphone";
       if (call.voice) call.voice.fixedAt = Date.now();
       swapMic();
@@ -6496,11 +6707,22 @@ function answer(){
 
   /* Warmed up while ringing: the relay details are here and the path
      is already being reserved - no waiting for either now. */
+  var c0 = call;
   var warm = call.warmPc || null;
-  Promise.all([micStream(true), warm ? Promise.resolve(true) : ensureRelay()])
-    .then(function(got){
-      var stream = got[0];
-      if (!call) { stopStream(stream); return null; }
+  micStream(true).then(function(stream){
+    if (call !== c0) { stopStream(stream); return; }
+    call.stream = stream;
+    watchMic(stream);
+    if ($("callNote").textContent === L("Your browser should be asking to allow it")) $("callNote").textContent = "";
+    micAttach();
+  }, function(err){
+    if (call !== c0) return;
+    toast(callError(err, "answer"));
+    hangUp("failed");
+  });
+  (warm ? Promise.resolve(true) : ensureRelay())
+    .then(function(){
+      if (!call || call !== c0) return null;
       if (warm && call.warmPc === warm) {
         call.pc = warm;
       } else {
@@ -6512,26 +6734,32 @@ function answer(){
         call.pc = newPeer(call.peer);
       }
       call.warmPc = null;
-      call.stream = stream;
-      watchMic(stream);
-      stream.getTracks().forEach(function(t){ call.pc.addTrack(t, stream); });
       return call.pc.setRemoteDescription({ type:"offer", sdp: call.offer });
     })
     .then(function(){
-      if (!call || !call.pc) return null;
+      if (!call || call !== c0 || !call.pc) return null;
       drainPending();
+      /* The voice channel the offer brought, made two-way; the
+         microphone joins it when allowed (micAttach). */
+      call.tx = call.pc.getTransceivers().filter(function(t){
+        return !t.stopped && t.receiver && t.receiver.track && t.receiver.track.kind === "audio";
+      })[0];
+      if (!call.tx) throw new Error("The call had no voice in it");
+      try { call.tx.direction = "sendrecv"; } catch (e) {}
+      micAttach();
       tuneAudio(call.pc);
       return call.pc.createAnswer();
     })
     .then(function(ans){
-      if (!ans || !call) return null;
+      if (!ans || !call || call !== c0) return null;
       return call.pc.setLocalDescription(ans).then(function(){
         call.state = "answered";
         paintCallButtons(false);
         setCallState("Connecting…");
         watchConnect();
         return sendSig(call.peer, { t:"answer", call: call.id,
-                                    from: state.me, sdp: ans.sdp });
+                                    from: state.me, sdp: ans.sdp,
+                                    nomic: call.micOn ? 0 : (call.micWaitSent = 1) });
       });
     })
     .catch(function(err){
@@ -6884,6 +7112,7 @@ function beginRecovery(delay){
   if (!call || !call.pc || call.state !== "connected") return;
   if (!call.recovering) {
     call.recovering = true;
+    callStep("reconnect");
     setCallState("Reconnecting…");
     $("callNote").textContent = "The connection dropped — reconnecting";
   }
@@ -7034,7 +7263,7 @@ function watchMic(stream){
 }
 
 function swapMic(){
-  if (!call || !call.pc || call.swapping) return;
+  if (!call || !call.pc || call.swapping || !call.micOn) return;
   call.swapping = true;
   micStream().then(function(stream){
     if (!call || !call.pc) { stopStream(stream); return; }
@@ -7098,8 +7327,12 @@ function watchAudio(){
         if (r.type === "inbound-rtp" && (r.kind === "audio" || r.mediaType === "audio"))
           got += r.packetsReceived || 0;
       });
+      /* Their microphone isn't in the call yet (they are still on the
+         permission prompt): silence then is not a broken network. */
+      if (call && call.peerNoMic) { last = got; stalls = 0; return; }
       if (got > last) {
         if (stalls >= 3 && call && !call.recovering) {
+          callStep("sound-back");
           $("callNote").textContent = call.forcedRelay
             ? "Connected through the relay" : "";
         }
@@ -7139,6 +7372,7 @@ function checkOneWay(stats){
   if (o.dead < 6 || (!o.seen && !/Chrome|Chromium|Android/.test(navigator.userAgent))) return;
   o.dead = 0;
   $("callNote").textContent = nameOf(call.peer) + " can't hear you — switching to the relay";
+  callStep("they-hear-nothing");
   noSound(1);
 }
 
@@ -7327,12 +7561,13 @@ function checkVoice(stats){
   v.outE = outE;
   if (!call.muted && (gone || v.outDead >= 3) && Date.now() - v.fixedAt > 20000) {
     v.fixedAt = Date.now(); v.outDead = 0;
+    callStep("mic-restart");
     $("callNote").textContent = "Your microphone stopped — restarting it";
     swapMic();
   }
 
   /* Their microphone. */
-  if (!call.theyMuted && inE !== null && v.inE !== null && inE - v.inE <= 1e-10) v.inDead++;
+  if (!call.theyMuted && !call.peerNoMic && inE !== null && v.inE !== null && inE - v.inE <= 1e-10) v.inDead++;
   else {
     if (v.inDead >= 5 && $("callNote").getAttribute("data-v")) {
       $("callNote").textContent = ""; $("callNote").removeAttribute("data-v");
@@ -7437,6 +7672,7 @@ function finishUsage(){
     entry.k = "call"; entry.st = "done"; entry.dur = secs0; entry.det = tech;
     delete entry.what; save(); paintRecent();
   } else logCall(call.peer, call.out ? "out" : "in", "done", { dur: secs0, det: tech, cid: call.id });
+  callReport(how, qsum, total, secs0);
 
   /* Into this phone's permanent record, which the admin receives. */
   var secs = Math.round((Date.now() - call.t0) / 1000), out = !!call.out;
@@ -7489,6 +7725,7 @@ function paintUsage(){
 function noSound(stage){
   if (!call) return;
   stage = stage || 1;
+  callStep("no-sound-in");
   /* Nothing arriving can also be their microphone dying (some phones
      then send nothing at all): ask their phone to restart it too - but
      not every six seconds. */
@@ -7544,6 +7781,7 @@ function noSound(stage){
 function goRelay(ours){
   if (!call || !call.pc || call.forcedRelay || !hasRelay()) return;
   call.forcedRelay = true;
+  callStep("relay");
   /* Remembered on this phone: its network needs the relay, so the next
      call starts there. */
   if (!state.preferRelay) { state.preferRelay = true; save(); }
@@ -15547,6 +15785,15 @@ $("testTurn").onclick = function(){
 };
 
 $("micAllow").onclick = micAllowNow;
+$("reportBtn").onclick = function(){
+  var r = null;
+  try { r = JSON.parse(localStorage.getItem("fmn-lastcall") || "null"); } catch (e) {}
+  if (!r) { toast("No call on this phone yet"); return; }
+  if (!state || !state.admin) { toast("This family has no admin to send it to"); return; }
+  r.steps = (r.steps || []).filter(function(x){ return x[0] !== "user"; }).concat([["user", r.secs || 0]]);
+  sendReport(r);
+  toast(isAdmin() ? "Saved — see Settings → Usage" : "Sent to " + nameOf(state.admin.id));
+};
 
 /* ------------------------------------------------ removing a phone
  *
@@ -15948,6 +16195,7 @@ function monthName(mk){
   return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 function paintOverview(){
+  try { paintReports(); } catch (e) {}
   var block = $("overviewBlock");
   if (!block) return;
   var on = !!(state && isAdmin());
