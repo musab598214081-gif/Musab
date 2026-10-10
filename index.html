@@ -95,6 +95,8 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0F1B2A">
+<link rel="preconnect" href="https://family-server.musab598214081.workers.dev" crossorigin>
+<link rel="dns-prefetch" href="https://family-server.musab598214081.workers.dev">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- The font arrives on its own time: the page never waits for it (a slow
@@ -2911,6 +2913,10 @@ Object.assign(AR, {
 "Photo removed": "تمت إزالة الصورة",
 "Couldn't read this picture — try another one": "تعذرت قراءة هذه الصورة — جرّب صورة أخرى"
 });
+Object.assign(AR, {
+"A faster first connection, and each phone's opening time in the family overview": "اتصال أول أسرع، ووقت فتح كل هاتف في نظرة العائلة العامة",
+"Opens in ": "يفتح خلال "
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3146,16 +3152,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.18.0";
+var APP_VERSION = "1.18.1";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Your own photo, shown to your family in place of your initials";
+var WHATS_NEW   = "A faster first connection, and each phone's opening time in the family overview";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-10a";
+var VERSION  = "2026-11-11a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -16398,7 +16404,7 @@ function reportUsage(force){
 function deviceInfo(){
   var perm = null;
   try { perm = APP ? appNotif() : ("Notification" in window) ? Notification.permission : null; } catch (e) {}
-  return { v: VERSION, av: APP_VERSION, notif: perm, app: APP ? 1 : 0,
+  return { v: VERSION, av: APP_VERSION, notif: perm, app: APP ? 1 : 0, boot: Math.round((window.__splashGone || 0) / 500) * 500,
            push: fsPushState === "on",
            ios: isIOS(), home: !!(window.navigator.standalone ||
              (window.matchMedia && matchMedia("(display-mode: standalone)").matches)) };
@@ -16454,7 +16460,7 @@ function takeUsage(msg){
              av: /^\d{1,3}(\.\d{1,3}){0,2}$/.test(String(msg.info.av || "")) ? String(msg.info.av) : null,
              push: !!msg.info.push,
              ios: !!msg.info.ios, home: !!msg.info.home,
-             notif: ["granted", "denied", "default"].indexOf(msg.info.notif) !== -1 ? msg.info.notif : null };
+             notif: ["granted", "denied", "default"].indexOf(msg.info.notif) !== -1 ? msg.info.notif : null, boot: Math.max(0, Math.min(60000, Number(msg.info.boot) || 0)) };
   }
   famRecord(m.id, m.name, msg.dev, clean, info);
 }
@@ -16549,6 +16555,7 @@ function paintOverview(){
       chip(info.push ? "Notifications on" : "Notifications off", info.push ? "ok" : "bad");
       if (info.notif === "denied") chip("Page alerts blocked", "warn");
       if (info.ios && !info.home) chip("Not on Home Screen", "warn");
+      if (info.boot) chip("Opens in " + (info.boot / 1000).toFixed(1) + " s", info.boot <= 1500 ? "ok" : info.boot <= 3000 ? "warn" : "bad");
     } else chip("No report yet — opens with the next version", "");
     var cnt = m.c ? m.c.length : null;
     chip(m.id === state.me ? "Admin · sees everyone"
@@ -16883,7 +16890,7 @@ document.addEventListener("visibilitychange", function(){
 });
 window.addEventListener("pagehide", function(){ sendPresence("off", true); });
 setInterval(function(){
-  if (!state || !state.me) return;
+  if (!state || !state.me || document.hidden) return;
   paintPresence();                     /* keeps "Away · 5 min" current */
 }, 60000);
 
