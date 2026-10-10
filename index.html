@@ -1029,6 +1029,12 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   /* ---- Edited messages ---- */
   .bub .bm .bed{font-style:italic}
 
+  /* ---- Quiet hours ---- */
+  .qhrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+  .qhrow label{margin:0}
+  .qhrow input{padding:10px 12px;border-radius:12px;border:1px solid var(--seam);background:var(--night);
+    color:var(--paper);font:inherit;font-size:16px}
+
   /* ---- Blocking ---- */
   .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
@@ -1550,6 +1556,12 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     <div class="sectiontitle">With the app closed or in the background</div>
     <p class="sub" id="sndClosedNote"></p>
     <ol class="sndsteps" id="sndSteps"></ol>
+    </div>
+    <div class="sectiontitle">Quiet hours</div>
+    <label class="chk"><input type="checkbox" id="qhOn"><span>Messages, buzzes and missed calls arrive without sound or vibration at night. Calls still ring.</span></label>
+    <div class="qhrow" id="qhRow">
+      <label for="qhFrom">From</label><input type="time" id="qhFrom">
+      <label for="qhTo">Until</label><input type="time" id="qhTo">
     </div>
     <button class="btn ghost" id="sndTest">Show a test notification</button>
     </div>
@@ -2975,6 +2987,13 @@ Object.assign(AR, {
 "edited": "مُعدّلة",
 "Cancel editing": "إلغاء التعديل"
 });
+Object.assign(AR, {
+"Photos on notifications, reply from a notification, and quiet hours": "صور في الإشعارات، والرد من الإشعار، وساعات الهدوء",
+"Quiet hours": "ساعات الهدوء",
+"Messages, buzzes and missed calls arrive without sound or vibration at night. Calls still ring.": "تصل الرسائل والتنبيهات والمكالمات الفائتة دون صوت أو اهتزاز ليلًا. وتظل المكالمات ترن.",
+"From": "من",
+"Until": "حتى"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3210,16 +3229,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.20.0";
+var APP_VERSION = "1.21.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Video calls, and edit a message for 15 minutes after sending";
+var WHATS_NEW   = "Photos on notifications, reply from a notification, and quiet hours";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-13a";
+var VERSION  = "2026-11-14a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -4384,7 +4403,7 @@ function ringPush(memberId, title, message, answerable, kind, opt){
 var fsSkew = 0;
 function swConfig(){
   if (useFS()) appPost({ t: "cfg", send: fsBase() + "/send", me: state.me, sec: mySec(), skew: fsSkew,
-                         url: location.origin + location.pathname });
+                         url: location.origin + location.pathname, name: nameOf(state.me) });
   if (!useFS() || !("serviceWorker" in navigator)) return;
   fsVapidKey().then(function(key){
     return navigator.serviceWorker.getRegistration().then(function(reg){
@@ -8140,7 +8159,8 @@ function toneName(){
  * follows them while the app is closed. */
 /* nfg: a sound for messages while the app is open - off: you are looking
    at the app, you see it on screen. */
-var SND_DEF = { rv: 1, rvib: true, nt: "n_ding", nv: 0.7, nvib: true, nopen: true, nfg: false };
+var SND_DEF = { rv: 1, rvib: true, nt: "n_ding", nv: 0.7, nvib: true, nopen: true, nfg: false,
+                qh: false, qf: "22:00", qt: "07:00" };
 function sndPrefs(){
   var s = (state && state.snd) || {}, o = {};
   Object.keys(SND_DEF).forEach(function(k){ o[k] = typeof s[k] === typeof SND_DEF[k] ? s[k] : SND_DEF[k]; });
@@ -8161,7 +8181,11 @@ function sndSet(k, v){
    vibration only if it is on. */
 /* The notification helper needs only the language: sounds and vibration
    with the app closed are the phone's own (see sw.js). */
-function sndToHelper(){ swPost({ t: "lang", v: LANG }); }
+function sndToHelper(){
+  swPost({ t: "lang", v: LANG });
+  var q = sndPrefs();
+  swPost({ t: "quiet", on: q.qh, from: q.qf, to: q.qt });
+}
 /* A volume, as a step the sound files are made at: 10 steps is plenty
    to hear, and keeps a handful of files instead of one per slider pixel. */
 function volStep(v){ return Math.max(1, Math.min(10, Math.round(v * 10))) / 10; }
@@ -8712,7 +8736,8 @@ function primeNote(){
 }
 function notifySound(kind, opts){
   opts = opts || {};
-  if (document.hidden) return;                   /* the phone's notification sounds */
+  if (document.hidden) return;
+  if (quietNow()) return;                   /* the phone's notification sounds */
   var p = sndPrefs();
   /* The app is open and in use: what arrives shows on screen, silently -
      unless "a sound while the app is open" was chosen. */
@@ -9292,6 +9317,7 @@ var PHOTO_KEY = "familyNotifyer.photos";
 idbGet(PHOTO_KEY).then(function(o){
   if (!o || typeof o !== "object") return;
   for (var k in o) if (!PH[k] || PH[k].v < o[k].v) PH[k] = o[k];
+  photoToApp(Object.keys(PH));
   if (state && state.me) paintMain();
 });
 function photoSave(){
@@ -9339,6 +9365,7 @@ function photoTake(msg, from){
   if (PH[from] && PH[from].v >= v) return;
   PH[from] = { v: v, url: d };
   photoSave();
+  photoToApp([from]);
   photoRepaint(from);
 }
 function photoSet(file){
@@ -9557,6 +9584,32 @@ $("chatEditX").onclick = chatEditCancel;
 $("chatInput").addEventListener("keydown", function(e){
   if (e.key === "Escape" && chatEdit) { e.preventDefault(); chatEditCancel(); }
 });
+
+/* ---- Quiet hours, and photos for the Android app's notifications ---- */
+function quietNow(){
+  var q = sndPrefs();
+  if (!q.qh) return false;
+  function mins(t){ var m = /^(\d{1,2}):(\d{2})$/.exec(t || ""); return m ? (+m[1]) * 60 + (+m[2]) : -1; }
+  var f = mins(q.qf), t = mins(q.qt), d = new Date(), now = d.getHours() * 60 + d.getMinutes();
+  if (f < 0 || t < 0 || f === t) return false;
+  return f < t ? (now >= f && now < t) : (now >= f || now < t);
+}
+function paintQuiet(){
+  var q = sndPrefs();
+  $("qhOn").checked = q.qh;
+  $("qhFrom").value = q.qf;
+  $("qhTo").value = q.qt;
+  $("qhRow").style.display = q.qh ? "" : "none";
+}
+$("qhOn").onchange = function(){ sndSet("qh", this.checked); paintQuiet(); };
+$("qhFrom").onchange = function(){ if (/^\d{2}:\d{2}$/.test(this.value)) sndSet("qf", this.value); };
+$("qhTo").onchange = function(){ if (/^\d{2}:\d{2}$/.test(this.value)) sndSet("qt", this.value); };
+function photoToApp(ids){
+  if (!APP) return;
+  var map = {}, k = 0;
+  ids.forEach(function(id){ if (PH[id] && PH[id].url) { map[id] = PH[id].url; k++; } });
+  if (k) appPost({ t: "photos", map: map });
+}
 
 function orderedPeople(list, keep){
   var key = list.map(function(m){ return m.id; }).sort().join();
@@ -13472,7 +13525,7 @@ function openSetup(create){
      whole sheet from opening, so tapping Settings did nothing at all. */
   function safe(f){ try { f(); } catch (e) {
     try { console.error(e); toast("Part of Settings failed: " + e.message); } catch (x) {} } }
-  safe(paintSwatches); safe(paintAvGrid); safe(paintMembers); safe(paintTones); safe(paintPhotoBlock);
+  safe(paintSwatches); safe(paintAvGrid); safe(paintMembers); safe(paintTones); safe(paintPhotoBlock); safe(paintQuiet);
   $("shareArea").style.display = state ? "block" : "none";
   if (state) { safe(paintInvites);
                safe(function(){ $("mineLink").textContent = maskLink(personalLink()); }); }

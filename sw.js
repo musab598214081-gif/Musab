@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-11-13a";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-11-14a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var FONTS = "fmn-fonts-v1";   /* the app's font, kept here between launches */
@@ -272,14 +272,58 @@ function quietShow(d, kind) {
     .catch(function () {});
 }
 
+/* Quiet hours (the Sounds page in the app): messages, buzzes and missed
+   calls are shown without sound or vibration. Calls still ring. */
+var QUIET = null;
+function savedQuiet() {
+  if (QUIET) return Promise.resolve(QUIET);
+  return caches.open(CFG).then(function (c) { return c.match("quiet"); })
+    .then(function (r) { return r ? r.json() : { on: false }; })
+    .then(function (q) { QUIET = q; return q; })
+    .catch(function () { return { on: false }; });
+}
+function quietNow() {
+  var q = QUIET;
+  if (!q || !q.on) return false;
+  function mins(s) { var m = /^(\d{1,2}):(\d{2})$/.exec(s || ""); return m ? (+m[1]) * 60 + (+m[2]) : -1; }
+  var f = mins(q.from), t = mins(q.to), d = new Date(), now = d.getHours() * 60 + d.getMinutes();
+  if (f < 0 || t < 0 || f === t) return false;
+  return f < t ? (now >= f && now < t) : (now >= f || now < t);
+}
+/* The sender's photo, as the app keeps it, for the notification. */
+function idbKv(key) {
+  return new Promise(function (res) {
+    try {
+      var r = indexedDB.open("familyNotifyer", 1);
+      r.onupgradeneeded = function () { try { r.result.createObjectStore("kv"); } catch (e) {} };
+      r.onsuccess = function () {
+        try {
+          var q = r.result.transaction("kv", "readonly").objectStore("kv").get(key);
+          q.onsuccess = function () { res(q.result || null); };
+          q.onerror = function () { res(null); };
+        } catch (e) { res(null); }
+      };
+      r.onerror = function () { res(null); };
+    } catch (e) { res(null); }
+  });
+}
+function photoFor(id) {
+  if (!id) return Promise.resolve(null);
+  return idbKv("familyNotifyer.photos").then(function (o) {
+    var e = o && o[id];
+    return e && typeof e.url === "string" && e.url.indexOf("data:image/jpeg") === 0 ? e.url : null;
+  }).catch(function () { return null; });
+}
+
 function handlePush(d) {
   var kind = d.kind || "buzz";
   var tag = d.tag || null;
   var ringing = !!CALL_KINDS[kind];
   var cfg = null, quietCall = false;
 
-  return Promise.all([savedCfg(), ringing ? isSilenced(tag) : false, savedLang()]).then(function (got) {
+  return Promise.all([savedCfg(), ringing ? isSilenced(tag) : false, savedLang(), savedQuiet(), photoFor(d.from)]).then(function (got) {
     cfg = got[0]; quietCall = got[1];
+    if (got[4]) d = Object.assign({}, d, { icon: got[4] });
     return self.clients.matchAll({ type: "window", includeUncontrolled: true });
   }).then(function (list) {
     /* Any open copy of the app is told at once. A laptop tab that was
@@ -400,9 +444,10 @@ function options(d, kind, quiet) {
             cb: d.cb || null, jr: d.jr || null, rej: d.rej || null, rn: d.rn || null },
     timestamp: d.ts || Date.now()
   };
+  if (d.icon) o.icon = d.icon;
   var call = !!CALL_KINDS[kind];
   if (d.tag) { o.tag = d.tag; o.renotify = !quiet; }
-  if (quiet) o.silent = true;
+  if (quiet || (!call && kind !== "test" && quietNow())) { o.silent = true; quiet = true; if (d.tag) o.renotify = false; }
   /* Followed only by older Android phones: since Android 8 the phone's own
      setting for the app decides the sound and the vibration. */
   if (!quiet) o.vibrate = call ? CALL_VIB : NOTE_VIB;
@@ -532,6 +577,9 @@ self.addEventListener("message", function (e) {
                                                         sec: m.sec || null,
                                                         skew: typeof m.skew === "number" ? m.skew : 0 })));
     }));
+  } else if (m.t === "quiet") {
+    QUIET = { on: !!m.on, from: String(m.from || ""), to: String(m.to || "") };
+    e.waitUntil(caches.open(CFG).then(function (c) { return c.put("quiet", new Response(JSON.stringify(QUIET))); }).catch(function () {}));
   } else if (m.t === "lang") {
     LANG = m.v === "ar" ? "ar" : "en";
     e.waitUntil(caches.open(CFG).then(function (c) { return c.put("lang", new Response(LANG)); }).catch(function () {}));
