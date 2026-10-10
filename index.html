@@ -976,6 +976,26 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   .avopt.sel{border-color:var(--brass)}
   .avopt.none{font-size:11px;font-weight:700;color:var(--mist)}
 
+  /* ---- Quick actions, chat search, new messages, motion ---- */
+  .tile,.person{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  .csearch{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:6px 8px;
+    background:var(--hearth);border-bottom:1px solid var(--seam)}
+  .csearch[hidden]{display:none}
+  .csearch input{flex:1;min-width:0;padding:9px 12px;border-radius:12px;border:1px solid var(--seam);
+    background:var(--night);color:var(--paper);font:inherit;font-size:16px}
+  .csearch input:focus{outline:2px solid var(--brass);outline-offset:-1px}
+  .cfcount{font-size:12.5px;color:var(--mist);white-space:nowrap;min-width:40px;text-align:center}
+  .csearch .iconbtn{padding:6px}
+  .csearch .iconbtn svg{width:20px;height:20px}
+  .cnew{text-align:center;margin:12px auto 6px}
+  .cnew span{font-size:12px;font-weight:600;color:var(--brass-ink);background:var(--brass);
+    padding:4px 12px;border-radius:10px}
+  @keyframes bubin{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+  .bub.fresh{animation:bubin .18s ease-out}
+  @keyframes viewin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .viewin{animation:viewin .16s ease-out}
+  @media (prefers-reduced-motion:reduce){ .bub.fresh,.viewin{animation:none} }
+
   /* ---- Blocking ---- */
   .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
@@ -1629,6 +1649,13 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     <button class="iconbtn cmorebtn" id="chatMore" aria-label="More options" aria-haspopup="menu">
       <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="18.5" r="1.9"/></svg>
     </button>
+  </div>
+  <div class="csearch" id="chatFind" hidden>
+    <input type="search" id="chatFindInput" placeholder="Search in chat" autocomplete="off" aria-label="Search in chat">
+    <span class="cfcount" id="chatFindCount" aria-live="polite"></span>
+    <button class="iconbtn" id="chatFindUp" aria-label="Older match"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14.5l6-6 6 6"/></svg></button>
+    <button class="iconbtn" id="chatFindDown" aria-label="Newer match"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"/></svg></button>
+    <button class="iconbtn" id="chatFindX" aria-label="Close search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="cwrap">
     <div class="cbody" id="chatBody" aria-live="polite"></div>
@@ -2848,6 +2875,14 @@ Object.assign(AR, {
 "computer": "حاسوب",
 "Android app": "تطبيق Android"
 });
+Object.assign(AR, {
+"Hold a person for quick actions, see when someone is typing, search inside a chat, and a marker for new messages": "اضغط مطولًا على شخص لإجراءات سريعة، وشاهد متى يكتب أحدهم، وابحث داخل المحادثة، مع علامة للرسائل الجديدة",
+"Search in chat": "البحث في المحادثة",
+"Older match": "النتيجة الأقدم",
+"Newer match": "النتيجة الأحدث",
+"typing…": "يكتب…",
+"1 new message": "رسالة جديدة واحدة"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3083,16 +3118,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.16.0";
+var APP_VERSION = "1.17.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Clearer calls that start faster, and call problems reported to the admin automatically";
+var WHATS_NEW   = "Hold a person for quick actions, see when someone is typing, search inside a chat, and a marker for new messages";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-08a";
+var VERSION  = "2026-11-09a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3790,6 +3825,7 @@ function fsFrame(f){
     var co = null; try { co = JSON.parse(f.body); } catch (e) {}
     if (co && /^co-/.test(String(co.t))) { fsSetSince(f.time); takeCo(co, f.from); return; }
     if (co && co.t === "creport") { fsSetSince(f.time); takeReport({ from: f.from, r: co.r }); return; }
+    if (co && co.t === "typing") { fsSetSince(f.time); if (Date.now() + fsSkew - f.time < 8000 && !isBlocked(f.from)) typingFrom(f.from); return; }
     fsSetSince(f.time);
     if (Date.now() - f.time > 120000) {
       var inner; try { inner = JSON.parse(f.body); } catch (e) { return; }
@@ -8989,7 +9025,7 @@ function homeMenu(btn, focus){
   var v = homeView(others().length), srt = homeSort(), f = homeFilter();
   function it(label, on, k, val){
     return { label: (on ? "\u2713 " : "") + label,
-             run: function(){ homeSet(k, val); panelOrder = null; paintMain(); } };
+             run: function(){ homeSet(k, val); panelOrder = null; homeFade = true; paintMain(); } };
   }
   cmenuOpen(btn.getBoundingClientRect(), [
     it("Grid", v === "grid", "view", "grid"),
@@ -9004,6 +9040,132 @@ function homeMenu(btn, focus){
   ], { anchor: btn, focus: focus, right: !isRtl() });
 }
 var homeTab = "family", panelOrder = null, panelKey = "", panelFind = "", findOpen = false;
+
+/* ---- Hold a person: quick actions ---- */
+var ICO_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H9l-5 4Z"/></svg>';
+var homeFade = false;
+function personMenu(id, el, x, y){
+  if (!memberById(id)) return;
+  try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) {}
+  cmenuOpen(el.getBoundingClientRect(), [
+    { label: "Message", icon: ICO_CHAT, run: function(){ openChat(id); } },
+    { label: "Call", icon: ICON.phone, run: function(){
+        unlockAudio(); askNotify(); nightCheck([id], function(){ startCall(id); }); } },
+    { label: "Buzz", icon: ICON.bell, run: function(){ pendingId = id; unlockAudio(); openMsgSheet(); } },
+    { label: isFav(id) ? "Unpin from favourites" : "Pin to favourites", icon: ICO_STAR,
+      run: function(){ favToggle(id); } }
+  ], { x: x, y: y, right: isRtl() });
+}
+(function(){
+  var main = $("main"), lp = null, skip = 0;
+  function target(t){ return t && t.closest ? t.closest(".tile[data-id], .person[data-id]") : null; }
+  function cancel(){ if (lp) { clearTimeout(lp.t); lp = null; } }
+  main.addEventListener("pointerdown", function(e){
+    if (e.pointerType === "mouse") return;
+    var el = target(e.target);
+    if (!el || e.target.closest(".qa")) return;
+    cancel();
+    var me = lp = { x0: e.clientX, y0: e.clientY, t: 0 };
+    me.t = setTimeout(function(){
+      if (lp !== me) return;
+      lp = null; skip = Date.now();
+      personMenu(el.getAttribute("data-id"), el);
+    }, 480);
+  }, { passive: true });
+  main.addEventListener("pointermove", function(e){
+    if (lp && (Math.abs(e.clientX - lp.x0) > 10 || Math.abs(e.clientY - lp.y0) > 10)) cancel();
+  }, { passive: true });
+  main.addEventListener("pointerup", cancel);
+  main.addEventListener("pointercancel", cancel);
+  /* The lift after a long-press is not a tap. */
+  main.addEventListener("click", function(e){
+    if (Date.now() - skip < 700 && target(e.target)) { e.stopPropagation(); e.preventDefault(); skip = 0; }
+  }, true);
+  main.addEventListener("contextmenu", function(e){
+    var el = target(e.target);
+    if (!el) return;
+    e.preventDefault();
+    if (Date.now() - skip < 700) return;
+    personMenu(el.getAttribute("data-id"), el, e.clientX, e.clientY);
+  });
+})();
+
+/* ---- typing… ---- */
+var typingAt = {}, typingSent = 0;
+function typingFrom(id){
+  typingAt[id] = Date.now();
+  if (chatOpenId === id) chatPaintSub();
+  setTimeout(function(){
+    if (Date.now() - (typingAt[id] || 0) >= 6000) { delete typingAt[id]; if (chatOpenId === id) chatPaintSub(); }
+  }, 6100);
+}
+function isTyping(id){ return Date.now() - (typingAt[id] || 0) < 6000; }
+$("chatInput").addEventListener("input", function(){
+  if (!chatOpenId || isBlocked(chatOpenId) || !$("chatInput").value.trim()) return;
+  if (Date.now() - typingSent < 4000) return;
+  typingSent = Date.now();
+  sendSig(chatOpenId, { t: "typing" }).catch(function(){});
+});
+
+/* ---- New messages, marked ---- */
+var chatUnreadMark = null, chatFresh = {};
+function chatFirstUnread(pid){
+  var l = chatStore().by[pid] || [], first = null, k = 0;
+  for (var i = 0; i < l.length; i++) if (l[i].d === "in" && !l[i].r) { k++; if (!first) first = l[i].c; }
+  return first ? { pid: pid, cid: first, n: k } : null;
+}
+function chatNewRow(k){
+  return function(){
+    var d = document.createElement("div"); d.className = "cnew";
+    var sp = document.createElement("span");
+    sp.textContent = k === 1 ? "1 new message" : k + " new messages";
+    d.appendChild(sp);
+    return d;
+  };
+}
+
+/* ---- Search in a chat ---- */
+var chatFindHits = [], chatFindAt = -1, chatFindTimer = null;
+function chatSearchOpen(){
+  $("chatFind").hidden = false;
+  $("chatFindInput").value = ""; $("chatFindCount").textContent = "";
+  chatFindHits = []; chatFindAt = -1;
+  try { $("chatFindInput").focus(); } catch (e) {}
+}
+function chatSearchClose(){
+  $("chatFind").hidden = true;
+  chatFindHits = []; chatFindAt = -1;
+}
+function chatSearchRun(){
+  var q = $("chatFindInput").value.trim().toLowerCase();
+  chatFindHits = []; chatFindAt = -1;
+  if (q && chatOpenId) (chatStore().by[chatOpenId] || []).forEach(function(m){
+    var t = (m.t || "") + " " + (m.a && m.a.n ? m.a.n : "");
+    if (t.toLowerCase().indexOf(q) !== -1) chatFindHits.push(m.c);
+  });
+  $("chatFindCount").textContent = q && !chatFindHits.length ? "0" : "";
+  if (chatFindHits.length) chatSearchGo(chatFindHits.length - 1);
+}
+function chatSearchGo(i){
+  if (!chatFindHits.length) return;
+  chatFindAt = (i + chatFindHits.length) % chatFindHits.length;
+  $("chatFindCount").textContent = (chatFindAt + 1) + "/" + chatFindHits.length;
+  chatJump(chatFindHits[chatFindAt]);
+}
+(function(){
+  var inp = $("chatFindInput");
+  inp.addEventListener("input", function(){
+    clearTimeout(chatFindTimer);
+    chatFindTimer = setTimeout(chatSearchRun, 250);
+  });
+  inp.addEventListener("keydown", function(e){
+    if (e.key === "Enter") { e.preventDefault(); if (chatFindAt === -1) chatSearchRun(); else chatSearchGo(chatFindAt - 1); }
+    if (e.key === "Escape") { e.preventDefault(); chatSearchClose(); }
+  });
+  $("chatFindUp").onclick = function(){ chatSearchGo(chatFindAt - 1); };
+  $("chatFindDown").onclick = function(){ chatSearchGo(chatFindAt + 1); };
+  $("chatFindX").onclick = chatSearchClose;
+})();
 
 function orderedPeople(list, keep){
   var key = list.map(function(m){ return m.id; }).sort().join();
@@ -9151,6 +9313,7 @@ function paintPanel(main){
     list.forEach(function(m){ box.appendChild(personCard(m, view)); });
     if (all.length >= 2) { var g2 = groupButton(); g2.id = "grpTile"; box.appendChild(g2); }
   }
+  if (homeFade) { box.classList.add("viewin"); homeFade = false; }
   main.appendChild(box);
   var none = document.createElement("p");
   none.className = "hint"; none.id = "findNone"; none.style.display = "none";
@@ -10043,6 +10206,7 @@ function chatTake(f){
   var pid = mine ? f.to : f.from;
   if (!pid || pid === state.me || !memberById(pid)) return;
   if (!mine && isBlocked(pid)) return;
+  if (!mine && typingAt[pid]) { delete typingAt[pid]; if (chatOpenId === pid) chatPaintSub(); }
   /* Cleared on this phone: a copy sent again stays cleared. */
   var gone = chatStore().gone[pid];
   if (gone && gone[f.cid]) return;
@@ -10062,6 +10226,7 @@ function chatTake(f){
   if (!m.t && !m.a) return;
   if (mine) m.st = "sent";              /* sent from another phone of ours */
   chatInsert(chatList(pid), m);
+  if (chatOpenId === pid) chatFresh[m.c] = 1;
   chatSave();
   var looking = false;
   if (!mine) {
@@ -10233,7 +10398,11 @@ function openChat(id){
   if (!wasOpen) { try { history.pushState({ fmnChat: 1 }, ""); } catch (e) {} }
   clearMissed(m);
   chatFit();
+  chatSearchClose();
+  chatUnreadMark = chatFirstUnread(id);
   chatPaint(true);
+  var um = chatUnreadMark && $("chatBody").querySelector(".cnew");
+  if (um && chatUnreadMark.n > 3) um.scrollIntoView({ block: "start" });
   chatMarkRead(id);
   unlockAudio();
   askNotify();
@@ -10247,6 +10416,7 @@ function closeChat(fromHistory){
   cmenuClose();
   voiceDiscard(); voiceStop();
   chatOpenId = null;
+  chatUnreadMark = null; chatSearchClose();
   chatReply = null; chatReplyPaint();
   chatCache = { pid: null, map: {} };
   mediaRelease();
@@ -10267,6 +10437,7 @@ function chatPaintSub(){
   var st = presenceOf(chatOpenId), tt = theirTime(chatOpenId);
   var sub = $("chatSub");
   if (isBlocked(chatOpenId)) { sub.textContent = "Blocked"; sub.className = ""; return; }
+  if (isTyping(chatOpenId)) { sub.textContent = "typing…"; sub.className = "on"; return; }
   if (!tt) { sub.textContent = st.text; sub.className = st.k; return; }
   /* Two pieces, so a narrow phone can put their time under the status
      instead of cutting it off. The separator goes when they wrap. */
@@ -10367,6 +10538,8 @@ function chatPaint(toBottom, keep){
       lastDay = day;
       rows.push(chatRow(map, old, "d:" + day, "", chatDayRow(day)));
     }
+    if (it.k === "msg" && chatUnreadMark && chatUnreadMark.pid === pid && it.m.c === chatUnreadMark.cid)
+      rows.push(chatRow(map, old, "u:" + it.m.c, String(chatUnreadMark.n), chatNewRow(chatUnreadMark.n)));
     if (it.k === "msg") rows.push(chatRow(map, old, it.m.c, chatSig(it.m), chatBubble.bind(null, pid, it.m)));
     else {
       var r = it.r;
@@ -10420,6 +10593,7 @@ function chatBubble(pid, m){
   d.className = "bub " + (m.d === "out" ? "out" : "in") + (m.st === "failed" ? " failed" : "") +
     (m.a ? " media" + (m.a.k === "img" ? " photo" : "") + (m.t ? "" : " nocap") : "");
   d.setAttribute("data-c", m.c);
+  if (chatFresh[m.c]) { d.classList.add("fresh"); delete chatFresh[m.c]; }
   if (m.re && m.re.c) {
     var q = document.createElement("div"); q.className = "bq";
     q.setAttribute("data-q", m.re.c);
@@ -10766,6 +10940,7 @@ function chatClear(pid){
     if (cmenuLast && cmenuLast.anchor === more && Date.now() - cmenuLast.skipClick < 600) return;
     var pid = chatOpenId, blocked = isBlocked(pid);
     cmenuOpen(more.getBoundingClientRect(), [
+      { label: "Search in chat", icon: ICON.search, run: function(){ chatSearchOpen(); } },
       { label: isFav(pid) ? "Unpin from favourites" : "Pin to favourites", icon: ICO_STAR,
         run: function(){ favToggle(pid); } },
       blocked ? { label: "Unblock " + nameOf(pid), icon: ICO_BLOCK, run: function(){ blockSet(pid, false); } }
@@ -11269,6 +11444,7 @@ function chatNewOut(pid, text, a){
     chatReplyCancel();
   }
   chatInsert(chatList(pid), m);
+  if (chatOpenId === pid) chatFresh[m.c] = 1;
   chatSave(); chatChanged(pid, true);
   return m;
 }
