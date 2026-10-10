@@ -1018,6 +1018,17 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     border-radius:50%;flex:0 0 auto}
   #cmenu .rxrow button.sel{background:rgba(232,176,75,.25)}
 
+  /* ---- Video calls ---- */
+  #call.camin .scr video{object-fit:cover;border-radius:18px}
+  #call.camin .scrcap{display:none}
+  @media (max-width:400px){
+    .callbtns.tight .cb{width:58px;margin:0 2px}
+    .callbtns.tight .rnd{width:52px;height:52px}
+  }
+
+  /* ---- Edited messages ---- */
+  .bub .bm .bed{font-style:italic}
+
   /* ---- Blocking ---- */
   .cblk{flex:0 0 auto;display:flex;align-items:center;gap:12px;
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--seam)}
@@ -1676,6 +1687,9 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     <button class="qa buzz" id="chatBuzz" aria-label="Buzz">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16h12c-1.1-1.2-1.7-2.8-1.7-4.9V9.5a4.3 4.3 0 0 0-8.6 0v1.6C7.7 13.2 7.1 14.8 6 16Z"/><path d="M10.2 19a2 2 0 0 0 3.6 0"/></svg>
     </button>
+    <button class="qa buzz" id="chatVideo" aria-label="Video call">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3Z"/></svg>
+    </button>
     <button class="qa ring" id="chatCall" aria-label="Call">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1Z"/></svg>
     </button>
@@ -1701,6 +1715,12 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   <div class="crep" id="chatReply" hidden>
     <div class="crq" id="chatReplyQ"><b id="chatReplyWho"></b><span id="chatReplyText" translate="no"></span></div>
     <button class="iconbtn" id="chatReplyX" aria-label="Cancel reply">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="crep" id="chatEditBar" hidden>
+    <div class="crq"><b>Editing</b><span id="chatEditText" translate="no"></span></div>
+    <button class="iconbtn" id="chatEditX" aria-label="Cancel editing">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
   </div>
@@ -2940,6 +2960,21 @@ Object.assign(AR, {
 "It's removed from their phone too, and shows as deleted.": "ستُحذف من هاتفه أيضًا، وتظهر كرسالة محذوفة.",
 "Delete this message from this phone?": "حذف هذه الرسالة من هذا الهاتف؟"
 });
+Object.assign(AR, {
+"Video calls, and edit a message for 15 minutes after sending": "مكالمات فيديو، وتعديل الرسالة خلال 15 دقيقة من إرسالها",
+"Video call": "مكالمة فيديو",
+"Incoming video call": "مكالمة فيديو واردة",
+"Camera": "الكاميرا",
+"Camera off": "إيقاف الكاميرا",
+"Turn the camera on once the call has connected": "شغّل الكاميرا بعد أن تبدأ المكالمة",
+" needs the latest version of the app for video": " يحتاج أحدث إصدار من التطبيق للفيديو"
+});
+Object.assign(AR, {
+"Edit": "تعديل",
+"Editing": "تعديل الرسالة",
+"edited": "مُعدّلة",
+"Cancel editing": "إلغاء التعديل"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3175,16 +3210,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.19.0";
+var APP_VERSION = "1.20.0";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "React to messages, and delete your own messages for everyone";
+var WHATS_NEW   = "Video calls, and edit a message for 15 minutes after sending";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-12a";
+var VERSION  = "2026-11-13a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -3885,7 +3920,7 @@ function fsFrame(f){
     if (co && co.t === "creport") { fsSetSince(f.time); takeReport({ from: f.from, r: co.r }); return; }
     if (co && co.t === "typing") { fsSetSince(f.time); if (Date.now() + fsSkew - f.time < 8000 && !isBlocked(f.from)) typingFrom(f.from); return; }
     if (co && (co.t === "avq" || co.t === "avd")) { fsSetSince(f.time); photoTake(co, f.from); return; }
-    if (co && (co.t === "react" || co.t === "del")) { fsSetSince(f.time); chatSigTake(co, f.from); return; }
+    if (co && (co.t === "react" || co.t === "del" || co.t === "edit")) { fsSetSince(f.time); chatSigTake(co, f.from); return; }
     fsSetSince(f.time);
     if (Date.now() - f.time > 120000) {
       var inner; try { inner = JSON.parse(f.body); } catch (e) { return; }
@@ -5425,11 +5460,15 @@ function paintCallButtons(incoming){
   /* In every one-to-one call. A computer shares its screen; a phone -
      which no browser lets share its screen - offers its camera instead
      (see scrToggle). */
-  if (SCR_CAN || CAM_CAN) {
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    var cmb = add("scrbtn", ICO_CAMV, "Camera", camToggle);
+    cmb.button.id = "camBtn"; cmb.label.id = "camLbl";
+  }
+  if (SCR_CAN) {
     var sb = add("scrbtn", ICO_SCREEN, "Share screen", scrToggle);
     sb.button.id = "scrBtn"; sb.label.id = "scrLbl";
-    scrPaint();
   }
+  scrPaint();
 
   add("hang", ICON.end, "End", function(){ hangUp("ended"); });
   box.classList.toggle("tight", box.children.length >= 5);
@@ -5945,6 +5984,7 @@ function markConnected(){
   startTimer();
   setTimeout(showRoute, 600);
   scrHello();
+  videoAuto();
 }
 
 /* Just after connecting: the sender really has a live, unmuted track. */
@@ -6367,7 +6407,7 @@ function flushIce(peerId){
     .catch(function(){});
 }
 
-function startCall(peerId){
+function startCall(peerId, opts){
   if (blockGuard(peerId, "call")) return;
   if (call) { toast("Already on a call"); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -6381,6 +6421,7 @@ function startCall(peerId){
 
   call = { id: rand(8), peer: peerId, out: true, pc: null,
            stream: null, state: "calling", pending: [] };
+  call.wantVideo = !!(opts && opts.video);
   showCallScreen(peerId, false);
   setCallState("Asking for the microphone…");
   $("callNote").textContent = "Your browser should be asking to allow it";
@@ -6427,7 +6468,7 @@ function startCall(peerId){
       return call.pc.setLocalDescription(offer).then(function(){
         return sendSig(peerId, { t:"offer", call: call.id, from: state.me, v: 2,
                                  sentAt: Date.now(), relay: !!call.forcedRelay,
-                                 cf: !!call.viaCloudflare, nomic: call.micOn ? 0 : (call.micWaitSent = 1),
+                                 cf: !!call.viaCloudflare, video: call.wantVideo ? 1 : 0, nomic: call.micOn ? 0 : (call.micWaitSent = 1),
                                  sdp: call.pc.localDescription.sdp })
           .then(function(r){
             /* Refused: the call never left this phone. It used to go on
@@ -6526,7 +6567,7 @@ function warmUp(){
 
 function ringIncoming(msg){
   showCallScreen(msg.from, true);
-  setCallState("Incoming call");
+  setCallState(call.wantVideo ? "Incoming video call" : "Incoming call");
   tone({ incoming: true, tag: msg.call, title: nameOf(msg.from) + " is calling" });
   warmUp();
   /* A backstop in case the goodbye never arrives - the caller's phone
@@ -6611,7 +6652,7 @@ function onSignal(msg){
     }
     call = { id: msg.call, peer: msg.from, out: false, pc: null,
              stream: null, state: "incoming", offer: msg.sdp, pending: [],
-             wantRelay: !!msg.relay, wantCf: !!msg.cf, offerMsg: msg, peerNoMic: !!msg.nomic };
+             wantRelay: !!msg.relay, wantCf: !!msg.cf, offerMsg: msg, peerNoMic: !!msg.nomic, wantVideo: !!msg.video };
     /* Opening the app after a missed call used to ring as if the call
        were happening now: the offer was still on the server, and nothing
        said the caller had given up. So an offer that wasn't heard live -
@@ -6976,6 +7017,7 @@ function scrPeerCan(){
   call.peerScr = true;
   if (!call.scrHi && call.state === "connected") scrHello();
   scrPaint();
+  videoAuto();
 }
 
 function scrToggle(){
@@ -7003,11 +7045,11 @@ function camOpen(facing){
     audio: false
   });
 }
-function camStart(){
+function camStart(facing){
   closeSheet("camSheet");
   if (!call || !call.pc || call.state !== "connected" || call.scr) return;
   var id = call.id;
-  camFacing = "environment";
+  camFacing = facing === "user" ? "user" : "environment";
   camOpen(camFacing).then(function(stream){ return scrSend(id, stream, "cam"); }).catch(function(e){
     if (e && e.name === "NotAllowedError") { toast("The camera was refused — allow it in the phone's settings for this app"); return; }
     toast("Couldn't start the camera");
@@ -7147,12 +7189,21 @@ function scrPaint(){
   var showIn = !!(call && call.scrTheirs && t && t.readyState === "live");
   if (view.hidden === showIn) view.hidden = !showIn;
   $("call").classList.toggle("scrin", showIn);
+  $("call").classList.toggle("camin", showIn && call.scrTheirKind === "cam");
   $("scrCap").textContent = !showIn ? "" : call.scrTheirKind === "cam"
-    ? nameOf(call.peer) + " is sharing their camera · tap it to see it full screen"
+    ? ""
     : nameOf(call.peer) + " is sharing their screen · tap it to see it full screen";
+  var cbn = $("camBtn");
+  if (cbn) {
+    var con = !!(call && call.scr && call.scrKind === "cam");
+    cbn.classList.toggle("on", con);
+    cbn.setAttribute("aria-label", con ? "Camera off" : "Camera");
+    $("camLbl").textContent = con ? "Camera off" : "Camera";
+    cbn.style.opacity = call && call.state === "connected" && call.peerScr ? "" : ".5";
+  }
   var b = $("scrBtn"), l = $("scrLbl");
   if (b) {
-    var on = !!(call && call.scr);
+    var on = !!(call && call.scr && call.scrKind !== "cam");
     b.classList.toggle("on", on);
     b.setAttribute("aria-label", on ? "Stop sharing" : "Share screen");
     l.textContent = on ? "Stop sharing" : "Share screen";
@@ -9113,6 +9164,8 @@ function personMenu(id, el, x, y){
     { label: "Message", icon: ICO_CHAT, run: function(){ openChat(id); } },
     { label: "Call", icon: ICON.phone, run: function(){
         unlockAudio(); askNotify(); nightCheck([id], function(){ startCall(id); }); } },
+    { label: "Video call", icon: ICO_CAMV, run: function(){
+        unlockAudio(); askNotify(); nightCheck([id], function(){ startCall(id, { video: true }); }); } },
     { label: "Buzz", icon: ICON.bell, run: function(){ pendingId = id; unlockAudio(); openMsgSheet(); } },
     { label: isFav(id) ? "Unpin from favourites" : "Pin to favourites", icon: ICO_STAR,
       run: function(){ favToggle(id); } }
@@ -9427,10 +9480,83 @@ function chatSigTake(msg, from){
     if (!m.rx.me && !m.rx.them) delete m.rx;
   } else {
     if (m.del || (mine && m.d !== "out") || (!mine && m.d !== "in")) return;
-    chatWipeMsg(m);
+    if (msg.t === "edit") {
+      var x = typeof msg.x === "string" ? msg.x.slice(0, CHAT_MAX) : "";
+      if (!x.trim() || !m.t) return;
+      m.t = x; m.ed = Date.now();
+    } else chatWipeMsg(m);
   }
   chatSave(); chatChanged(pid);
 }
+
+/* ---- Video calls ----
+   A video call is a call with both cameras on: the camera travels the
+   same way as a shared camera already did, and the Camera button turns
+   it on or off at any time. */
+var ICO_CAMV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5-3v9l-5-3Z"/></svg>';
+function videoAuto(){
+  if (!call || !call.wantVideo || call.videoTried || !call.peerScr || call.state !== "connected" || call.scr) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  call.videoTried = true;
+  if (!speakerOn) setSpeaker(true);
+  camStart("user");
+}
+function camToggle(){
+  if (!call || !call.pc || call.state !== "connected") { toast("Turn the camera on once the call has connected"); return; }
+  if (!call.peerScr) { toast(nameOf(call.peer) + " needs the latest version of the app for video"); return; }
+  if (call.scr && call.scrKind === "cam") { scrStop(); return; }
+  if (call.scr) scrStop();
+  camStart("user");
+}
+$("chatVideo").onclick = function(){
+  if (!chatOpenId) return;
+  var pid = chatOpenId;
+  unlockAudio(); askNotify();
+  nightCheck([pid], function(){ startCall(pid, { video: true }); });
+};
+
+/* ---- Editing a sent message, for 15 minutes ---- */
+var EDIT_MS = 15 * 60 * 1000, chatEdit = null;
+var ICO_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg>';
+function chatCanEdit(m){
+  return !!m && m.d === "out" && !m.del && !!m.t &&
+         ["sent", "delivered", "read"].indexOf(m.st || "sent") !== -1 && Date.now() - m.at < EDIT_MS;
+}
+function chatEditStart(pid, cid){
+  var m = chatFind(pid, cid);
+  if (!chatCanEdit(m)) return;
+  chatReplyCancel();
+  chatEdit = { pid: pid, cid: cid };
+  $("chatEditText").textContent = m.t;
+  $("chatEditBar").hidden = false;
+  var i = $("chatInput");
+  i.value = m.t; chatGrow();
+  try { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } catch (e) {}
+}
+function chatEditCancel(){
+  var was = !!chatEdit;
+  chatEdit = null;
+  $("chatEditBar").hidden = true;
+  if (was) { $("chatInput").value = ""; chatGrow(); }
+}
+function chatEditSave(text){
+  var e = chatEdit;
+  chatEditCancel();
+  if (!e || !text) return;
+  var m = chatFind(e.pid, e.cid);
+  if (!m || m.d !== "out" || m.del || !m.t || Date.now() - m.at > EDIT_MS + 60000) return;
+  text = text.slice(0, CHAT_MAX);
+  if (text === m.t) return;
+  m.t = text; m.ed = Date.now();
+  chatSave(); chatChanged(e.pid);
+  sendSig(e.pid, { t: "edit", c: e.cid, x: text }).catch(function(){});
+  sendSig(state.me, { t: "edit", c: e.cid, x: text, p: e.pid }).catch(function(){});
+}
+$("chatEditX").addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+$("chatEditX").onclick = chatEditCancel;
+$("chatInput").addEventListener("keydown", function(e){
+  if (e.key === "Escape" && chatEdit) { e.preventDefault(); chatEditCancel(); }
+});
 
 function orderedPeople(list, keep){
   var key = list.map(function(m){ return m.id; }).sort().join();
@@ -10407,6 +10533,7 @@ function noteUrl(memberId){
 /* ------------------------------------------------------------ sending */
 function chatSend(pid, text){
   text = String(text || "").replace(/^\s+|\s+$/g, "");
+  if (chatEdit && chatEdit.pid === pid) { chatEditSave(text); return; }
   if (!pid || !text || blockGuard(pid, "message")) return;
   if (text.length > CHAT_MAX) text = text.slice(0, CHAT_MAX);
   chatDeliver(pid, chatNewOut(pid, text, null));
@@ -10663,7 +10790,7 @@ function openChat(id){
   if (!wasOpen) { try { history.pushState({ fmnChat: 1 }, ""); } catch (e) {} }
   clearMissed(m);
   chatFit();
-  chatSearchClose();
+  chatSearchClose(); chatEditCancel();
   chatUnreadMark = chatFirstUnread(id);
   chatPaint(true);
   var um = chatUnreadMark && $("chatBody").querySelector(".cnew");
@@ -10681,7 +10808,7 @@ function closeChat(fromHistory){
   cmenuClose();
   voiceDiscard(); voiceStop();
   chatOpenId = null;
-  chatUnreadMark = null; chatSearchClose();
+  chatUnreadMark = null; chatSearchClose(); chatEditCancel();
   chatReply = null; chatReplyPaint();
   chatCache = { pid: null, map: {} };
   mediaRelease();
@@ -10750,7 +10877,7 @@ function chatItems(pid){
    ones come in steps as you scroll back to the top. */
 var chatCache = { pid: null, map: {} };
 function chatSig(m){
-  return (m.del ? "D|" : "") + (m.rx ? (m.rx.me || "") + "/" + (m.rx.them || "") + "|" : "") + (m.st || "") + "|" + (m.why || "") + "|" + m.at + "|" + (m.re ? m.re.c : "") +
+  return (m.ed ? "E" + m.ed + "|" : "") + (m.del ? "D|" : "") + (m.rx ? (m.rx.me || "") + "/" + (m.rx.them || "") + "|" : "") + (m.st || "") + "|" + (m.why || "") + "|" + m.at + "|" + (m.re ? m.re.c : "") +
          (m.a ? "|" + (m.a.gone ? "g" : "") + (m.a.up ? "u" : "") + (m.prep ? "p" : "") : "");
 }
 function chatRow(map, old, key, sig, make){
@@ -10885,6 +11012,7 @@ function chatBubble(pid, m){
   t.setAttribute("translate", "no");
   var meta = document.createElement("span"); meta.className = "bm";
   var tm = document.createElement("span"); tm.textContent = timeOf(m.at);
+  if (m.ed && !m.del) { var ed = document.createElement("span"); ed.className = "bed"; ed.textContent = "edited"; meta.appendChild(ed); }
   meta.appendChild(tm);
   if (m.d === "out") {
     var tk = document.createElement("span");
@@ -11134,6 +11262,7 @@ function chatMsgMenu(el, opts){
   }
   if (m.d === "out" && m.st === "failed" && !m.why)
     items.push({ label: "Send again", icon: ICO_RETRY, run: function(){ chatRetryOne(pid, cid); } });
+  if (chatCanEdit(m)) items.push({ label: "Edit", icon: ICO_EDIT, run: function(){ chatEditStart(pid, cid); } });
   if (m.d === "out" && !m.del && m.st !== "sending")
     items.push({ label: "Delete for everyone", icon: ICO_CLEAR, danger: true, run: function(){ chatDeleteAsk(pid, cid, true); } });
   items.push({ label: "Delete for me", icon: ICO_CLEAR, danger: true, run: function(){ chatDeleteAsk(pid, cid, false); } });
