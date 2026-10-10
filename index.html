@@ -12,6 +12,71 @@
 try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
   if (s && s.u && s.q) { var l = document.createElement("link"); l.rel = "apple-touch-startup-image";
     l.media = s.q; l.href = s.u; document.head.appendChild(l); } } catch (e) {}
+/* The safety net. If the app fails before its first screen - an error
+   in a bad update, a copy that did not download whole - this says so
+   and offers a fresh copy (and the previous version, when the
+   notification helper kept one), instead of a splash that never goes.
+   It lives up here, before the app, so it runs even when the app
+   cannot. */
+(function(){
+  var done = false, KEY = location.origin + location.pathname;
+  function fail(why){
+    if (done || window.__splashGone) return;
+    done = true;
+    var sp = document.getElementById("splash");
+    if (!sp) return;
+    var ar = false;
+    try { ar = localStorage.getItem("fmn-lang") === "ar"; } catch (e) {}
+    sp.innerHTML = "";
+    sp.style.animation = "none"; sp.style.opacity = "1"; sp.style.visibility = "visible";
+    sp.classList.remove("gone");
+    sp.dir = ar ? "rtl" : "ltr";
+    var box = document.createElement("div");
+    box.style.cssText = "max-width:320px;margin:0 20px;text-align:center;color:#F3F6F9;" +
+      "font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+    var h = document.createElement("div");
+    h.style.cssText = "font-size:19px;font-weight:700;margin-bottom:8px";
+    h.textContent = ar ? "\u062a\u0639\u0630\u0631 \u0641\u062a\u062d \u0627\u0644\u062a\u0637\u0628\u064a\u0642" : "The app couldn't start";
+    var p = document.createElement("div");
+    p.style.color = "#9CB0C4";
+    p.textContent = ar ? "\u0642\u062f \u062a\u0643\u0648\u0646 \u0627\u0644\u0646\u0633\u062e\u0629 \u0627\u0644\u0645\u062d\u0641\u0648\u0638\u0629 \u062a\u0627\u0644\u0641\u0629. \u0646\u0633\u062e\u0629 \u062c\u062f\u064a\u062f\u0629 \u062a\u0635\u0644\u062d \u0630\u0644\u0643."
+                        : "Its saved copy may be damaged. A fresh copy fixes this.";
+    function btn(text, ghost){
+      var b = document.createElement("button");
+      b.style.cssText = "display:block;width:100%;margin-top:12px;padding:13px 22px;border-radius:14px;" +
+        "font:inherit;font-weight:600;cursor:pointer;" +
+        (ghost ? "background:transparent;color:#F3F6F9;border:1px solid #26394E"
+               : "background:#E8B04B;color:#2A1C02;border:0");
+      b.textContent = text;
+      box.appendChild(b);
+      return b;
+    }
+    btn(ar ? "\u062a\u062d\u0645\u064a\u0644 \u0646\u0633\u062e\u0629 \u062c\u062f\u064a\u062f\u0629" : "Load a fresh copy").onclick = function(){
+      var go = function(){ location.replace(location.pathname + "?nocache=1" + location.hash); };
+      try { caches.delete("fmn-shell-v1").then(go, go); } catch (e) { go(); }
+    };
+    try {
+      caches.open("fmn-shell-prev").then(function(pc){ return pc.match(KEY); }).then(function(prev){
+        if (!prev) return;
+        btn(ar ? "\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0633\u0627\u0628\u0642" : "Go back to the previous version", true).onclick = function(){
+          caches.open("fmn-shell-v1").then(function(c){ return c.put(KEY, prev); })
+            .then(function(){ location.replace(location.pathname + location.hash); },
+                  function(){ location.replace(location.pathname + "?nocache=1" + location.hash); });
+        };
+      }).catch(function(){});
+    } catch (e) {}
+    var w = document.createElement("div");
+    w.style.cssText = "margin-top:14px;font-size:11px;color:#5E6E80;overflow-wrap:anywhere";
+    w.textContent = String(why || "");
+    box.appendChild(h); box.appendChild(p); box.appendChild(w);
+    sp.appendChild(box);
+  }
+  window.addEventListener("error", function(e){ fail(e && e.message); });
+  window.addEventListener("unhandledrejection", function(e){
+    if (!window.__splashGone) fail(e && e.reason && (e.reason.message || String(e.reason)));
+  });
+  setTimeout(function(){ if (!window.__splashGone) fail("timed out"); }, 9000);
+})();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="Musab B.">
@@ -2980,16 +3045,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.15.0";
+var APP_VERSION = "1.15.1";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "The family window: grid, list or cards, search, sorting, favourites, and a character of your own";
+var WHATS_NEW   = "A safety net: the app can no longer be left stuck by a bad update";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-06b";
+var VERSION  = "2026-11-07a";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -13142,12 +13207,24 @@ function applyUpdate(){
   }
   if (!updInfo) return;
   var html = updInfo.html;
+  /* Never a copy that cannot run: the page must be whole and its
+     script must parse. The copy being replaced is kept, so a version
+     that fails on its first screen can be undone (see the safety net
+     at the head of the page). */
+  if (!shellSane(html)) {
+    updInfo = null; paintUpdateBar();
+    toast("That update didn't download properly — it will be offered again later");
+    return;
+  }
   $("updGo").disabled = true; $("updGo").textContent = "Updating…";
   var jobs = [];
-  /* The new version, straight into the copy the app opens from... */
+  var key = location.origin + location.pathname;
   if ("caches" in window) jobs.push(caches.open(SHELL_CACHE).then(function(c){
-    return c.put(location.origin + location.pathname,
-                 new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } }));
+    return c.match(key).then(function(old){
+      return old ? caches.open("fmn-shell-prev").then(function(pv){ return pv.put(key, old); }).catch(function(){}) : null;
+    }).then(function(){
+      return c.put(key, new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } }));
+    });
   }).catch(function(){}));
   /* ...and the notification helper (sw.js) brought up to date too. */
   if ("serviceWorker" in navigator) jobs.push(navigator.serviceWorker.getRegistration()
@@ -13160,6 +13237,14 @@ function applyUpdate(){
   Promise.race([Promise.all(jobs), new Promise(function(r){ setTimeout(r, 4000); })]).then(go, go);
 }
 $("updGo").onclick = applyUpdate;
+function shellSane(html){
+  var t = String(html || "");
+  if (t.indexOf("</html>") === -1) return false;
+  var a = t.lastIndexOf("<script>"), b = t.lastIndexOf("</script>");
+  if (a === -1 || b < a) return false;
+  try { new Function(t.slice(a + 8, b)); return true; }
+  catch (e) { return !(e instanceof SyntaxError); }
+}
 
 /* After an update: say so, once. */
 (function(){

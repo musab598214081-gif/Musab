@@ -20,7 +20,7 @@
  *   - renews this device's notification registration by itself when
  *     the browser replaces it. */
 
-var SW_VERSION = "2026-11-06b";   /* follows the app's build (VERSION in index.html) */
+var SW_VERSION = "2026-11-07a";   /* follows the app's build (VERSION in index.html) */
 var SHELL = "fmn-shell-v1";
 var CFG = "fmn-cfg-v1";
 var FONTS = "fmn-fonts-v1";   /* the app's font, kept here between launches */
@@ -121,7 +121,7 @@ self.addEventListener("activate", function (e) {
     self.clients.claim(),
     caches.keys().then(function (keys) {
       return Promise.all(keys.filter(function (k) {
-        return /^fmn-shell-/.test(k) && k !== SHELL;
+        return /^fmn-shell-/.test(k) && k !== SHELL && k !== PREV;
       }).map(function (k) { return caches.delete(k); }));
     })
   ]));
@@ -159,8 +159,7 @@ self.addEventListener("fetch", function (e) {
   e.respondWith(caches.open(SHELL).then(function (c) {
     return c.match(key).then(function (hit) {
       var fresh = fetch(req).then(function (res) {
-        if (res && res.ok && res.type === "basic")
-          c.put(key, res.clone()).catch(function () {});
+        if (res && res.ok && res.type === "basic") keepShell(c, key, res.clone());
         return res;
       });
       if (hit) {
@@ -175,6 +174,34 @@ self.addEventListener("fetch", function (e) {
     });
   }));
 });
+
+/* A fresh copy of the app goes into the cache only when it is whole and
+   its script parses: a broken publish must never replace a working copy
+   on every phone. The copy it replaces is kept under PREV when the
+   version changes, so the page's safety net (see the head of
+   index.html) can go back to it. */
+var PREV = "fmn-shell-prev";
+function versionOf(t) { var m = /var VERSION\s*=\s*"([^"]+)"/.exec(t); return m ? m[1] : ""; }
+function saneShell(t) {
+  if (t.indexOf("</html>") === -1) return false;
+  var a = t.lastIndexOf("<script>"), b = t.lastIndexOf("</script>");
+  if (a === -1 || b < a) return false;
+  try { new Function(t.slice(a + 8, b)); return true; }
+  catch (e) { return !(e instanceof SyntaxError); }
+}
+function keepShell(c, key, res) {
+  return res.text().then(function (t) {
+    if (!saneShell(t)) return;
+    var fresh = new Response(t, { status: 200, headers: res.headers });
+    return c.match(key).then(function (old) {
+      if (!old) return;
+      return old.clone().text().then(function (ot) {
+        if (versionOf(ot) !== versionOf(t))
+          return caches.open(PREV).then(function (p) { return p.put(key, old); });
+      });
+    }).catch(function () {}).then(function () { return c.put(key, fresh); });
+  }).catch(function () {});
+}
 
 /* ------------------------------------------------------------ push */
 
