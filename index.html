@@ -3041,6 +3041,9 @@ Object.assign(AR, {
 Object.assign(AR, {
 "Last seen and local time now show in full, never cut off": "يظهر آخر ظهور والتوقيت المحلي الآن كاملين دون اقتطاع"
 });
+Object.assign(AR, {
+"Hidden status no longer shows a misleading last-seen time": "لم يعد الوضع المخفي يعرض وقت «آخر ظهور» مضللًا"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3276,16 +3279,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.22.1";
+var APP_VERSION = "1.22.2";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Last seen and local time now show in full, never cut off";
+var WHATS_NEW   = "Hidden status no longer shows a misleading last-seen time";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-15b";
+var VERSION  = "2026-11-15c";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -4084,7 +4087,7 @@ function fsFrame(f){
 }
 function fsTakePres(p){
   if (!p || !p.id || p.id === state.me || !memberById(p.id)) return;
-  PRES[p.id] = { s: p.s, at: p.at || Date.now(), tz: typeof p.tz === "string" && p.tz ? p.tz : null };
+  PRES[p.id] = { s: p.s, at: p.at || Date.now(), tz: typeof p.tz === "string" && p.tz ? p.tz : null, h: !!p.h };
 }
 /* A request that expects an answer. Over the live connection when it is
    up (cheapest and fastest), otherwise one plain HTTP request - which is
@@ -4138,7 +4141,7 @@ function fsRequest(frame, timeout, keepalive, viaHttp){
 }
 function fsSendPres(){
   var s = (state && state.presOff) ? "off" : fsPres;
-  var frame = { k: "pres", s: s, tz: (state && state.tzOff) ? "" : myTz() };
+  var frame = { k: "pres", s: s, tz: (state && state.tzOff) ? "" : myTz(), hid: (state && state.presOff) ? 1 : 0 };
   if (fsOpen && fsWs) { try { fsWs.send(JSON.stringify(frame)); } catch (e) {} }
   /* Leaving the screen: said over plain HTTP as well (a request the
      phone finishes even as the page freezes). An iPhone stops the page
@@ -11154,7 +11157,7 @@ function chatInfoPaint(id){
   var rows = [];
   if (id && !isBlocked(id)) {
     var p = PRES[id], st = presenceOf(id);
-    if (p && st.k === "off") rows.push(["ci-seen", ciLang("Last seen ", "آخر ظهور ") + ciWhen(presAt(p))]);
+    if (p && st.k === "off" && !p.h) rows.push(["ci-seen", ciLang("Last seen ", "آخر ظهور ") + ciWhen(presAt(p))]);
     else if (p && st.k === "away") rows.push(["ci-away", ciLang("Away \u00B7 ", "بعيد \u00B7 ") + ciWhen(presAt(p))]);
     var tt = ciTheirTime(id);
     if (tt) rows.push([tt.night ? "ci-time ci-night" : "ci-time", tt.text]);
@@ -17427,6 +17430,7 @@ function presAt(p){
 function presenceOf(id){
   var p = PRES[id];
   if (!p) return { k: "off", text: "Offline" };
+  if (p.h) return { k: "off", text: "Offline" };
   if (p.s === "on") return { k: "on", text: "Online" };
   if (p.s === "away") return { k: "away", text: "Away \u00B7 " + ago(presAt(p)) };
   return { k: "off", text: "Offline \u00B7 last seen " + ago(presAt(p)) };
