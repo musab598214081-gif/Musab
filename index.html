@@ -1206,6 +1206,19 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     .bub.snap{transition:none} .brep{transition:none}
     .bub.flash{animation:none;box-shadow:0 0 0 3px var(--brass)}
   }
+  /* ---- Last seen and their local time ----
+     The header holds only the short status (Online, Away, Offline), which
+     always fits. Everything else sits in a full-width strip underneath, so
+     nothing is cut off: a long line simply wraps. */
+  .cinfo{flex:0 0 auto;padding:6px 14px 8px;background:var(--hearth);
+    border-bottom:1px solid var(--seam);font-size:12.5px;line-height:1.45;color:var(--mist)}
+  .cinfo[hidden]{display:none}
+  .ci-row{overflow-wrap:break-word}
+  .ci-row + .ci-row{margin-top:2px}
+  .ci-away{color:var(--amber)}
+  .ci-time{color:#C9D6E3}
+  .ci-time.ci-night{color:#B9C4FF}
+  #chat.hasinfo .chead{border-bottom-color:transparent}
 </style>
 </head>
 <body>
@@ -1709,6 +1722,7 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
       <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="18.5" r="1.9"/></svg>
     </button>
   </div>
+  <div class="cinfo" id="chatInfo" translate="no" hidden></div>
   <div class="csearch" id="chatFind" hidden>
     <input type="search" id="chatFindInput" placeholder="Search in chat" autocomplete="off" aria-label="Search in chat">
     <span class="cfcount" id="chatFindCount" aria-live="polite"></span>
@@ -3024,6 +3038,9 @@ Object.assign(AR, {
 "Android Home Screen app": "تطبيق Android على الشاشة الرئيسية",
 "Windows computer": "حاسوب Windows"
 });
+Object.assign(AR, {
+"Last seen and local time now show in full, never cut off": "يظهر آخر ظهور والتوقيت المحلي الآن كاملين دون اقتطاع"
+});
 /*I18N_MORE*/
 
 var I18N_SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1, PRE: 1, SVG: 1, svg: 1 };
@@ -3259,16 +3276,16 @@ i18nStart();
  *   1.0.1, 1.0.2        small fixes
  *   2.0                 a major overhaul
  * Raise it with each release you hand out. */
-var APP_VERSION = "1.22.0";
+var APP_VERSION = "1.22.1";
 /* One line on what the version brings - shown when it's offered, and
    after it's installed. Rewrite it with each release. */
-var WHATS_NEW   = "Your account is open on one device at a time; a new device needs your approval";
+var WHATS_NEW   = "Last seen and local time now show in full, never cut off";
 var APP_AUTHOR  = "Musab B.";
 /* The exact build, underneath. Changes with every update, however small,
    so the admin's report can tell a phone that has not updated yet even
    while the version number stays the same - and so can the service
    worker (sw.js), whose SW_VERSION follows it. Shown small in Settings. */
-var VERSION  = "2026-11-15a";
+var VERSION  = "2026-11-15b";
 /* The family server every family uses unless its admin sets another
    (Settings → Connection). It carries calls, messages and status, and
    wakes closed phones with their own notifications. */
@@ -8857,12 +8874,12 @@ function greeting(){
 }
 
 function ago(ms){
-  var m = Math.round((Date.now() - ms) / 60000);
+  var m = Math.floor((Date.now() - ms) / 60000);
   if (m < 1) return "just now";
   if (m < 60) return m + " min ago";
-  var h = Math.round(m / 60);
+  var h = Math.floor(m / 60);
   if (h < 24) return h + " h ago";
-  var d = Math.round(h / 24);
+  var d = Math.floor(h / 24);
   return d === 1 ? "yesterday" : d + " days ago";
 }
 
@@ -11047,27 +11064,126 @@ window.addEventListener("popstate", function(){
   if (chatOpenId) closeChat(true);
 });
 
+/* ---- The top of a conversation ----
+   The header itself holds only the short status - Online, Away or
+   Offline - which always fits beside the buttons. When they were last
+   seen, and what time it is for them, go in a full-width strip under it
+   (#chatInfo), where nothing is cut off and a long line simply wraps. */
+function ciLang(en, ar){ return LANG === "ar" ? ar : en; }
+
+function ciFormat(opts, ms, tz){
+  var o = {}, k, tags = LANG === "ar" ? ["ar-u-nu-latn", undefined] : [undefined];
+  for (k in opts) o[k] = opts[k];
+  if (tz) o.timeZone = tz;
+  for (var i = 0; i < tags.length; i++) {
+    try { return new Intl.DateTimeFormat(tags[i], o).format(ms); } catch (e) {}
+  }
+  return "";
+}
+function ciClock(ms, tz){
+  return ciFormat({ hour: "numeric", minute: "2-digit" }, ms, tz) || timeOf(ms);
+}
+
+/* "just now", "5 min ago", "today at 6:19 AM", "yesterday at 9:41 PM",
+   "Mon, 5 Oct at 6:19 AM" - always in your own time zone. */
+function ciWhen(at){
+  var ar = LANG === "ar", diff = Date.now() - at;
+  if (diff < 60000) return ar ? "الآن" : "just now";
+  if (diff < 3600000) {
+    var m = Math.floor(diff / 60000);
+    return ar ? "منذ " + m + " د" : m + " min ago";
+  }
+  var d = new Date(at), t = new Date(), clock = ciClock(at);
+  var yesterday = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
+  if (d.toDateString() === t.toDateString()) return (ar ? "اليوم عند " : "today at ") + clock;
+  if (d.toDateString() === yesterday.toDateString()) return (ar ? "أمس عند " : "yesterday at ") + clock;
+  var f = { weekday: "short", day: "numeric", month: "short" };
+  if (d.getFullYear() !== t.getFullYear()) f.year = "numeric";
+  return ciFormat(f, at) + (ar ? " عند " : " at ") + clock;
+}
+
+/* The difference between the two clocks, in whole hours and minutes
+   (5 h 45 min, not 5.8 h). diff > 0 means they are ahead of you. */
+function ciGap(diff){
+  var ar = LANG === "ar", a = Math.abs(diff), h = Math.floor(a / 60), m = a % 60, amt;
+  if (ar) amt = h && m ? h + " س " + m + " د" : h ? h + " س" : m + " د";
+  else amt = h && m ? h + " h " + m + " min" : h ? h + " h" : m + " min";
+  if (diff > 0) return ar ? "يسبقك بـ " + amt : amt + " ahead of you";
+  return ar ? "يتأخر عنك بـ " + amt : amt + " behind you";
+}
+
+function ciCity(c){
+  if (LANG !== "ar" || !c) return c;
+  var map = { Jerusalem: "القدس", Hebron: "الخليل", Gaza: "غزة", Beirut: "بيروت", Damascus: "دمشق",
+              Amman: "عمّان", Baghdad: "بغداد", Riyadh: "الرياض", Kuwait: "الكويت", Qatar: "قطر",
+              Bahrain: "البحرين", Muscat: "مسقط", Dubai: "دبي", Aden: "عدن", Cairo: "القاهرة",
+              Khartoum: "الخرطوم", Tripoli: "طرابلس", Tunis: "تونس", Algiers: "الجزائر",
+              Casablanca: "الدار البيضاء", Istanbul: "إسطنبول", Tehran: "طهران",
+              London: "لندن", Paris: "باريس" };
+  return map[c] || c;
+}
+
+/* What time it is for them. Only their time zone is known - never their
+   position - so it says "Jerusalem time", not "in Jerusalem". Nothing is
+   shown when it is the same time as yours. */
+function ciTheirTime(id){
+  var p = PRES[id];
+  if (!p || !p.tz) return null;
+  try {
+    var now = new Date(), mine = myTz() || "UTC";
+    var diff = tzOffset(p.tz, now) - tzOffset(mine, now);
+    if (!diff) return null;
+    var h = Number(new Intl.DateTimeFormat("en-US", { timeZone: p.tz, hour: "numeric", hourCycle: "h23" }).format(now)) % 24;
+    var theirDay = new Intl.DateTimeFormat("en-CA", { timeZone: p.tz }).format(now);
+    var myDay = new Intl.DateTimeFormat("en-CA", { timeZone: mine }).format(now);
+    var day = theirDay > myDay ? ciLang("Tomorrow ", "غدًا ")
+            : theirDay < myDay ? ciLang("Yesterday ", "أمس ") : "";
+    var night = h >= NIGHT_FROM || h < NIGHT_TO;
+    var city = tzCity(p.tz);
+    var parts = [(night ? "\u263E " : "") + day + ciClock(now.getTime(), p.tz) + ciLang(" there", " هناك")];
+    if (city) parts.push(ciLang(ciCity(city) + " time", "توقيت " + ciCity(city)));
+    parts.push(ciGap(diff));
+    return { text: parts.join(" \u00B7 "), night: night };
+  } catch (e) { return null; }
+}
+
+/* The strip under the header. Redrawn only when its words change. */
+function chatInfoPaint(id){
+  var box = $("chatInfo");
+  if (!box) return;
+  var rows = [];
+  if (id && !isBlocked(id)) {
+    var p = PRES[id], st = presenceOf(id);
+    if (p && st.k === "off") rows.push(["ci-seen", ciLang("Last seen ", "آخر ظهور ") + ciWhen(presAt(p))]);
+    else if (p && st.k === "away") rows.push(["ci-away", ciLang("Away \u00B7 ", "بعيد \u00B7 ") + ciWhen(presAt(p))]);
+    var tt = ciTheirTime(id);
+    if (tt) rows.push([tt.night ? "ci-time ci-night" : "ci-time", tt.text]);
+  }
+  var key = rows.map(function(r){ return r[0] + "|" + r[1]; }).join("\n");
+  if (box._key === key) return;
+  box._key = key;
+  var body = $("chatBody");
+  var near = !!body && body.scrollHeight - body.scrollTop - body.clientHeight < 90;
+  box.textContent = "";
+  rows.forEach(function(r){
+    var d = document.createElement("div");
+    d.className = "ci-row " + r[0];
+    d.textContent = r[1];
+    box.appendChild(d);
+  });
+  box.hidden = !rows.length;
+  $("chat").classList.toggle("hasinfo", rows.length > 0);
+  if (near && body) body.scrollTop = body.scrollHeight;
+}
+
 function chatPaintSub(){
   if (!chatOpenId) return;
-  var st = presenceOf(chatOpenId), tt = theirTime(chatOpenId);
-  var sub = $("chatSub");
-  if (isBlocked(chatOpenId)) { sub.textContent = "Blocked"; sub.className = ""; return; }
-  if (isTyping(chatOpenId)) { sub.textContent = "typing…"; sub.className = "on"; return; }
-  if (!tt) { sub.textContent = st.text; sub.className = st.k; return; }
-  /* Two pieces, so a narrow phone can put their time under the status
-     instead of cutting it off. The separator goes when they wrap. */
-  sub.textContent = "";
-  var a = document.createElement("span"), sep = document.createElement("span"),
-      b = document.createElement("span");
-  a.textContent = st.text;
-  sep.className = "sep"; sep.textContent = "\u00A0·\u00A0";
-  b.className = "lt" + (tt.night ? " night" : "");
-  b.textContent = (tt.night ? "\u263E " : "") + tt.short;
-  sub.appendChild(a); sub.appendChild(sep); sub.appendChild(b);
-  sub.className = st.k + " split";
-  chatSubWrap();
-  /* Again once the screen is up and the words are in their language. */
-  requestAnimationFrame(chatSubWrap);
+  var id = chatOpenId, st = presenceOf(id), sub = $("chatSub");
+  if (isBlocked(id)) { sub.textContent = "Blocked"; sub.className = ""; chatInfoPaint(null); return; }
+  chatInfoPaint(id);
+  if (isTyping(id)) { sub.textContent = "typing\u2026"; sub.className = "on"; return; }
+  sub.textContent = st.k === "on" ? "Online" : st.k === "away" ? "Away" : "Offline";
+  sub.className = st.k;
 }
 /* Whether their time went down to a second line - checked after layout,
    and again whenever the screen changes width. */
@@ -17301,12 +17417,19 @@ function theirTime(id){
   } catch (e) { return null; }
 }
 
+/* A time the family server reported, on this phone's own clock. The two
+   clocks can differ by minutes, which made "last seen" read a little off,
+   or even sit in the future. */
+function presAt(p){
+  var k = (typeof fsSkew === "number" && isFinite(fsSkew) && Math.abs(fsSkew) < 86400000) ? fsSkew : 0;
+  return (p && p.at ? p.at : Date.now()) - k;
+}
 function presenceOf(id){
   var p = PRES[id];
   if (!p) return { k: "off", text: "Offline" };
   if (p.s === "on") return { k: "on", text: "Online" };
-  if (p.s === "away") return { k: "away", text: "Away · " + ago(p.at) };
-  return { k: "off", text: "Offline · last seen " + ago(p.at) };
+  if (p.s === "away") return { k: "away", text: "Away \u00B7 " + ago(presAt(p)) };
+  return { k: "off", text: "Offline \u00B7 last seen " + ago(presAt(p)) };
 }
 function paintPresence(){
   paintTileNotes();
