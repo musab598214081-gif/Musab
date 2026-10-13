@@ -16136,7 +16136,7 @@ function tryJoin(){
        screen reads like something went wrong. */
     if (!openedFromNote) toast((same && prev.me === mine ? "Welcome back, " : "Welcome, ") +
                                nameOf(mine));
-    if (joinFrom && isAndroid() && !APP && !isStandalone() && !(same && prev.me === mine)) {
+    if (joinFrom && isPhone() && !APP && !isStandalone() && !(same && prev.me === mine)) {
       var mainEl = $("main"); if (mainEl && mainEl.firstChild) {
         var hold = document.createElement("div"); paintOpenInApp(hold, joinFrom);
         if (hold.firstChild) mainEl.insertBefore(hold.firstChild, mainEl.firstChild.nextSibling);
@@ -16199,16 +16199,30 @@ var joinForm = null;
  * invitation; a phone without the app simply stays here. (Once the app
  * is built with verified links, Android opens it by itself and this
  * card is never needed.) */
-var ANDROID_PKG = "com.musab.familynotifier";
+var ANDROID_PKG = "app.family.notifyer";  /* the APP_ID the Android build uses */
+/* Where each kind of device is sent for the app. Fill these in when the
+   listings go live; while one is empty that device keeps the web page.
+   Computers always stay on the web page. */
+var PLAY_URL  = "";  /* https://play.google.com/store/apps/details?id=app.family.notifyer */
+var APPLE_URL = "";  /* https://apps.apple.com/app/id0000000000 */
+function storeUrl(frag){
+  if (isAndroid() && PLAY_URL) {
+    /* Play hands the referrer to the app after install, so the invite survives it. */
+    var ref = encodeURIComponent(String(frag || "").replace(/^#/, ""));
+    return PLAY_URL + (PLAY_URL.indexOf("?") < 0 ? "?" : "&") + "referrer=" + ref;
+  }
+  if (isIOS() && APPLE_URL) return APPLE_URL;
+  return "";
+}
 function appIntentUrl(frag){
   frag = String(frag || "").replace(/^#/, "");
-  var fallback = location.origin + location.pathname + "?" + frag + "&noapp=1";
+  var fallback = storeUrl(frag) || (location.origin + location.pathname + "?" + frag + "&noapp=1");
   return "intent://" + location.host + location.pathname + "?" + frag +
          "#Intent;scheme=https;package=" + ANDROID_PKG +
          ";S.browser_fallback_url=" + encodeURIComponent(fallback) + ";end";
 }
 function paintOpenInApp(main, frag){
-  if (!isAndroid() || APP || isStandalone() || !frag) return;
+  if (!isPhone() || APP || isStandalone() || !frag) return;
   if (/(^|&)noapp=1/.test(location.search || "")) return;
   var card = document.createElement("div"); card.className = "onb";
   var h = document.createElement("h3"); h.textContent = "Have the Family Notifier app?";
@@ -16216,7 +16230,15 @@ function paintOpenInApp(main, frag){
   p.textContent = "Open this invitation in the app instead — calls ring there even with the app closed.";
   var b = document.createElement("a"); b.className = "btn"; b.style.display = "block"; b.style.textAlign = "center";
   b.style.textDecoration = "none"; b.style.boxSizing = "border-box";
-  b.textContent = "Open in the app"; b.href = appIntentUrl(frag);
+  if (isAndroid()) {
+    b.textContent = "Open in the app"; b.href = appIntentUrl(frag);
+  } else {
+    /* iPhone: no app link to try, so straight to the App Store. */
+    if (!APPLE_URL) return;
+    h.textContent = "Get the Family Notifier app";
+    p.textContent = "Install the app from the App Store — calls ring there even with the app closed.";
+    b.textContent = "Open the App Store"; b.href = APPLE_URL;
+  }
   card.appendChild(h); card.appendChild(p); card.appendChild(b);
   main.appendChild(card);
 }
