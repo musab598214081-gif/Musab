@@ -2360,6 +2360,7 @@ Object.assign(AR, {
 "Turn on calls": "تفعيل المكالمات",
 "Turn on": "تفعيل",
 "Send a test notification": "إرسال إشعار تجريبي",
+"Open App Store": "فتح App Store",
 "This phone won't show a ringing call on the lock screen yet. Allow Family Notifier to show full-screen notifications, and calls will ring like a normal phone call.": "لن يعرض هذا الهاتف المكالمة الواردة على شاشة القفل بعد. اسمح لـ Family Notifier بعرض الإشعارات بملء الشاشة، وسترنّ المكالمات مثل مكالمة الهاتف العادية.",
 "Allow full-screen calls": "السماح بالمكالمات بملء الشاشة",
 "On": "مفعّل",
@@ -14329,7 +14330,7 @@ function appUpdater(){
 window.familyUpdate = function(json){
   var d = {}; try { d = JSON.parse(json); } catch (e) { return; }
   appUpdState = d.state || "";
-  if (d.state === "available") appUpd = { code: d.code, name: d.name, notes: d.notes || "" };
+  if (d.state === "available") appUpd = { code: d.code, name: d.name, notes: d.notes || "", store: !!d.store };
   else if (d.state === "downloading" && typeof d.pct === "number" && d.pct >= 0) appUpdPct = d.pct;
   else if (d.state === "none") appUpd = null;
   else if (d.state === "failed") {
@@ -14358,6 +14359,8 @@ function checkUpdate(){
       if (!v || v <= VERSION) { updInfo = null; paintUpdateBar(); return { current: true }; }
       updInfo = { v: v, av: av, wn: wn, html: html };
       paintUpdateBar();
+      /* Just opened and nothing under way: straight into the new version. */
+      if (performance.now() < 60000 && updSafe() && !updTouched) applyUpdate(true);
       return updInfo;
     }).catch(function(){ return null; });
 }
@@ -14373,7 +14376,8 @@ function paintUpdateBar(){
     else if (appUpdState === "installing") t = "Opening the installer…";
     $("updText").textContent = t;
     go.disabled = appUpdState === "downloading" || appUpdState === "installing";
-    go.textContent = L(appUpdState === "downloading" || appUpdState === "installing" ? "Updating…" : "Update");
+    go.textContent = L(appUpdState === "downloading" || appUpdState === "installing" ? "Updating…"
+                       : appUpd.store ? "Open App Store" : "Update");
     return;
   }
   go.disabled = false; go.textContent = L("Update");
@@ -14382,11 +14386,34 @@ function paintUpdateBar(){
       ? "Version " + updInfo.av + " is ready" : "An update is ready") + (updInfo.wn ? " — " + updInfo.wn : "");
 }
 
-function applyUpdate(){
-  if (call || group) { toast("Finish the call first — then Update"); return; }
+/* A new version of the page goes in by itself - nobody has to tap Update -
+   but only at a moment nobody would notice: just after opening, or as the
+   app leaves the screen. Never in a call, while someone is ringing or
+   buzzing, mid-recording, with a message half typed or something open. */
+var updTouched = false;
+document.addEventListener("pointerdown", function(){ updTouched = true; }, true);
+function updSafe(){
+  try {
+    if (call || group || vr) return false;
+    if ($("ring") && $("ring").classList.contains("on")) return false;
+    if ($("chatInput") && $("chatInput").value.trim()) return false;
+    if (topSheet() || $("linkBoxWrap") || viewer) return false;
+    return true;
+  } catch (e) { return false; }
+}
+document.addEventListener("visibilitychange", function(){
+  if (document.hidden && updInfo && !appUpd && updSafe()) applyUpdate(true);
+});
+
+function applyUpdate(quiet){
+  if (quiet !== true) quiet = false;
+  if (call || group) { if (!quiet) toast("Finish the call first — then Update"); return; }
   if (appUpd) {
+    if (quiet) return;          /* the app's own update always waits for its tap */
     var u = appUpdater();
     if (!u) return;
+    /* iPhone: the app's own App Store page, which has the Update button. */
+    if (appUpd.store) { try { u.install(); } catch (e) {} return; }
     saveFlush(); try { chatFlush(); } catch (e) {}
     appUpdState = "downloading"; paintUpdateBar();
     try { u.install(); } catch (e) { appUpdState = ""; paintUpdateBar(); }
@@ -14400,10 +14427,10 @@ function applyUpdate(){
      at the head of the page). */
   if (!shellSane(html)) {
     updInfo = null; paintUpdateBar();
-    toast("That update didn't download properly — it will be offered again later");
+    if (!quiet) toast("That update didn't download properly — it will be offered again later");
     return;
   }
-  $("updGo").disabled = true; $("updGo").textContent = "Updating…";
+  if (!quiet) { $("updGo").disabled = true; $("updGo").textContent = "Updating…"; }
   var jobs = [];
   var key = location.origin + location.pathname;
   if ("caches" in window) jobs.push(caches.open(SHELL_CACHE).then(function(c){
@@ -14423,7 +14450,7 @@ function applyUpdate(){
   }
   Promise.race([Promise.all(jobs), new Promise(function(r){ setTimeout(r, 4000); })]).then(go, go);
 }
-$("updGo").onclick = applyUpdate;
+$("updGo").onclick = function(){ applyUpdate(); };
 function shellSane(html){
   var t = String(html || "");
   if (t.indexOf("</html>") === -1) return false;
