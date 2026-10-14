@@ -6365,6 +6365,10 @@ function audioCtxReset(){
    asked for again - once - rather than sent into the call as silence. */
 function micReady(stream){
   var t = stream.getAudioTracks()[0];
+  /* Speech, not music: the voice codec and the phone's own sound
+     processing tune themselves for a voice (clarity and steadiness over
+     fidelity, and the noise and echo filters at their keenest). */
+  try { if (t && "contentHint" in t) t.contentHint = "speech"; } catch (e) {}
   if (!t || (t.readyState === "live" && !t.muted)) return Promise.resolve(stream);
   return new Promise(function(res){
     var done = false;
