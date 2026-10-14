@@ -1479,6 +1479,8 @@ try { var s = JSON.parse(localStorage.getItem("fmn-launch") || "null");
     <p class="sub" id="fsPushState">—</p>
     <button class="btn" id="fsPushBtn">Turn on calls</button>
     <button class="btn ghost" id="fsPushTest">Send a test notification</button>
+    <p class="notice" id="fsiNote" style="display:none">This phone won't show a ringing call on the lock screen yet. Allow Family Notifier to show full-screen notifications, and calls will ring like a normal phone call.</p>
+    <button class="btn" id="fsiBtn" style="display:none">Allow full-screen calls</button>
     </div>
 
     <div id="silentBlock" data-pages="calls">
@@ -2358,6 +2360,8 @@ Object.assign(AR, {
 "Turn on calls": "تفعيل المكالمات",
 "Turn on": "تفعيل",
 "Send a test notification": "إرسال إشعار تجريبي",
+"This phone won't show a ringing call on the lock screen yet. Allow Family Notifier to show full-screen notifications, and calls will ring like a normal phone call.": "لن يعرض هذا الهاتف المكالمة الواردة على شاشة القفل بعد. اسمح لـ Family Notifier بعرض الإشعارات بملء الشاشة، وسترنّ المكالمات مثل مكالمة الهاتف العادية.",
+"Allow full-screen calls": "السماح بالمكالمات بملء الشاشة",
 "On": "مفعّل",
 "Off — tap to turn on": "متوقف — اضغط للتفعيل",
 "Blocked — tap to fix": "محظور — اضغط للإصلاح",
@@ -4282,7 +4286,18 @@ function paintFsPush(){
   el.textContent = t[fsPushState] || t.unknown;
   if (btn) btn.style.display = (fsPushState === "on" || fsPushState === "nosw" ||
                                 fsPushState === "unsupported") ? "none" : "block";
+  /* Android 14 and later: a call fills the locked screen only once the
+     person allows it, in the phone's settings. */
+  var fsiOff = appFullScreen() === "off";
+  $("fsiNote").style.display = fsiOff ? "block" : "none";
+  $("fsiBtn").style.display = fsiOff ? "block" : "none";
 }
+function appFullScreen(){
+  try { return APP && APP.fullScreenState ? String(APP.fullScreenState()) : "ok"; } catch (e) { return "ok"; }
+}
+$("fsiBtn").onclick = function(){ try { APP.openFullScreen(); } catch (e) {} };
+/* Back from the phone's settings: the button goes once it is allowed. */
+document.addEventListener("visibilitychange", function(){ if (!document.hidden && APP) paintFsPush(); });
 if ("serviceWorker" in navigator) {
   /* A notification tapped while the app is already open: go where it
      points (the answer link, usually) without reloading. */
@@ -11062,9 +11077,12 @@ function closeChat(fromHistory){
   paintCardNotes();
 }
 window.addEventListener("popstate", function(){
-  /* Back closes the photo first, then the conversation. */
-  if (viewer) { viewerClose(true); return; }
-  if (chatOpenId) closeChat(true);
+  /* Back closes the photo first, then the conversation - each only when
+     its own step was left (closing the photo lands on the conversation's
+     step, which keeps the conversation open). */
+  var hs = history.state || {};
+  if (viewer) { if (!hs.fmnView) viewerClose(true); return; }
+  if (chatOpenId && !hs.fmnChat) closeChat(true);
 });
 
 /* ---- The top of a conversation ----
@@ -16502,14 +16520,54 @@ function enableCalls(){
 
 /* -------------------------------------------------------------- wire */
 
-function openSheet(id){ $(id).classList.add("on"); }
-function closeSheet(id){ $(id).classList.remove("on"); }
+/* The sheets open, oldest first - so Back closes the one on top. */
+var sheetsOpen = [];
+function openSheet(id){
+  $(id).classList.add("on");
+  sheetsOpen = sheetsOpen.filter(function(x){ return x !== id; }); sheetsOpen.push(id);
+}
+function closeSheet(id){
+  $(id).classList.remove("on");
+  sheetsOpen = sheetsOpen.filter(function(x){ return x !== id; });
+}
+function topSheet(){
+  for (var i = sheetsOpen.length - 1; i >= 0; i--) if ($(sheetsOpen[i]).classList.contains("on")) return sheetsOpen[i];
+  var on = document.querySelectorAll(".sheet.on");
+  return on.length ? on[on.length - 1].id : null;
+}
+
+/* The phone's Back button or gesture, inside the Android app: whatever is
+   open on top closes, one step at a time, as in any other app - a menu,
+   a photo, a box, a sheet, a settings page back to the menu, then the
+   conversation. True when something closed; false when nothing is open,
+   and the app goes to the home screen. A call or a ringing screen is not
+   closed by Back: the app goes to the home screen and the call goes on. */
+window.familyBack = function(){
+  try {
+    if (cmenuState) { cmenuClose(true); return true; }
+    var box = $("linkBoxWrap");
+    if (box) { box.parentNode.removeChild(box); return true; }
+    if (viewer) { viewerClose(); return true; }
+    var sh = topSheet();
+    if (sh === "setupSheet" && setPageNow !== "home" && setPageNow !== "setup" && state) { setPage("home"); return true; }
+    if (sh) { closeSheet(sh); return true; }
+    if (chatOpenId) {
+      if (vr) { voiceDiscard(); voiceStop(); return true; }
+      if (chatEdit) { chatEditCancel(); return true; }
+      if (!$("chatFind").hidden) { chatSearchClose(); return true; }
+      if (chatReply) { chatReply = null; chatReplyPaint(); return true; }
+      closeChat();
+      return true;
+    }
+  } catch (e) {}
+  return false;
+};
 
 each(document.querySelectorAll("[data-close]"), function(b){
   b.onclick = function(){ closeSheet(b.getAttribute("data-close")); };
 });
 each(document.querySelectorAll(".sheet"), function(s){
-  s.onclick = function(e){ if (e.target === s) s.classList.remove("on"); };
+  s.onclick = function(e){ if (e.target === s) closeSheet(s.id); };
 });
 
 $("settingsBtn").onclick = openSetup;
